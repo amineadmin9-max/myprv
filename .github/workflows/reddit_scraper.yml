@@ -1,0 +1,41 @@
+name: Reddit Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      subreddit:
+        description: 'Subreddit name (without r/)'
+        required: true
+        default: 'game'
+      num_posts:
+        description: 'Number of posts'
+        required: false
+        default: '25'
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Scrape Reddit
+        run: |
+          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddit || 'game' }}" "${{ github.event.inputs.num_posts || '25' }}"
+
+      - name: Commit results
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add data/*.json
+          git diff --cached --quiet || git commit -m "Update r/${{ github.event.inputs.subreddit || 'game' }} data"
+          git push
