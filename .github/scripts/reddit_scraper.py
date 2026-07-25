@@ -22,7 +22,6 @@ def scrape_reddit(subreddit, num_posts=50):
 
     urls = [
         f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}",
-        f"https://old.reddit.com/r/{subreddit}/.rss?limit={num_posts}",
     ]
 
     for rss_url in urls:
@@ -31,6 +30,12 @@ def scrape_reddit(subreddit, num_posts=50):
             print(f"  URL: {rss_url} -> Status: {r.status_code}, Length: {len(r.text)}")
             if r.status_code == 200 and "<entry>" in r.text:
                 return parse_rss(r.text, subreddit, num_posts)
+            elif r.status_code == 429:
+                print(f"  Rate limited, waiting...")
+                time.sleep(5)
+                r2 = requests.get(rss_url, headers=headers, timeout=15)
+                if r2.status_code == 200 and "<entry>" in r2.text:
+                    return parse_rss(r2.text, subreddit, num_posts)
         except Exception as e:
             print(f"  Error: {e}")
             continue
