@@ -564,28 +564,36 @@ function classifyNicheType(title,source,cachedTrends){
     if(tLower.includes(titleLower)||titleLower.includes(tLower)){inTrends=true;break;}
   }
   if(source==='Google Trends')inTrends=true;
-  if(inTrends&&source==='Reddit Unmet Demand')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
-  if(inTrends)return{type:'trending',label:'Trending',color:'#8b5cf6'};
-  if(source==='Reddit Unmet Demand')return{type:'evergreen',label:'Evergreen',color:'#10b981'};
+
+  const trendKW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative','hot','buzz','fad'];
+  const evergreenKW=['best','how to','guide','tutorial','review','comparison','vs','alternative','maintenance','care','essential','classic','traditional','durable','quality'];
+  const hasTrendKW=trendKW.some(kw=>titleLower.includes(kw));
+  const hasEvergreenKW=evergreenKW.some(kw=>titleLower.includes(kw));
+
+  if(inTrends&&hasEvergreenKW)return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
+  if(inTrends||hasTrendKW)return{type:'trending',label:'Trending',color:'#8b5cf6'};
+  if(source==='Reddit Unmet Demand'||hasEvergreenKW)return{type:'evergreen',label:'Evergreen',color:'#10b981'};
   return{type:'general',label:'General',color:'#64748b'};
 }
 
 async function classifyTrendingAI(topic,trendsIdeas){
   const trendList=trendsIdeas.slice(0,20).map(t=>`- ${t.title} (${t.traffic||'N/A'})`).join('\n');
-  const prompt=`Analyze if this niche topic is "Trending" or "Evergreen" based on current Google Trends data.
+  const prompt=`Classify this niche topic into ONE of these categories based on current Google Trends and topic characteristics.
 
 Niche topic: "${topic}"
 
 Current Google Trends (top 20):
 ${trendList||'No trends data available'}
 
-Rules:
-- "Trending" = topic has rising momentum, appears in current trends, or is time-sensitive
-- "Evergreen" = topic is a persistent need, not time-dependent, from ongoing demand
-- "Hybrid" = shows both trending signals and evergreen demand
+Classification rules:
+- "trending": Topic has rising momentum, appears in current trends, time-sensitive, viral, new technology, seasonal
+- "evergreen": Topic is a persistent need, not time-dependent, ongoing demand, evergreen hobby, essential product
+- "hybrid": Shows both trending signals AND evergreen demand
 
-Return ONLY a JSON object:
-{"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":0-100}`;
+IMPORTANT: You MUST return exactly ONE of: "trending", "evergreen", or "hybrid"
+
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":50}`;
 
   const result=await callOpenRouter(prompt);
   if(!result)return null;
@@ -595,7 +603,12 @@ Return ONLY a JSON object:
     if(d.type==='trending')return{type:'trending',label:'Trending',color:'#8b5cf6',reason:d.reason,confidence:d.confidence};
     if(d.type==='hybrid')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:d.reason,confidence:d.confidence};
     return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:d.reason,confidence:d.confidence};
-  }catch(e){return null;}
+  }catch(e){
+    const lower=result.toLowerCase();
+    if(lower.includes('trending')&&!lower.includes('evergreen'))return{type:'trending',label:'Trending',color:'#8b5cf6',reason:'AI classified as trending',confidence:60};
+    if(lower.includes('hybrid'))return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:'AI classified as hybrid',confidence:60};
+    return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:'AI classified as evergreen',confidence:60};
+  }
 }
 
 async function computeTrafficLight(posts){
