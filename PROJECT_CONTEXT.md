@@ -36,21 +36,16 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - **Fallback chain**: 7 free models with automatic switching on failure/rate-limit
 - User rule: LLM is for **analysis only**, NOT content generation
 
-### Fallback Chain (LLM_MODELS array)
-1. `meta-llama/llama-3.3-70b-instruct:free` — primary model
-2. `qwen/qwen-2.5-72b-instruct:free` — strong fallback
-3. `nvidia/nemotron-3-super-120b-a12b:free` — 120B, structured outputs
-4. `google/gemma-4-31b-it:free` — Google quality, response_format
-5. `openai/gpt-oss-20b:free` — OpenAI, structured outputs
-6. `nvidia/nemotron-nano-9b-v2:free` — lightweight, fast
-7. `openrouter/free` — meta-router (picks best available)
+### Fallback Chain
+- **Removed** — now uses `openrouter/free` (auto-router) exclusively
+- OpenRouter picks the best available free model automatically
+- Real model name is logged from `response.model` on each call
 
 ### Fallback Logic
-- Tries models in order from index 0 to 6
-- On 429 (rate limit) or any error → moves to next model
-- Logs each attempt and success/failure
-- `llmStats.lastModel` tracks which model actually worked
-- All models are free (no cost)
+- Uses `openrouter/free` — auto-router picks best available free model
+- On success: logs real model name from `response.model`
+- On failure: prints full raw error (status code + body) — no assumptions
+- `llmStats.lastModel` tracks which model actually responded
 
 ## Architecture (docs/index.html)
 ### Pages (bottom nav: 2 tabs)
@@ -66,8 +61,8 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - **OpenRouter API Stats panel**: shows Total/OK/Fail + first raw error in results
 
 ### Key Functions
-- `callOpenRouter(prompt, timeoutMs)` — calls OpenRouter API with fallback to backup model
-- `_llmFetch(model, prompt, timeoutMs)` — low-level LLM fetch helper
+- `callOpenRouter(prompt, timeoutMs)` — calls OpenRouter with `openrouter/free`, logs real model name
+- `_llmFetch(model, prompt, timeoutMs)` — low-level LLM fetch, returns `{content, realModel}` or error with full raw status
 - `extractTopic(post)` — AI analyzes Reddit post → clean topic name (uses callOpenRouter)
 - `batchClassify(posts)` — AI classifies 10 posts at once (promo/edu/story/interactive scores 0-100)
 - `classifyTrendingAI(topic, trendsIdeas)` — AI determines Trending vs Evergreen
@@ -87,7 +82,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 
 ### Constants
 - `PROXIES` — CORS proxy URLs (corsproxy.io, codetabs)
-- `LLM_BASE`, `LLM_MODEL`, `FALLBACK_MODEL` — OpenRouter config
+- `LLM_BASE`, `LLM_MODEL` — OpenRouter config (`openrouter/free`)
 - `SEED_SUBS` — ['findareddit','whatisthisthing','DoesAnybodyElse','AskReddit']
 - `PROMO_KW`, `DISCUSSION_KW`, `STORY_KW`, `DEMAND_KW`, `COMMERCIAL_KW`, `TREND_KW` — keyword arrays
 - `GARBAGE` — set of meaningless words for topic validation
@@ -136,8 +131,10 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `.github/workflows/reddit_scraper.yml` — GitHub Actions scraper
 
 ## Recent Commits (newest first)
+- Switched to `openrouter/free` auto-router (no more hardcoded model list)
+- Added real model name logging from `response.model`
+- Added full raw error logging (status code + body) on failure
 - Switched from DeepSeek to OpenRouter (meta-llama/llama-3.3-70b-instruct:free)
-- Added fallback model (qwen/qwen-2.5-72b-instruct:free) for 429/error handling
 - Reduced LLM calls: 10 posts max per search, 10 batch classify
 - Cleaned up all Gemini/DeepSeek naming to generic LLM/OpenRouter
 - API key now stored in localStorage (not hardcoded)
