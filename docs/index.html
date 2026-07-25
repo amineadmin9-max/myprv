@@ -352,7 +352,7 @@ function setStatus(msg){document.getElementById('status').textContent=msg;}
 function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 
-async function callGemini(prompt,timeoutMs=30000){
+async function callGemini(prompt,timeoutMs=20000){
   const key=getGeminiKey();
   if(!key){geminiStats.total++;geminiStats.fail++;if(!geminiStats.firstError)geminiStats.firstError='No API key set in localStorage';return null;}
   geminiStats.total++;
@@ -765,7 +765,7 @@ Post title: "${post.title}"
 Post content: "${(post.content||'').slice(0,300)}"
 
 Answer only "yes" or "no".`;
-  const result=await callGemini(prompt,20000);
+  const result=await callGemini(prompt,10000);
   if(result){
     const answer=result.toLowerCase().trim();
     if(answer.includes('no')&&!answer.includes('yes')){
@@ -843,20 +843,29 @@ function extractCleanTopic(title,content){
 
 async function fetchSeedsFromReddit(){
   const allSeeds=[];const seen=new Set();
+  let geminiValidated=0;const GEMINI_CAP=20;
   for(const sub of SEED_SUBS){
     try{
-      const url=`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=25&t=month`;
+      const url=`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
       const data=await fetchWithProxyJSON(url);
       if(data?.data?.children){
         for(const child of data.data.children){
           const p=child.data;
           if(p.stickied||p.score<0)continue;
+          if(geminiValidated>=GEMINI_CAP){allSeeds.push({post:{title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},title:null,originalTitle:p.title,subreddit:p.subreddit,url:'https://reddit.com'+p.permalink,content:p.selftext||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(p.title,p.selftext||'')});continue;}
+          setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${p.title.slice(0,50)}...`);
           await processSeedPost({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},seen,allSeeds);
+          geminiValidated++;
         }
       }else{
-        const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=25&t=month`;
+        const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
         const xml=await fetchWithProxy(rssUrl);
-        if(xml){const posts=parseRSS(xml);for(const post of posts)await processSeedPost(post,seen,allSeeds);}
+        if(xml){const posts=parseRSS(xml);for(const post of posts){
+          if(geminiValidated>=GEMINI_CAP){allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});continue;}
+          setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${post.title.slice(0,50)}...`);
+          await processSeedPost(post,seen,allSeeds);
+          geminiValidated++;
+        }}
       }
     }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
   }
