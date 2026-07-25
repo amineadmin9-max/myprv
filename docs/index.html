@@ -186,9 +186,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
     </div>
     <div class="dropdown" id="dropdownMenu">
-      <div class="dropdown-item" onclick="openGeminiModal()">
+      <div class="dropdown-item" onclick="openAPIKeyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Add DeepSeek API
+        Add OpenRouter API
       </div>
       <div class="dropdown-item" onclick="openAboutModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -197,19 +197,19 @@
     </div>
   </div>
 
-  <!-- Modal: Gemini API Key -->
-  <div class="modal-overlay hidden" id="geminiModal" onclick="closeModalBg(event)">
+  <!-- Modal: OpenRouter API Key -->
+  <div class="modal-overlay hidden" id="apiKeyModal" onclick="closeModalBg(event)">
     <div class="modal-box">
-      <div id="geminiFormView">
-        <h2>DeepSeek API Key</h2>
-        <p>Paste your DeepSeek API key to enable AI-powered analysis. Your key is stored locally in your browser only.</p>
-        <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIza...">
+      <div id="apiKeyFormView">
+        <h2>OpenRouter API Key</h2>
+        <p>Paste your OpenRouter API key to enable AI-powered analysis. Your key is stored locally in your browser only.</p>
+        <input type="password" class="modal-input" id="apiKeyInput" placeholder="sk-or-...">
         <div class="modal-actions">
-          <button class="modal-btn ghost" onclick="closeGeminiModal()">Cancel</button>
-          <button class="modal-btn primary" onclick="saveGeminiKey()">Save</button>
+          <button class="modal-btn ghost" onclick="closeAPIKeyModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveAPIKey()">Save</button>
         </div>
       </div>
-      <div class="modal-saved" id="geminiSaved">
+      <div class="modal-saved" id="apiKeySaved">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
         Key saved & active
       </div>
@@ -220,7 +220,7 @@
   <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <h2>Niche Finder</h2>
-      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, Google Trends, and DeepSeek AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.1</span> — AI-powered topic extraction & classification</p>
+      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, Google Trends, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.2</span> — OpenRouter + AI-powered topic extraction & classification</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
@@ -334,11 +334,18 @@
 <script>
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
-// const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
-// function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
-const LLM_BASE='https://api.deepseek.com/v1/chat/completions';
-const LLM_MODEL='deepseek-chat';
-const LLM_KEY='sk-650eb287574247908a035aa3072c993e';
+const LLM_BASE='https://openrouter.ai/api/v1/chat/completions';
+const LLM_MODELS=[
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-31b-it:free',
+  'openai/gpt-oss-20b:free',
+  'nvidia/nemotron-nano-9b-v2:free',
+  'openrouter/free'
+];
+function getAPIKey(){return localStorage.getItem('nf_openrouter_key')||'';}
+function getLLMKey(){return getAPIKey();}
 const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
 const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
 const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
@@ -346,8 +353,8 @@ const DEMAND_KW=['does anyone know','looking for','wish there was','is there a p
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
 
-let geminiStats={total:0,ok:0,fail:0,firstError:null};
-function resetGeminiStats(){geminiStats={total:0,ok:0,fail:0,firstError:null};}
+let llmStats={total:0,ok:0,fail:0,firstError:null,lastModel:null};
+function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastModel:null};}
 
 // ===================== HELPERS =====================
 function countKW(text,kw){return kw.filter(k=>text.toLowerCase().includes(k)).length;}
@@ -357,57 +364,58 @@ function showProgress(pct){document.getElementById('progressBar').classList.remo
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
-async function callDeepSeek(prompt,timeoutMs=30000){
-  geminiStats.total++;
-  const body={model:LLM_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
-  const headers={'Content-Type':'application/json','Authorization':`Bearer ${LLM_KEY}`};
+async function _llmFetch(model,prompt,timeoutMs){
+  const body={model,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  const headers={'Content-Type':'application/json','Authorization':`Bearer ${getLLMKey()}`};
   const fetchOpts={method:'POST',headers,body:JSON.stringify(body)};
   try{
     const r=await fetch(LLM_BASE,{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
     const rawText=await r.text();
     if(rawText.startsWith('{')||rawText.startsWith('[')){
       const d=JSON.parse(rawText);
-      if(d.choices&&d.choices[0]?.message?.content){geminiStats.ok++;return d.choices[0].message.content.trim();}
-      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status}\nParsed but no content\nRaw: ${JSON.stringify(d).slice(0,600)}`;
-    }else{
-      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
+      if(d.choices&&d.choices[0]?.message?.content)return d.choices[0].message.content.trim();
     }
-  }catch(e){
-    if(!geminiStats.firstError)geminiStats.firstError=`Direct: ${e.constructor.name}: ${e.message}`;
-  }
-  for(const proxy of PROXIES){
-    try{
-      const r=await fetch(proxy+encodeURIComponent(LLM_BASE),{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
-      const rawText=await r.text();
-      if(!rawText.startsWith('{')&&!rawText.startsWith('[')){
-        if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
-        continue;
-      }
-      const d=JSON.parse(rawText);
-      if(d.choices&&d.choices[0]?.message?.content){geminiStats.ok++;return d.choices[0].message.content.trim();}
-      if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status}\nParsed but no content\nRaw: ${JSON.stringify(d).slice(0,600)}`;
-    }catch(e){
-      if(!geminiStats.firstError){
-        let detail=`Proxy: ${proxy}\n${e.constructor.name}: ${e.message||e.toString()}`;
-        try{detail+=`\nFull stack: ${e.stack||'N/A'}`;}catch(x){}
-        geminiStats.firstError=detail;
-      }
+    return{status:r.status,body:rawText.slice(0,300)};
+  }catch(e){return{error:e.constructor.name,msg:e.message};}
+}
+
+async function callOpenRouter(prompt,timeoutMs=30000){
+  llmStats.total++;
+  for(let i=0;i<LLM_MODELS.length;i++){
+    const model=LLM_MODELS[i];
+    console.log(`[LLM] Trying model ${i+1}/${LLM_MODELS.length}: ${model}`);
+    const result=await _llmFetch(model,prompt,timeoutMs);
+    if(typeof result==='string'){
+      llmStats.ok++;
+      llmStats.lastModel=model;
+      if(i>0)console.log(`[LLM] Fallback success with ${model} after ${i} failures`);
+      return result;
+    }
+    const status=result.status||0;
+    const err=result.error||result.body||'unknown';
+    console.log(`[LLM] Model ${model} failed: ${status} ${err}`);
+    if(status===429||result.error){
+      console.log(`[LLM] Rate limited or error, trying next model...`);
+      continue;
+    }
+    if(status>=400&&status<500&&status!==429){
+      console.log(`[LLM] Client error ${status}, trying next model...`);
       continue;
     }
   }
-  geminiStats.fail++;
+  if(!llmStats.firstError)llmStats.firstError=`All ${LLM_MODELS.length} models failed`;
+  llmStats.fail++;
   return null;
 }
-// async function callGemini(prompt,timeoutMs=25000){ /* SEE callDeepSeek above */ }
 
-function saveGeminiKey(){
-  const key=document.getElementById('geminiKeyInput').value.trim();
+function saveAPIKey(){
+  const key=document.getElementById('apiKeyInput').value.trim();
   if(!key){alert('Enter a valid key');return;}
-  localStorage.setItem('nf_gemini_key',key);
-  document.getElementById('geminiFormView').style.display='none';
-  const saved=document.getElementById('geminiSaved');
+  localStorage.setItem('nf_openrouter_key',key);
+  document.getElementById('apiKeyFormView').style.display='none';
+  const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('geminiFormView').style.display='';document.getElementById('geminiModal').classList.add('hidden');document.getElementById('geminiKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('apiKeyInput').value='';},1500);
 }
 
 function toggleDropdown(e){
@@ -416,10 +424,10 @@ function toggleDropdown(e){
   dd.classList.toggle('show');
 }
 
-function openGeminiModal(){
+function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
-  document.getElementById('geminiModal').classList.remove('hidden');
-  document.getElementById('geminiKeyInput').value=getGeminiKey();
+  document.getElementById('apiKeyModal').classList.remove('hidden');
+  document.getElementById('apiKeyInput').value=getAPIKey();
 }
 
 function openAboutModal(){
@@ -427,22 +435,25 @@ function openAboutModal(){
   document.getElementById('aboutModal').classList.remove('hidden');
 }
 
-function closeGeminiModal(){document.getElementById('geminiModal').classList.add('hidden');}
+function closeAPIKeyModal(){document.getElementById('apiKeyModal').classList.add('hidden');}
 
 function closeModalBg(e){if(e.target===e.currentTarget)e.target.classList.add('hidden');}
 
 document.addEventListener('click',()=>{const dd=document.getElementById('dropdownMenu');if(dd)dd.classList.remove('show');});
 
-function renderGeminiStats(){
-  const s=geminiStats;
+function renderLLMStats(){
+  const s=llmStats;
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">First error raw:</b>\n${s.firstError}</div>`:'<div style="margin-top:8px;color:var(--green);font-size:11px">No errors captured</div>';
+  const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Last used: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
   return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
-    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">DeepSeek API Stats (this run)</div>
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">OpenRouter API Stats (this run)</div>
     <div style="display:flex;justify-content:center;gap:20px;font-size:13px">
       <span>Total: <b style="color:var(--text)">${s.total}</b></span>
       <span style="color:var(--green)">OK: <b>${s.ok}</b></span>
       <span style="color:var(--red-icon)">Fail: <b>${s.fail}</b></span>
     </div>
+    <div style="margin-top:4px;font-size:10px;color:var(--text-dim);text-align:center">${LLM_MODELS.length} models in fallback chain</div>
+    ${modelHtml}
     ${errHtml}
   </div>`;
 }
@@ -474,7 +485,7 @@ function classify(title,selftext){
   return{promoScore,eduScore,storyScore,interactiveScore};
 }
 
-async function geminiClassifyPost(post){
+async function classifyPost(post){
   const prompt=`Analyze this Reddit post and return a JSON object with promo analysis.
 Post title: "${post.title}"
 Post content: "${(post.content||post.selftext||'').slice(0,400)}"
@@ -489,7 +500,7 @@ Scoring guide:
 - story: 0=factual question, 100=personal experience/story
 - interactive: 0=statement, 100=engaging question`;
 
-  const result=await callDeepSeek(prompt);
+  const result=await callOpenRouter(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -498,7 +509,7 @@ Scoring guide:
   }catch(e){return null;}
 }
 
-async function geminiBatchClassify(posts){
+async function batchClassify(posts){
   const prompt=`Analyze these ${posts.length} Reddit posts and classify each for promotional content.
 For each post, return a JSON array with promo scores.
 
@@ -514,7 +525,7 @@ Scoring:
 - story: 0=factual question, 100=personal experience
 - interactive: 0=statement, 100=engaging question`;
 
-  const result=await callDeepSeek(prompt);
+  const result=await callOpenRouter(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -561,7 +572,7 @@ function classifyNicheType(title,source,cachedTrends){
   return{type:'general',label:'General',color:'#64748b'};
 }
 
-async function geminiClassifyTrending(topic,trendsIdeas){
+async function classifyTrendingAI(topic,trendsIdeas){
   const trendList=trendsIdeas.slice(0,20).map(t=>`- ${t.title} (${t.traffic||'N/A'})`).join('\n');
   const prompt=`Analyze if this niche topic is "Trending" or "Evergreen" based on current Google Trends data.
 
@@ -578,7 +589,7 @@ Rules:
 Return ONLY a JSON object:
 {"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":0-100}`;
 
-  const result=await callDeepSeek(prompt);
+  const result=await callOpenRouter(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -595,8 +606,8 @@ async function computeTrafficLight(posts){
 
   let classResults=null;
   try{
-    const batch=posts.slice(0,15);
-    classResults=await geminiBatchClassify(batch);
+    const batch=posts.slice(0,10);
+    classResults=await batchClassify(batch);
   }catch(e){classResults=null;}
 
   const promo=posts.filter((p,i)=>{
@@ -660,7 +671,7 @@ async function fetchWithProxyJSON(url){
 }
 
 async function searchReddit(keyword){
-  const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=50&t=month`;
+  const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=10&t=month`;
   const xml=await fetchWithProxy(url);
   if(!xml)throw new Error('Could not reach Reddit.');
   const posts=parseRSS(xml);
@@ -711,7 +722,7 @@ const Q_PATTERNS=[
   /best .+ for/i,
 ];
 
-async function geminiExtractTopic(post){
+async function extractTopic(post){
   const prompt=`Analyze this Reddit post and extract a clean, concise niche topic name (2-5 words).
 Post title: "${post.title}"
 Post content: "${(post.content||'').slice(0,300)}"
@@ -735,19 +746,19 @@ Rules:
 - If unsure, return "SKIP"`;
 
   for(let attempt=1;attempt<=2;attempt++){
-    const result=await callDeepSeek(prompt,45000);
+    const result=await callOpenRouter(prompt,45000);
     if(result){
       const cleaned=result.replace(/^["']|["']$/g,'').replace(/\n/g,' ').trim();
       if(cleaned==='SKIP'||cleaned.length<3||cleaned.length>60){
-        console.log(`[Gemini Topic] Attempt ${attempt}: invalid result "${cleaned.slice(0,40)}" for "${post.title.slice(0,40)}"`);
+        console.log(`[LLM Topic] Attempt ${attempt}: invalid result "${cleaned.slice(0,40)}" for "${post.title.slice(0,40)}"`);
         return null;
       }
-      console.log(`[Gemini Topic] Attempt ${attempt}: OK → "${cleaned}"`);
+      console.log(`[LLM Topic] Attempt ${attempt}: OK → "${cleaned}"`);
       return cleaned;
     }
-    console.log(`[Gemini Topic] Attempt ${attempt}: null response for "${post.title.slice(0,50)}"`);
+    console.log(`[LLM Topic] Attempt ${attempt}: null response for "${post.title.slice(0,50)}"`);
   }
-  console.log(`[Gemini Topic] FAILED after 2 attempts: "${post.title.slice(0,60)}"`);
+  console.log(`[LLM Topic] FAILED after 2 attempts: "${post.title.slice(0,60)}"`);
   return null;
 }
 
@@ -783,16 +794,16 @@ Post title: "${post.title}"
 Post content: "${(post.content||'').slice(0,300)}"
 
 Answer only "yes" or "no".`;
-  const result=await callDeepSeek(prompt,10000);
+  const result=await callOpenRouter(prompt,10000);
   if(result){
     const answer=result.toLowerCase().trim();
     if(answer.includes('no')&&!answer.includes('yes')){
-      console.log(`[Unmet Demand] FILTERED (Gemini=no): "${post.title.slice(0,55)}"`);
+      console.log(`[Unmet Demand] FILTERED (LLM=no): "${post.title.slice(0,55)}"`);
       return;
     }
-    console.log(`[Unmet Demand] PASSED (Gemini=yes): "${post.title.slice(0,55)}"`);
+    console.log(`[Unmet Demand] PASSED (LLM=yes): "${post.title.slice(0,55)}"`);
   }else{
-    console.log(`[Unmet Demand] Gemini null, REJECTING: "${post.title.slice(0,55)}"`);
+    console.log(`[Unmet Demand] LLM null, REJECTING: "${post.title.slice(0,55)}"`);
     return;
   }
   allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});
@@ -861,7 +872,7 @@ function extractCleanTopic(title,content){
 
 async function fetchSeedsFromReddit(){
   const allSeeds=[];const seen=new Set();
-  let geminiValidated=0;const GEMINI_CAP=20;
+  let llmValidated=0;const LLM_CAP=10;
   for(const sub of SEED_SUBS){
     try{
       const url=`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
@@ -870,35 +881,35 @@ async function fetchSeedsFromReddit(){
         for(const child of data.data.children){
           const p=child.data;
           if(p.stickied||p.score<0)continue;
-          if(geminiValidated>=GEMINI_CAP){allSeeds.push({post:{title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},title:null,originalTitle:p.title,subreddit:p.subreddit,url:'https://reddit.com'+p.permalink,content:p.selftext||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(p.title,p.selftext||'')});continue;}
-          setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${p.title.slice(0,50)}...`);
+          if(llmValidated>=LLM_CAP){allSeeds.push({post:{title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},title:null,originalTitle:p.title,subreddit:p.subreddit,url:'https://reddit.com'+p.permalink,content:p.selftext||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(p.title,p.selftext||'')});continue;}
+          setStatus(`Filtering [${llmValidated}/${LLM_CAP}]: ${p.title.slice(0,50)}...`);
           await processSeedPost({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},seen,allSeeds);
-          geminiValidated++;
+          llmValidated++;
           await delay(250);
         }
       }else{
         const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
         const xml=await fetchWithProxy(rssUrl);
         if(xml){const posts=parseRSS(xml);for(const post of posts){
-          if(geminiValidated>=GEMINI_CAP){allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});continue;}
-          setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${post.title.slice(0,50)}...`);
+          if(llmValidated>=LLM_CAP){allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});continue;}
+          setStatus(`Filtering [${llmValidated}/${LLM_CAP}]: ${post.title.slice(0,50)}...`);
           await processSeedPost(post,seen,allSeeds);
-          geminiValidated++;
+          llmValidated++;
           await delay(250);
         }}
       }
     }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
   }
 
-  setStatus(`Analyzing ${allSeeds.length} posts with DeepSeek...`);
+  setStatus(`Analyzing ${allSeeds.length} posts with OpenRouter...`);
   const enriched=[];
   for(let i=0;i<allSeeds.length;i++){
     const seed=allSeeds[i];
     setStatus(`[${i+1}/${allSeeds.length}] Analyzing: ${seed.originalTitle.slice(0,60)}...`);
     try{
-      const geminiTopic=await geminiExtractTopic(seed.post||{title:seed.originalTitle,content:seed.content,subreddit:seed.subreddit});
-      if(geminiTopic){
-        seed.title=geminiTopic;
+      const topicName=await extractTopic(seed.post||{title:seed.originalTitle,content:seed.content,subreddit:seed.subreddit});
+      if(topicName){
+        seed.title=topicName;
         enriched.push(seed);
       }else{
         const fallback=extractCleanTopic(seed.originalTitle,seed.content);
@@ -1005,7 +1016,7 @@ function renderSearchResult(keyword,scoring,posts){
 
 // ===================== FULL DISCOVERY =====================
 async function runFullDiscovery(){
-  resetGeminiStats();
+  resetLLMStats();
   const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
@@ -1039,8 +1050,8 @@ async function runFullDiscovery(){
 
         let nicheType=classifyNicheType(top[i].title,top[i].sources?.[0]||'manual',cachedTrendsIdeas);
         try{
-          const geminiType=await geminiClassifyTrending(top[i].title,cachedTrendsIdeas);
-          if(geminiType)nicheType=geminiType;
+          const aiType=await classifyTrendingAI(top[i].title,cachedTrendsIdeas);
+          if(aiType)nicheType=aiType;
         }catch(e){}
 
         results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType,sources:top[i].sources,relatedSubs:top[i].relatedSubs||[]});
@@ -1055,8 +1066,8 @@ async function runFullDiscovery(){
 
 function renderDiscoveryResults(results){
   const el=document.getElementById('results');
-  if(!results.length){el.innerHTML=renderGeminiStats()+'<div class="error">No results found.</div>';return;}
-  const header=renderGeminiStats()+`<div style="text-align:center;margin-bottom:20px;padding:16px;background:var(--card);border-radius:20px;border:1px solid var(--border)">
+  if(!results.length){el.innerHTML=renderLLMStats()+'<div class="error">No results found.</div>';return;}
+  const header=renderLLMStats()+`<div style="text-align:center;margin-bottom:20px;padding:16px;background:var(--card);border-radius:20px;border:1px solid var(--border)">
     <h2 style="color:var(--green);font-size:20px;margin-bottom:5px">Discovery Results</h2>
     <p style="color:var(--text-dim);font-size:13px">${results.length} viable niches found - ranked best to worst</p>
   </div>`;
