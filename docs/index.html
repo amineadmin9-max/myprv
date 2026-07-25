@@ -1,927 +1,724 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Niche Finder</title>
-    <link rel="manifest" href="manifest.json">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; }
-        .container { max-width: 500px; margin: 0 auto; padding: 20px; padding-top: 50px; }
-        h1 { text-align: center; font-size: 28px; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; font-size: 14px; }
-        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; font-size: 16px; margin-bottom: 10px; }
-        button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #3b82f6; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
-        button:disabled { opacity: 0.5; }
-        .status { text-align: center; color: #94a3b8; margin: 10px 0; font-size: 13px; min-height: 20px; }
-        .progress-bar { width: 100%; height: 4px; background: #334155; border-radius: 2px; margin: 10px 0; overflow: hidden; }
-        .progress-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s; }
-        .legend { background: #1e293b; border-radius: 12px; padding: 16px; margin: 20px 0; }
-        .legend-title { font-weight: bold; margin-bottom: 10px; }
-        .legend-item { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; color: #94a3b8; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-        .results { margin-top: 20px; }
-        .card { background: #1e293b; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 2px solid; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .card-title { font-size: 18px; font-weight: bold; }
-        .badge { border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: bold; }
-        .stats { display: flex; justify-content: space-between; margin: 12px 0; }
-        .stat { text-align: center; }
-        .stat-val { font-size: 18px; font-weight: bold; }
-        .stat-lbl { font-size: 10px; color: #64748b; }
-        .posts { margin-top: 12px; }
-        .post { background: #0f172a; border-radius: 10px; padding: 12px; margin-bottom: 8px; }
-        .post-title { font-size: 13px; margin-bottom: 6px; line-height: 1.4; }
-        .post-stats { font-size: 11px; color: #94a3b8; }
-        .post-link { color: #3b82f6; font-size: 12px; text-decoration: none; }
-        .green { border-color: #22c55e; }
-        .yellow { border-color: #eab308; }
-        .red { border-color: #ef4444; }
-        .green-bg { background: #052e16; color: #4ade80; }
-        .yellow-bg { background: #422006; color: #facc15; }
-        .red-bg { background: #450a0a; color: #f87171; }
-        .loading { text-align: center; padding: 40px; }
-        .spinner { border: 3px solid #334155; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .hidden { display: none; }
-        .error { color: #f87171; text-align: center; padding: 20px; }
-        .mode-toggle { display: flex; gap: 8px; margin-bottom: 15px; }
-        .mode-btn { flex: 1; padding: 12px; border-radius: 12px; border: 2px solid #334155; background: #1e293b; color: #94a3b8; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-        .mode-btn.active { border-color: #3b82f6; background: #1e3a5f; color: #f8fafc; }
-        .mode-btn:hover { border-color: #3b82f6; }
-        .auto-panel { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 15px; }
-        .auto-panel h3 { font-size: 14px; margin-bottom: 10px; color: #3b82f6; }
-        .auto-panel p { font-size: 12px; color: #94a3b8; margin-bottom: 10px; line-height: 1.5; }
-        .seed-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .seed-chip { background: #0f172a; border: 1px solid #334155; border-radius: 20px; padding: 6px 12px; font-size: 12px; color: #94a3b8; cursor: pointer; transition: all 0.2s; }
-        .seed-chip:hover { border-color: #3b82f6; color: #f8fafc; }
-        .seed-chip.selected { background: #3b82f6; color: white; border-color: #3b82f6; }
-        .trending-list { max-height: 200px; overflow-y: auto; }
-        .trending-item { padding: 8px 12px; background: #0f172a; border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; }
-        .trending-item:hover { background: #1e3a5f; }
-        .trending-item .source { font-size: 10px; color: #64748b; }
-        .generate-btn { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .generate-btn:disabled { opacity: 0.5; }
-        .niche-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; margin-left: 6px; }
-        .niche-trending { background: #7c3aed; color: #e9d5ff; }
-        .niche-evergreen { background: #059669; color: #d1fae5; }
-        .niche-hybrid { background: #d97706; color: #fef3c7; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Niche Finder</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --bg:#0a0e1a;--card:#10162a;--card-2:#131a30;--border:#1f2740;
+    --blue:#3b6bf5;--blue-light:#1b2a52;--text:#f4f6fb;--text-dim:#8b93ab;
+    --red:#7a1f2b;--red-icon:#ff5566;--green:#22c55e;--yellow:#eab308;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;height:100%;}
+  body{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;}
+
+  .page{flex:1;display:none;flex-direction:column;padding:10px 20px 90px;animation:fadeIn .25s ease;}
+  .page.active{display:flex;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .header-row{display:flex;justify-content:flex-end;align-items:center;margin-bottom:6px;}
+  .add-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .cancel-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .add-btn svg,.cancel-btn svg,.search-box button svg,.sim-btn svg,.del-btn svg{width:18px;height:18px;}
+
+  h1.title{font-size:34px;font-weight:800;margin:10px 0 22px;line-height:1.2;}
+
+  .create-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px 20px;margin-bottom:18px;}
+  .create-card h2{color:var(--blue);font-size:18px;font-weight:700;text-align:center;margin-bottom:20px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;color:var(--text-dim);font-size:13px;margin-bottom:8px;}
+  .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-size:15px;outline:none;}
+  .field input::placeholder{color:var(--text-dim);opacity:.7;}
+  .field input:focus,.field select:focus{border-color:var(--blue);}
+  .field select option{background:var(--bg);color:var(--text);}
+
+  .create-actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
+  .save-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;}
+  .freq-group{display:flex;gap:8px;}
+  .freq-btn{background:var(--bg);color:var(--text-dim);border:1px solid var(--border);border-radius:999px;padding:11px 18px;font-size:14px;cursor:pointer;}
+  .freq-btn.active{color:var(--blue);border-color:var(--blue);}
+
+  .channel-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:22px 20px;margin-bottom:18px;}
+  .channel-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .channel-name{font-size:20px;font-weight:700;}
+  .badge{background:var(--blue-light);color:#7fa1ff;font-size:13px;padding:7px 14px;border-radius:999px;white-space:nowrap;font-family:monospace;}
+  .meta{color:var(--text-dim);font-size:14px;margin-bottom:18px;}
+  .channel-bottom{display:flex;justify-content:space-between;align-items:center;}
+  .toggle-wrap{display:flex;align-items:center;gap:8px;}
+  .toggle-label{color:var(--text-dim);font-size:14px;}
+  .switch{position:relative;width:52px;height:30px;background:var(--blue);border-radius:999px;cursor:pointer;transition:background .2s;}
+  .switch.off{background:#2a3350;}
+  .switch .knob{position:absolute;top:3px;left:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:transform .2s;}
+  .switch.off .knob{transform:translateX(22px);}
+  .del-btn{background:rgba(122,31,43,.35);border:none;border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red-icon);}
+
+  .sim-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 22px;text-align:center;}
+  .sim-title{color:#ffd15c;font-size:19px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .sim-desc{color:var(--text-dim);font-size:14.5px;line-height:1.9;margin-bottom:22px;}
+  .sim-btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:999px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+
+  .search-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;}
+  .bell{position:relative;color:#ffd15c;display:flex;cursor:pointer;}
+  .bell svg{width:24px;height:24px;}
+  .bell .dot{position:absolute;top:-4px;left:-6px;background:#ff3b3b;color:#fff;font-size:10px;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .brand{color:var(--text-dim);letter-spacing:3px;font-size:15px;font-weight:700;}
+
+  .search-hero{text-align:left;margin-bottom:30px;}
+  .search-hero h1{font-size:42px;font-weight:800;margin-bottom:16px;}
+  .search-hero p{color:var(--text-dim);font-size:15px;line-height:1.9;}
+
+  .search-box{display:flex;gap:10px;margin-bottom:24px;}
+  .search-box input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;color:var(--text);font-size:14px;outline:none;}
+  .search-box button{background:var(--blue);color:#fff;border:none;border-radius:16px;padding:0 22px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;}
+
+  .idea-card{background:transparent;border:1.5px dashed var(--border);border-radius:16px;padding:22px;text-align:center;cursor:pointer;transition:border-color .2s;}
+  .idea-card:hover{border-color:var(--blue);}
+  .idea-card h3{font-size:16.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .idea-card p{color:var(--text-dim);font-size:13.5px;}
+
+  .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:14px 0 10px;z-index:10;}
+  .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text-dim);font-size:12px;cursor:pointer;}
+  .nav-item.active{color:var(--blue);}
+  .nav-item .icon{width:22px;height:22px;}
+  .nav-item .icon svg{width:100%;height:100%;}
+
+  .notif-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .back-link{color:var(--text-dim);font-size:14px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+  .back-link svg{width:16px;height:16px;}
+  .notif-title{font-size:26px;font-weight:800;}
+  .notif-divider{border:none;border-top:1px solid var(--border);margin:18px 0 20px;}
+  .notif-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:18px;}
+  .notif-top{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+  .notif-top-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .notif-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 0 8px currentColor;}
+  .notif-dot.green{background:#3ddc6f;color:#3ddc6f;}
+  .notif-dot.amber{background:#ffb020;color:#ffb020;}
+  .notif-dot.red{background:#ff5566;color:#ff5566;}
+  .notif-name{font-size:17px;font-weight:700;}
+  .notif-body{color:var(--text);font-size:15px;line-height:1.8;margin-bottom:18px;}
+  .notif-body .inline-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 2px;vertical-align:middle;}
+  .notif-bottom{display:flex;justify-content:space-between;align-items:center;}
+  .notif-time{color:var(--text-dim);font-size:13px;display:flex;align-items:center;gap:6px;}
+  .notif-time svg{width:14px;height:14px;}
+  .promo-pct{color:var(--text-dim);font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:6px 12px;}
+
+  .hidden{display:none!important;}
+  .loading{text-align:center;padding:40px;}
+  .spinner{border:3px solid var(--border);border-top:3px solid var(--blue);border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;margin:0 auto 10px;}
+  @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+  .status{text-align:center;color:var(--text-dim);margin:10px 0;font-size:13px;min-height:20px;}
+  .progress-bar{width:100%;height:4px;background:var(--border);border-radius:2px;margin:10px 0;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .3s;}
+  .error{color:var(--red-icon);text-align:center;padding:20px;}
+
+  .card{background:var(--card);border-radius:20px;padding:20px;margin-bottom:16px;border:2px solid;}
+  .card-green{border-color:var(--green);}
+  .card-yellow{border-color:var(--yellow);}
+  .card-red{border-color:var(--red-icon);}
+  .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .card-title{font-size:18px;font-weight:700;}
+  .card-badge{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;}
+  .card-badge.green{background:rgba(34,197,94,.15);color:#4ade80;}
+  .card-badge.yellow{background:rgba(234,179,8,.15);color:#facc15;}
+  .card-badge.red{background:rgba(255,85,102,.15);color:#ff5566;}
+  .niche-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:6px;}
+
+  .results-area{margin-top:16px;}
+  .result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+  .result-stat{text-align:center;background:var(--bg);border-radius:12px;padding:10px 4px;}
+  .result-stat .val{font-size:18px;font-weight:700;}
+  .result-stat .lbl{font-size:10px;color:var(--text-dim);}
+  .result-scores{display:flex;gap:8px;justify-content:center;margin:12px 0;padding-top:12px;border-top:1px solid var(--border);}
+  .result-score{text-align:center;padding:8px 16px;background:var(--bg);border-radius:8px;}
+  .result-score .val{font-size:20px;font-weight:700;}
+  .result-score .lbl{font-size:10px;color:var(--text-dim);}
+  .result-score.highlight{border:2px solid var(--green);}
+  .result-posts{margin-top:12px;}
+  .result-post{background:var(--bg);border-radius:10px;padding:12px;margin-bottom:8px;}
+  .result-post-title{font-size:13px;margin-bottom:6px;line-height:1.4;}
+  .result-post-meta{font-size:11px;color:var(--text-dim);}
+  .result-post-link{color:var(--blue);font-size:12px;text-decoration:none;}
+
+  .empty-state{text-align:center;padding:30px;color:var(--text-dim);font-size:14px;}
+
+  .devbar{position:fixed;top:0;right:0;z-index:50;display:flex;gap:6px;padding:6px;background:#000;border-radius:0 0 0 10px;}
+  .devbar button{background:#222;color:#aaa;border:1px solid #444;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;font-family:monospace;}
+  .devbar button.active{background:var(--blue);color:#fff;}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>Niche Finder</h1>
-        <p class="subtitle">ابحث عن نيتشات Affiliate رابحة</p>
 
-        <div class="mode-toggle">
-            <button class="mode-btn active" id="manualMode" onclick="switchMode('manual')">✍️ فكرة مباشرة</button>
-            <button class="mode-btn" id="autoMode" onclick="switchMode('auto')">🤖 توليد تلقائي</button>
-        </div>
+<div class="devbar">
+  <button data-target="page-search" class="active">Search</button>
+  <button data-target="page-list">Schedule</button>
+  <button data-target="page-create">Create</button>
+  <button data-target="page-notifications">Notifs</button>
+</div>
 
-        <div id="manualPanel">
-            <input type="text" id="searchInput" placeholder="اكتب فكرة النيتش...">
-            <button id="searchBtn" onclick="handleSearch()">بحث</button>
-        </div>
-
-        <div id="autoPanel" class="hidden">
-            <div class="auto-panel" style="text-align:center">
-                <h3>🚀 اكتشف نيتشات واعدة</h3>
-                <p style="margin-bottom:15px">الأداة تبحث تلقائياً في <b>Google Trends</b> و <b>Reddit</b> وتدمج النتائج في خوارزمية ذكية</p>
-                <div style="display:flex;gap:8px;justify-content:center;margin-bottom:15px;flex-wrap:wrap">
-                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">📈 مواضيع صاعدة</span>
-                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">🔍 احتياجات غير مُلبّاة</span>
-                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">🏷️ تصنيف Evergreen/Trending</span>
-                </div>
-                <button class="generate-btn" id="fetchIdeasBtn" onclick="runFullDiscovery()" style="font-size:20px;padding:18px">
-                    🔍 ابدأ الاكتشاف
-                </button>
-            </div>
-        </div>
-
-        <div class="status" id="status"></div>
-        <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-
-        <div class="legend">
-            <div class="legend-title">دليل الألوان:</div>
-            <div class="legend-item"><div class="dot" style="background:#22c55e"></div>أخضر - فرصة نظيفة</div>
-            <div class="legend-item"><div class="dot" style="background:#eab308"></div>أصفر - سوق مصدّق</div>
-            <div class="legend-item"><div class="dot" style="background:#ef4444"></div>أحمر - مشبع بالترويج</div>
-        </div>
-
-        <div class="results hidden" id="results"></div>
+<!-- PAGE: Search / Niche Finder -->
+<div class="page active" id="page-search">
+  <div class="search-header">
+    <div class="bell" onclick="showPage('page-notifications')" style="cursor:pointer;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="dot" id="notifCount">0</span>
     </div>
+    <div class="brand">NICHE FINDER</div>
+  </div>
 
-    <script>
-        const PROXIES = [
-            'https://api.allorigins.win/raw?url=',
-            'https://corsproxy.io/?',
-            'https://api.codetabs.com/v1/proxy?quest='
-        ];
+  <div class="search-hero">
+    <h1>Where do we start?</h1>
+    <p>Search for any topic, keyword, or subreddit community to pull real posts and get live analysis from Reddit.</p>
+  </div>
 
-        // ===== خوارزمية تحليل النيتشات =====
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search by subreddit or keyword...">
+    <button id="searchBtn" onclick="handleSearch()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Search
+    </button>
+  </div>
 
-        // كلمات مفتاحية للترويج
-        const PROMO_KW = ['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
-        
-        // كلمات مفتاحية للتعليم والمناقشة
-        const DISCUSSION_KW = ['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
-        
-        // كلمات مفتاحية للقصص
-        const STORY_KW = ['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
-        
-        // كلمات مفتاحية للطلب غير المُلبّى (Unmet Demand)
-        const DEMAND_KW = [
-            'does anyone know','looking for','wish there was','is there a product',
-            'anyone recommend','need help finding','looking for something',
-            'does anyone use','where can i find','how do i get','any suggestions',
-            'what do you use','best product for','alternative to','better than',
-            'frustrated with','tired of','hate when','annoying that',
-            'wish i could','if only there','would pay for','shut up and take my money'
-        ];
-        
-        // كلمات مفتاحية للنية التجارية
-        const COMMERCIAL_KW = [
-            'buy','purchase','price','cost','expensive','cheap','budget',
-            'worth it','value','investment','subscription','monthly','annual',
-            'free trial','premium','pro version','upgrade','plan'
-        ];
+  <div class="idea-card" onclick="runFullDiscovery()">
+    <h3>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 2l1.9 5.8L20 9.7l-5.8 1.9L12 17.4l-1.9-5.8L4 9.7l5.8-1.9L12 2z"/></svg>
+      No idea yet? Generate suggestions for me
+    </h3>
+    <p>Unsolved problems from Reddit + Google Trends</p>
+  </div>
 
-        // كلمات مفتاحية للاتجاهات الصاعدة
-        const TREND_KW = [
-            'new','trending','viral','popular','growing','emerging','latest',
-            '2024','2025','2026','future','next gen','revolutionary','innovative'
-        ];
+  <div class="status" id="status"></div>
+  <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="results-area hidden" id="results"></div>
+</div>
 
-        // ===== كلمات مفتاحية لتصنيف النيتشات =====
-        
-        // كلمات تدل على Trending (مؤقت/صاعد)
-        const TRENDING_INDICATORS = [
-            'trending','viral','hot','breaking','just launched','new release',
-            'this week','today','tonight','just happened','breaking news',
-            'limited edition','flash sale','black friday','cyber monday',
-            'holiday','christmas','easter','valentine','summer sale',
-            '2024','2025','2026','new year','season','episode','finale',
-            'celebrity','scandal','drama','controversy','debate',
-            'election','vote','poll','survey','results','winner',
-            'launch','release','preorder','coming soon','announced'
-        ];
-        
-        // كلمات تدل على Evergreen (دائم/مستدام)
-        const EVERGREEN_INDICATORS = [
-            'how to','guide','tutorial','beginner','learn','course',
-            'best practices','tips','tricks','hacks','diy','do it yourself',
-            'review','comparison','vs','versus','alternative',
-            'health','fitness','weight','diet','nutrition','exercise',
-            'money','finance','budget','saving','invest','retire',
-            'relationship','dating','marriage','family','parenting',
-            'home','garden','cooking','recipe','meal prep',
-            'pet','dog','cat','animal','care',
-            'education','study','exam','degree','career','job',
-            'technology','software','app','tool','device',
-            'travel','vacation','trip','adventure','explore',
-            'hobby','craft','art','music','photo','video',
-            'safety','security','protection','insurance',
-            'maintenance','repair','fix','troubleshoot','issue',
-            'productivity','efficiency','workflow','automation',
-            'mental health','stress','anxiety','sleep','meditation',
-            'sustainability','eco','green','renewable','solar'
-        ];
-        
-        // كلمات تدل على موسمي/مؤقت
-        const SEASONAL_INDICATORS = [
-            'summer','winter','spring','fall','autumn',
-            'january','february','march','april','may','june',
-            'july','august','september','october','november','december',
-            'q1','q2','q3','q4','quarter'
-        ];
+<!-- PAGE: Active channels list -->
+<div class="page" id="page-list">
+  <div class="header-row">
+    <button class="add-btn" onclick="showPage('page-create')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Monitor
+    </button>
+  </div>
+  <h1 class="title">Active Monitoring Channels</h1>
+  <div id="monitorsList"></div>
+  <div class="sim-card" style="margin-top:10px">
+    <div class="sim-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ffd15c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M12 2l1.9 5.8L20 9.7l-5.8 1.9L12 17.4l-1.9-5.8L4 9.7l5.8-1.9L12 2z"/></svg>
+      Run All Monitors Now
+    </div>
+    <p class="sim-desc">Check all your monitoring channels instantly to detect new opportunities and alerts.</p>
+    <button class="sim-btn" onclick="runAllMonitors()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Run Check Now
+    </button>
+  </div>
+</div>
 
-        function countKW(text, kw) { 
-            return kw.filter(k => text.toLowerCase().includes(k)).length; 
+<!-- PAGE: Create monitor -->
+<div class="page" id="page-create">
+  <div class="header-row">
+    <button class="cancel-btn" onclick="showPage('page-list')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Cancel
+    </button>
+  </div>
+  <h1 class="title">Active Monitoring Channels</h1>
+  <div class="create-card">
+    <h2>Create New Monitor</h2>
+    <div class="field">
+      <label>Target niche name</label>
+      <input type="text" id="monitorName" placeholder="e.g. Sustainable Kitchen Tools">
+    </div>
+    <div class="field">
+      <label>Target subreddit</label>
+      <input type="text" id="monitorSub" placeholder="e.g. BuyItForLife">
+    </div>
+    <div class="create-actions">
+      <div class="freq-group">
+        <button class="freq-btn" onclick="setFreq(this,'hourly')">Hourly</button>
+        <button class="freq-btn active" onclick="setFreq(this,'daily')">Daily</button>
+        <button class="freq-btn" onclick="setFreq(this,'weekly')">Weekly</button>
+      </div>
+      <button class="save-btn" onclick="saveMonitor()">Save Schedule</button>
+    </div>
+  </div>
+  <div id="monitorsListCreate"></div>
+</div>
+
+<!-- PAGE: Notifications -->
+<div class="page" id="page-notifications">
+  <div class="notif-header">
+    <h1 class="notif-title">Notifications (<span id="notifTotal">0</span>)</h1>
+    <div class="back-link" onclick="showPage('page-list')">
+      Back
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </div>
+  </div>
+  <hr class="notif-divider">
+  <div id="notifList"></div>
+</div>
+
+<div class="bottomnav">
+  <div class="nav-item active" id="nav-search" onclick="showPage('page-search')">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <span>Search</span>
+  </div>
+  <div class="nav-item" id="nav-list" onclick="showPage('page-list')">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+    <span>Schedule</span>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
+const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
+const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
+const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
+const DEMAND_KW=['does anyone know','looking for','wish there was','is there a product','anyone recommend','need help finding','looking for something','does anyone use','where can i find','how do i get','any suggestions','what do you use','best product for','alternative to','better than','frustrated with','tired of','hate when','annoying that','wish i could','if only there','would pay for','shut up and take my money'];
+const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
+const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
+const TRENDING_INDICATORS=['trending','viral','hot','breaking','just launched','new release','this week','today','tonight','just happened','limited edition','flash sale','black friday','cyber monday','holiday','christmas','easter','valentine','summer sale','2024','2025','2026','new year','season','episode','finale','celebrity','scandal','drama','controversy','debate','election','vote','poll','launch','release','preorder','coming soon','announced'];
+const EVERGREEN_INDICATORS=['how to','guide','tutorial','beginner','learn','course','best practices','tips','tricks','hacks','diy','do it yourself','review','comparison','vs','versus','alternative','health','fitness','weight','diet','nutrition','exercise','money','finance','budget','saving','invest','retire','relationship','dating','marriage','family','parenting','home','garden','cooking','recipe','meal prep','pet','dog','cat','animal','care','education','study','exam','degree','career','job','technology','software','app','tool','device','travel','vacation','trip','adventure','hobby','craft','art','music','photo','video','safety','security','protection','insurance','maintenance','repair','fix','troubleshoot','productivity','efficiency','workflow','automation','mental health','stress','anxiety','sleep','meditation','sustainability','eco','green','renewable','solar'];
+
+// ===================== HELPERS =====================
+function countKW(text,kw){return kw.filter(k=>text.toLowerCase().includes(k)).length;}
+function countBW(text,w){return w.filter(x=>text.toLowerCase().includes(x)).length;}
+function setStatus(msg){document.getElementById('status').textContent=msg;}
+function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
+function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
+
+// ===================== PAGES =====================
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('nav-search').classList.toggle('active',id==='page-search');
+  document.getElementById('nav-list').classList.toggle('active',id!=='page-search');
+  document.querySelectorAll('.devbar button').forEach(b=>{
+    b.classList.toggle('active',b.dataset.target===id);
+  });
+  if(id==='page-list'||id==='page-create') renderMonitors();
+  if(id==='page-notifications') renderNotifications();
+}
+document.querySelectorAll('.devbar button').forEach(btn=>{
+  btn.addEventListener('click',()=>showPage(btn.dataset.target));
+});
+
+// ===================== SCORING =====================
+function classify(title,selftext){
+  const text=(title+' '+(selftext||'')).toLowerCase();
+  const promoScore=Math.min(100,Math.round((countKW(text,PROMO_KW)/4)*100));
+  const eduScore=Math.min(100,Math.round((countKW(text,DISCUSSION_KW)/3)*100));
+  const storyScore=Math.min(100,Math.round((countKW(text,STORY_KW)/2)*100));
+  const interactiveScore=(text.match(/\?/g)||[]).length>0?70:10;
+  return{promoScore,eduScore,storyScore,interactiveScore};
+}
+
+function computeDemandScore(title,content){
+  const text=(title+' '+(content||'')).toLowerCase();
+  let score=0;
+  score+=countKW(text,DEMAND_KW)*15;
+  score+=countKW(text,COMMERCIAL_KW)*10;
+  score+=(text.match(/\?/g)||[]).length*8;
+  score+=countKW(text,['problem','issue','frustrated','tired','hate','annoying','broken',"doesn't work","can't find",'no good'])*12;
+  score+=countKW(text,['wish','want','need','desire','looking','searching','hoping'])*10;
+  return Math.min(100,score);
+}
+
+function computeTrendScore(title,content){
+  const text=(title+' '+(content||'')).toLowerCase();
+  let score=0;
+  score+=countKW(text,TREND_KW)*20;
+  score+=countBW(text,['new','just launched','recently','recent','latest','first time','finally'])*15;
+  return Math.min(100,score);
+}
+
+function classifyNicheType(title,source){
+  const text=title.toLowerCase();
+  let trending=0,evergreen=0;
+  for(const w of TRENDING_INDICATORS)if(text.includes(w))trending+=10;
+  for(const w of EVERGREEN_INDICATORS)if(text.includes(w))evergreen+=10;
+  if(source==='Google Trends')trending+=20;
+  else if(source==='Reddit Unmet Demand')evergreen+=15;
+  if(text.includes('how to')||text.includes('best'))evergreen+=15;
+  if(text.includes('new'))trending+=10;
+  const max=Math.max(trending,evergreen);
+  if(max<10)return{type:'general',label:'General',color:'#64748b'};
+  if(trending>evergreen*1.5)return{type:'trending',label:'Trending',color:'#8b5cf6'};
+  if(evergreen>trending*1.5)return{type:'evergreen',label:'Evergreen',color:'#10b981'};
+  return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
+}
+
+function computeTrafficLight(posts){
+  if(!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
+  const total=posts.length;
+  const promo=posts.filter(p=>classify(p.title,p.content||p.selftext||'').promoScore>=60).length;
+  const ratio=promo/total;
+  const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
+  const avgScore=posts.reduce((s,p)=>s+(p.score||0),0)/total;
+  const hasEngData=avgComments>0||avgScore>0;
+  const highEng=hasEngData?(avgComments+avgScore)/2>20:true;
+  const avgDemand=posts.reduce((s,p)=>s+computeDemandScore(p.title,p.content||p.selftext||''),0)/total;
+  const avgTrend=posts.reduce((s,p)=>s+computeTrendScore(p.title,p.content||p.selftext||''),0)/total;
+  const opportunityScore=Math.round((avgDemand*0.4)+(avgTrend*0.3)+((100-ratio*100)*0.3));
+  let color,label;
+  if(ratio<=0.01&&highEng){color='green';label='Clean opportunity - strong signal';}
+  else if(ratio<=0.15&&highEng){color='green';label='Open and clean market';}
+  else if(ratio<=0.4){color='yellow';label='Moderate market - deeper analysis needed';}
+  else{color='red';label='Saturated with promotions';}
+  const edu=posts.filter(p=>classify(p.title,p.content||p.selftext||'').eduScore>=50).length;
+  const stories=posts.filter(p=>classify(p.title,p.content||p.selftext||'').storyScore>=50).length;
+  const interactive=posts.filter(p=>classify(p.title,p.content||p.selftext||'').interactiveScore>=50).length;
+  const subreddits=[...new Set(posts.map(p=>p.subreddit))];
+  return{color,label,total,promo,ratio:Math.round(ratio*100),avgComments:Math.round(avgComments),avgScore:Math.round(avgScore),edu,stories,interactive,subreddits,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore};
+}
+
+// ===================== RSS / FETCH =====================
+function parseRSS(xml){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(xml,'text/xml');
+  const entries=doc.querySelectorAll('entry');
+  return Array.from(entries).map(e=>{
+    const content=(e.querySelector('content')?.textContent||'').replace(/<[^>]+>/g,'').replace(/&#\d+;/g,' ').replace(/\s+/g,' ').trim().slice(0,500);
+    const url=e.querySelector('link')?.getAttribute('href')||'';
+    const subM=url.match(/reddit\.com\/r\/([^/]+)/);
+    return{title:e.querySelector('title')?.textContent||'',author:(e.querySelector('name')?.textContent||'unknown').replace('/u/',''),url,content,subreddit:subM?subM[1]:'unknown',score:0,numComments:0};
+  }).filter(p=>p.title);
+}
+
+async function fetchWithProxy(url){
+  for(const proxy of PROXIES){
+    try{const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});const t=await r.text();if(t.includes('<entry>')||t.includes('<feed'))return t;}catch(e){continue;}
+  }
+  return null;
+}
+
+async function fetchWithProxyJSON(url){
+  for(const proxy of PROXIES){
+    try{const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});const t=await r.text();if(t.startsWith('{')||t.startsWith('['))return JSON.parse(t);}catch(e){continue;}
+  }
+  return null;
+}
+
+async function searchReddit(keyword){
+  const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=50&t=month`;
+  const xml=await fetchWithProxy(url);
+  if(!xml)throw new Error('Could not reach Reddit.');
+  const posts=parseRSS(xml);
+  if(!posts.length)throw new Error('No results found.');
+  return posts;
+}
+
+// ===================== GOOGLE TRENDS =====================
+async function fetchGoogleTrends(){
+  try{
+    const url='https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
+    const data=await fetchWithProxyJSON(url);
+    if(!data)return[];
+    const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+    const ideas=[];
+    const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
+    for(const t of trends.slice(0,20)){
+      const q=t.title.query;const ql=q.toLowerCase();
+      if(skip.some(s=>ql.includes(s)))continue;
+      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+      for(const r of(t.relatedQueries||[]).slice(0,2)){
+        if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
+      }
+    }
+    return ideas;
+  }catch(e){console.error('Trends error:',e);return[];}
+}
+
+// ===================== REDDIT UNMET DEMAND =====================
+async function fetchRedditUnmetDemand(){
+  const patterns=['does anyone know a product','looking for a product that','wish there was a product','is there a product for','anyone recommend a product','need help finding a product','looking for something that','does anyone use a product','frustrated with','tired of','would pay for','alternative to','better than','replacement for'];
+  const allIdeas=[];const seen=new Set();
+  for(const p of patterns){
+    try{
+      const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(p)}&sort=relevance&limit=25&t=month`;
+      const xml=await fetchWithProxy(url);if(!xml)continue;
+      const posts=parseRSS(xml);
+      for(const post of posts){
+        const key=post.title.toLowerCase().slice(0,50);
+        if(!seen.has(key)){
+          seen.add(key);
+          const niche=extractNicheFromPost(post);
+          if(niche)allIdeas.push({title:niche,originalTitle:post.title,subreddit:post.subreddit,url:post.url,source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content)});
         }
+      }
+    }catch(e){continue;}
+  }
+  allIdeas.sort((a,b)=>b.demandScore-a.demandScore);
+  return allIdeas.slice(0,30);
+}
 
-        function classify(title, selftext) {
-            const text = (title + ' ' + (selftext || '')).toLowerCase();
-            const promoHits = countKW(text, PROMO_KW);
-            const promoScore = Math.min(100, Math.round((promoHits / 4) * 100));
-            const eduScore = Math.min(100, Math.round((countKW(text, DISCUSSION_KW) / 3) * 100));
-            const storyScore = Math.min(100, Math.round((countKW(text, STORY_KW) / 2) * 100));
-            const hasQ = (text.match(/\?/g) || []).length > 0;
-            const interactiveScore = hasQ ? 70 : 10;
-            return { promoScore, eduScore, storyScore, interactiveScore };
-        }
+function extractNicheFromPost(post){
+  const title=post.title;
+  const patterns=[/does anyone know (?:a |an )?(.+)/i,/looking for (?:a |an )?(.+)/i,/wish there was (?:a |an )?(.+)/i,/is there (?:a |an )?(.+) for/i,/anyone recommend (?:a |an )?(.+)/i,/need (?:a |an )?(.+)/i,/want (?:a |an )?(.+)/i,/best (.+) for/i,/alternative to (.+)/i,/better than (.+)/i];
+  for(const p of patterns){
+    const m=title.match(p);
+    if(m&&m[1]){const n=m[1].replace(/[?.!,;:]/g,'').replace(/\s+/g,' ').trim();if(n.length>3&&n.length<60)return n;}
+  }
+  const pk=['product','tool','app','software','service','device','gadget','equipment','gear','supply','resource','platform'];
+  const text=(title+' '+(post.content||'')).toLowerCase();
+  if(pk.some(k=>text.includes(k))){
+    const words=title.split(' ');const i=words.findIndex(w=>pk.includes(w.toLowerCase()));
+    if(i>0)return words.slice(Math.max(0,i-2),Math.min(words.length,i+3)).join(' ');
+  }
+  return null;
+}
 
-        // ===== خوارزمية تقييم الطلب (Demand Score) =====
-        function computeDemandScore(title, content) {
-            const text = (title + ' ' + (content || '')).toLowerCase();
-            let score = 0;
-            
-            // علامات الطلب المباشر
-            const demandMatches = countKW(text, DEMAND_KW);
-            score += demandMatches * 15;
-            
-            // علامات النية التجارية
-            const commercialMatches = countKW(text, COMMERCIAL_KW);
-            score += commercialMatches * 10;
-            
-            // وجود علامات استفهام (طلب معلومات)
-            const questions = (text.match(/\?/g) || []).length;
-            score += questions * 8;
-            
-            // وجود مشاكل أو شكاوى
-            const problemWords = ['problem','issue','frustrated','tired','hate','annoying','broken','doesn\'t work','can\'t find','no good'];
-            const problems = countKW(text, problemWords);
-            score += problems * 12;
-            
-            // وجود كلمات رغبة
-            const wishWords = ['wish','want','need','desire','looking','searching','hoping'];
-            const wishes = countKW(text, wishWords);
-            score += wishes * 10;
-            
-            return Math.min(100, score);
-        }
+// ===================== MERGE & SCORE IDEAS =====================
+function normalizeTitle(t){return t.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim().slice(0,50);}
+function calculateIdeaScore(idea){
+  let s=0;
+  if(idea.source==='Google Trends')s+=30;
+  else if(idea.source==='Reddit Unmet Demand')s+=40;
+  if(idea.demandScore)s+=idea.demandScore*0.3;
+  if(idea.title.length<20)s+=15;else if(idea.title.length<40)s+=10;
+  const text=idea.title.toLowerCase();
+  ['best','top','new','easy','fast','cheap','free','better'].forEach(w=>{if(text.includes(w))s+=5;});
+  ['worst','bad','slow','expensive','broken','fake'].forEach(w=>{if(text.includes(w))s-=5;});
+  return Math.round(s);
+}
 
-        // ===== خوارزمية تقييم الاتجاه (Trend Score) =====
-        function computeTrendScore(title, content) {
-            const text = (title + ' ' + (content || '')).toLowerCase();
-            let score = 0;
-            
-            const trendMatches = countKW(text, TREND_KW);
-            score += trendMatches * 20;
-            
-            // كلمات تدل على حداثة
-            const noveltyWords = ['new','just launched','recently','recent','latest','first time','finally'];
-            const novelty = countBW(text, noveltyWords);
-            score += novelty * 15;
-            
-            return Math.min(100, score);
-        }
+function mergeAndScoreIdeas(ideas){
+  const merged=new Map();
+  for(const idea of ideas){
+    const key=normalizeTitle(idea.title);
+    if(merged.has(key)){
+      const e=merged.get(key);e.score+=20;e.sources.push(idea.source);e.count+=1;
+    }else{
+      merged.set(key,{title:idea.title,normalizedTitle:key,score:calculateIdeaScore(idea),sources:[idea.source],count:1,type:idea.type,demandScore:idea.demandScore||0,subreddit:idea.subreddit,url:idea.url,related:idea.related||[],nicheType:classifyNicheType(idea.title,idea.source)});
+    }
+  }
+  return Array.from(merged.values()).sort((a,b)=>b.score-a.score).slice(0,20);
+}
 
-        function countBW(text, words) {
-            return words.filter(w => text.toLowerCase().includes(w)).length;
-        }
+// ===================== MANUAL SEARCH =====================
+async function handleSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  if(!q)return;
+  document.getElementById('searchBtn').disabled=true;
+  document.getElementById('results').classList.remove('hidden');
+  document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  showProgress(20);setStatus('Searching Reddit...');
+  try{
+    showProgress(50);const posts=await searchReddit(q);
+    showProgress(80);setStatus(`Found ${posts.length} posts - analyzing...`);
+    const scoring=computeTrafficLight(posts);showProgress(100);
+    renderSearchResult(q,scoring,posts);
+  }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
+  hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
+}
 
-        // ===== خوارزمية تصنيف نوع النيتش =====
-        function classifyNicheType(title, source, relatedQueries = []) {
-            const text = (title + ' ' + relatedQueries.join(' ')).toLowerCase();
-            
-            let trendingScore = 0;
-            let evergreenScore = 0;
-            let seasonalScore = 0;
-            
-            // تقييم المؤشرات
-            for (const word of TRENDING_INDICATORS) {
-                if (text.includes(word)) trendingScore += 10;
-            }
-            
-            for (const word of EVERGREEN_INDICATORS) {
-                if (text.includes(word)) evergreenScore += 10;
-            }
-            
-            for (const word of SEASONAL_INDICATORS) {
-                if (text.includes(word)) seasonalScore += 8;
-            }
-            
-            // تأثير المصدر
-            if (source === 'Google Trends') {
-                trendingScore += 20; // Google Trends = مؤشر قوي على الاتجاه
-            } else if (source === 'Reddit Unmet Demand') {
-                evergreenScore += 15; // Reddit = حاجة حقيقية مستمرة
-            }
-            
-            // تحليل بنية العنوان
-            const hasQuestion = text.includes('?');
-            const hasHowTo = text.includes('how to') || text.includes('how do');
-            const hasBest = text.includes('best') || text.includes('top');
-            const hasNew = text.includes('new') || text.includes('latest');
-            
-            if (hasHowTo || hasBest) evergreenScore += 15;
-            if (hasNew) trendingScore += 10;
-            
-            // تحديد النوع
-            const maxScore = Math.max(trendingScore, evergreenScore, seasonalScore);
-            
-            if (maxScore < 10) {
-                return { type: 'general', label: 'عام', color: '#64748b' };
-            }
-            
-            if (seasonalScore >= trendingScore && seasonalScore >= evergreenScore) {
-                return { type: 'seasonal', label: 'موسمي', color: '#f59e0b' };
-            }
-            
-            if (trendingScore > evergreenScore * 1.5) {
-                return { type: 'trending', label: 'Trending Niche', color: '#8b5cf6' };
-            }
-            
-            if (evergreenScore > trendingScore * 1.5) {
-                return { type: 'evergreen', label: 'Evergreen Niche', color: '#10b981' };
-            }
-            
-            // إذا كانت الدرجات متقاربة = هجين
-            return { type: 'hybrid', label: 'Trending + Evergreen', color: '#f59e0b' };
-        }
+function renderSearchResult(keyword,scoring,posts){
+  const el=document.getElementById('results');const s=scoring;const c=s.color;
+  const nt=classifyNicheType(keyword,'manual');
+  let nb='';if(nt.type!=='general')nb=`<span class="niche-badge" style="background:${nt.color}20;color:${nt.color}">${nt.label}</span>`;
+  const subs=s.subreddits?s.subreddits.slice(0,3).map(x=>'r/'+x).join(', '):'';
+  el.innerHTML=`
+  <div class="card card-${c}">
+    <div class="card-header">
+      <span class="card-title">"${keyword}"</span>
+      <div>${nb}<span class="card-badge ${c}">${{green:'Green',yellow:'Yellow',red:'Red'}[c]||''}</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:13px;margin:4px 0">${s.label}</p>
+    ${subs?`<p style="color:var(--text-dim);font-size:11px">${subs}</p>`:''}
+    <div class="result-stats">
+      <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
+      <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
+      <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Educational</div></div>
+      <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
+    </div>
+    <div class="result-scores">
+      <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
+      <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
+      <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
+    </div>
+    <div class="result-posts">${posts.slice(0,8).map(p=>`
+      <div class="result-post">
+        <div class="result-post-title">${p.title}</div>
+        <div class="result-post-meta">r/${p.subreddit} - u/${p.author}</div>
+        <a class="result-post-link" href="${p.url}" target="_blank">Open in Reddit</a>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
 
-        // ===== خوارزمية حساب إشارة المرور =====
-        function computeTrafficLight(posts) {
-            if (!posts.length) return { color: 'gray', label: 'بيانات غير كافية', demandScore: 0, trendScore: 0, opportunityScore: 0 };
-            
-            const total = posts.length;
-            const promo = posts.filter(p => classify(p.title, p.content || p.selftext || '').promoScore >= 60).length;
-            const ratio = promo / total;
-            const avgComments = posts.reduce((s, p) => s + (p.numComments || 0), 0) / total;
-            const avgScore = posts.reduce((s, p) => s + (p.score || 0), 0) / total;
-            const hasEngData = avgComments > 0 || avgScore > 0;
-            const highEng = hasEngData ? (avgComments + avgScore) / 2 > 20 : true;
+// ===================== FULL DISCOVERY =====================
+async function runFullDiscovery(){
+  const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
+  document.getElementById('results').classList.remove('hidden');
+  document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try{
+    showProgress(5);setStatus('Connecting to Google Trends and Reddit...');
+    const[trends,reddit]=await Promise.all([fetchGoogleTrends().catch(()=>[]),fetchRedditUnmetDemand().catch(()=>[])]);
+    showProgress(30);setStatus(`Got ${trends.length} from Trends + ${reddit.length} from Reddit`);
+    showProgress(40);setStatus('Merging and classifying...');
+    const all=[...trends,...reddit];const ideas=mergeAndScoreIdeas(all);
+    if(!ideas.length){document.getElementById('results').innerHTML='<div class="error">No ideas found. Try again.</div>';return;}
+    const top=ideas.slice(0,10);const results=[];
+    for(let i=0;i<top.length;i++){
+      setStatus(`[${i+1}/${top.length}] Analyzing: ${top[i].title}`);
+      showProgress(40+(i/top.length)*50);
+      try{const posts=await searchReddit(top[i].title);const scoring=computeTrafficLight(posts);results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType:top[i].nicheType,sources:top[i].sources});}catch(e){continue;}
+    }
+    results.sort((a,b)=>b.scoring.opportunityScore-a.scoring.opportunityScore);
+    showProgress(100);setStatus(`Done! Found ${results.length} viable niches.`);
+    renderDiscoveryResults(results);
+  }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
+  hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
+}
 
-            // حساب متوسط درجة الطلب
-            const avgDemand = posts.reduce((s, p) => s + computeDemandScore(p.title, p.content || p.selftext || ''), 0) / total;
-            
-            // حساب متوسط درجة الاتجاه
-            const avgTrend = posts.reduce((s, p) => s + computeTrendScore(p.title, p.content || p.selftext || ''), 0) / total;
-            
-            // حساب درجة الفرصة الإجمالية
-            const opportunityScore = Math.round((avgDemand * 0.4) + (avgTrend * 0.3) + ((100 - ratio * 100) * 0.3));
+function renderDiscoveryResults(results){
+  const el=document.getElementById('results');
+  if(!results.length){el.innerHTML='<div class="error">No results found.</div>';return;}
+  const header=`<div style="text-align:center;margin-bottom:20px;padding:16px;background:var(--card);border-radius:20px;border:1px solid var(--border)">
+    <h2 style="color:var(--green);font-size:20px;margin-bottom:5px">Discovery Results</h2>
+    <p style="color:var(--text-dim);font-size:13px">${results.length} viable niches found - ranked best to worst</p>
+  </div>`;
+  const cards=results.map((r,idx)=>{
+    const s=r.scoring;const c=s.color;
+    let nb='';if(r.nicheType&&r.nicheType.type!=='general')nb=`<span class="niche-badge" style="background:${r.nicheType.color}20;color:${r.nicheType.color};font-size:11px;padding:3px 8px">${r.nicheType.label}</span>`;
+    const srcs=r.sources?r.sources.map(s=>s==='Google Trends'?'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Trends</span>':'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Reddit</span>').join(' '):'';
+    return`<div class="card card-${c}">
+      <div class="card-header">
+        <span class="card-title" style="font-size:16px">#${idx+1} "${r.keyword}"</span>
+        <div>${nb}<span class="card-badge ${c}">${{green:'Green',yellow:'Yellow',red:'Red'}[c]||''}</span></div>
+      </div>
+      <p style="color:var(--text-dim);font-size:12px;margin:4px 0 8px">${s.label}</p>
+      <div style="margin-bottom:8px">${srcs}</div>
+      <div class="result-stats">
+        <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
+        <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
+        <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Edu</div></div>
+        <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
+      </div>
+      <div class="result-scores">
+        <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
+        <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
+        <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=header+cards;
+}
 
-            let color, label;
-            if (ratio <= 0.01 && highEng) { color = 'green'; label = 'فرصة نظيفة - أقوى إشارة'; }
-            else if (ratio <= 0.15 && highEng) { color = 'green'; label = 'سوق مفتوح ونظيف نسبياً'; }
-            else if (ratio <= 0.4) { color = 'yellow'; label = 'سوق مصدّق - يحتاج تحليل أعمق'; }
-            else { color = 'red'; label = 'سوق مشبع بالترويج'; }
+// ===================== MONITORS =====================
+let monitorFreq='daily';
+function setFreq(el,f){monitorFreq=f;el.parentElement.querySelectorAll('.freq-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
 
-            const edu = posts.filter(p => classify(p.title, p.content || p.selftext || '').eduScore >= 50).length;
-            const stories = posts.filter(p => classify(p.title, p.content || p.selftext || '').storyScore >= 50).length;
-            const interactive = posts.filter(p => classify(p.title, p.content || p.selftext || '').interactiveScore >= 50).length;
-            const subreddits = [...new Set(posts.map(p => p.subreddit))];
+function getMonitors(){try{return JSON.parse(localStorage.getItem('nf_monitors')||'[]');}catch(e){return[];}}
+function saveMonitors(m){localStorage.setItem('nf_monitors',JSON.stringify(m));}
 
-            return { 
-                color, label, total, promo, 
-                ratio: Math.round(ratio * 100), 
-                avgComments: Math.round(avgComments), 
-                avgScore: Math.round(avgScore), 
-                edu, stories, interactive, subreddits,
-                demandScore: Math.round(avgDemand),
-                trendScore: Math.round(avgTrend),
-                opportunityScore
-            };
-        }
+function saveMonitor(){
+  const name=document.getElementById('monitorName').value.trim();
+  const sub=document.getElementById('monitorSub').value.trim();
+  if(!name){alert('Enter a niche name');return;}
+  const monitors=getMonitors();
+  monitors.push({id:Date.now(),name,sub:sub||name,freq:monitorFreq,active:true,lastCheck:null});
+  saveMonitors(monitors);
+  document.getElementById('monitorName').value='';
+  document.getElementById('monitorSub').value='';
+  alert('Monitor saved!');
+  showPage('page-list');
+}
 
-        function parseRSS(xml) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(xml, 'text/xml');
-            const entries = doc.querySelectorAll('entry');
-            return Array.from(entries).map(e => {
-                const content = (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
-                const url = e.querySelector('link')?.getAttribute('href') || '';
-                const subM = url.match(/reddit\.com\/r\/([^/]+)/);
-                return {
-                    title: e.querySelector('title')?.textContent || '',
-                    author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
-                    url: url,
-                    content: content,
-                    subreddit: subM ? subM[1] : 'unknown',
-                    score: 0,
-                    numComments: 0
-                };
-            }).filter(p => p.title);
-        }
+function deleteMonitor(id){if(!confirm('Delete this monitor?'))return;saveMonitors(getMonitors().filter(m=>m.id!==id));renderMonitors();}
 
-        async function fetchWithProxy(url) {
-            for (const proxy of PROXIES) {
-                try {
-                    const resp = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(15000) });
-                    const text = await resp.text();
-                    if (text.includes('<entry>') || text.includes('<feed')) {
-                        return text;
-                    }
-                } catch(e) { continue; }
-            }
-            return null;
-        }
+function toggleMonitor(id){
+  const monitors=getMonitors();const m=monitors.find(x=>x.id===id);
+  if(m)m.active=!m.active;saveMonitors(monitors);renderMonitors();
+}
 
-        async function fetchWithProxyJSON(url) {
-            for (const proxy of PROXIES) {
-                try {
-                    const resp = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(15000) });
-                    const text = await resp.text();
-                    if (text.startsWith('{') || text.startsWith('[')) {
-                        return JSON.parse(text);
-                    }
-                } catch(e) { continue; }
-            }
-            return null;
-        }
+function renderMonitors(){
+  const monitors=getMonitors();
+  const html=monitors.length?monitors.map(m=>`
+    <div class="channel-card">
+      <div class="channel-top">
+        <span class="channel-name">${m.name}</span>
+        <span class="badge">r/${m.sub}</span>
+      </div>
+      <div class="meta">Check interval: ${m.freq}${m.lastCheck?' - Last check: '+m.lastCheck:''}</div>
+      <div class="channel-bottom">
+        <div class="toggle-wrap">
+          <span class="toggle-label">Active</span>
+          <div class="switch ${m.active?'':'off'}" onclick="toggleMonitor(${m.id})"><div class="knob"></div></div>
+        </div>
+        <button class="del-btn" onclick="deleteMonitor(${m.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+    </div>`).join(''):'<div class="empty-state">No monitors yet. Create one to start tracking niches.</div>';
+  const el1=document.getElementById('monitorsList');if(el1)el1.innerHTML=html;
+  const el2=document.getElementById('monitorsListCreate');if(el2)el2.innerHTML=html;
+}
 
-        async function searchReddit(keyword) {
-            const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=50&t=month`;
-            const xml = await fetchWithProxy(url);
-            if (!xml) throw new Error('ما قدرنا نوصل لـ Reddit. جرّب كلمة ثانية.');
-            const posts = parseRSS(xml);
-            if (!posts.length) throw new Error('ما لقينا نتائج لهالكلمة.');
-            return posts;
-        }
+async function runAllMonitors(){
+  const monitors=getMonitors().filter(m=>m.active);
+  if(!monitors.length){alert('No active monitors.');return;}
+  addNotification({sub:'System',name:'All Monitors',body:`Running check on ${monitors.length} monitors...`,color:'amber',promo:''});
+  for(const m of monitors){
+    try{
+      const posts=await searchReddit(m.sub);
+      const scoring=computeTrafficLight(posts);
+      const now=new Date();
+      m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+      saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
+      addNotification({sub:'r/'+m.sub,name:m.name,body:`Check complete: niche ${scoring.color==='green'?'in excellent condition':scoring.color==='yellow'?'stable':'needs attention'}. Promo rate: ${scoring.ratio}%.`,color:scoring.color==='green'?'green':scoring.color==='yellow'?'amber':'red',promo:scoring.ratio+'%'});
+    }catch(e){addNotification({sub:'r/'+m.sub,name:m.name,body:'Error: '+e.message,color:'red',promo:''});}
+  }
+  alert('All monitors checked!');
+}
 
-        function setStatus(msg) { document.getElementById('status').textContent = msg; }
-        function showProgress(pct) {
-            document.getElementById('progressBar').classList.remove('hidden');
-            document.getElementById('progressFill').style.width = pct + '%';
-        }
-        function hideProgress() { document.getElementById('progressBar').classList.add('hidden'); }
+// ===================== NOTIFICATIONS =====================
+function getNotifications(){try{return JSON.parse(localStorage.getItem('nf_notifs')||'[]');}catch(e){return[];}}
+function saveNotifications(n){localStorage.setItem('nf_notifs',JSON.stringify(n));}
+function addNotification(n){const notifs=getNotifications();notifs.unshift({id:Date.now(),...n,time:new Date().toLocaleString()});saveNotifications(notifs);updateNotifBadge();}
+function deleteNotification(id){saveNotifications(getNotifications().filter(n=>n.id!==id));renderNotifications();updateNotifBadge();}
+function updateNotifBadge(){
+  const c=getNotifications().length;
+  document.getElementById('notifCount').textContent=c;
+  document.getElementById('notifTotal').textContent=c;
+  document.getElementById('notifCount').style.display=c>0?'flex':'none';
+}
+function renderNotifications(){
+  const notifs=getNotifications();
+  document.getElementById('notifTotal').textContent=notifs.length;
+  const el=document.getElementById('notifList');
+  el.innerHTML=notifs.length?notifs.map(n=>`
+    <div class="notif-card">
+      <div class="notif-top">
+        <button class="del-btn" onclick="deleteNotification(${n.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="14 11v6"/></svg>
+        </button>
+        <div class="notif-top-left">
+          <span class="badge">${n.sub}</span>
+          <span class="notif-name">${n.name}</span>
+          <span class="notif-dot ${n.color}"></span>
+        </div>
+      </div>
+      <div class="notif-body">${n.body}</div>
+      <div class="notif-bottom">
+        <span class="notif-time">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${n.time}
+        </span>
+        ${n.promo?`<span class="promo-pct">Promo rate: ${n.promo}</span>`:''}
+      </div>
+    </div>`).join(''):'<div class="empty-state">No notifications yet.</div>';
+}
 
-        async function handleSearch() {
-            const q = document.getElementById('searchInput').value.trim();
-            if (!q) return;
-
-            document.getElementById('searchBtn').disabled = true;
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-            showProgress(20);
-            setStatus('جاري البحث في Reddit...');
-
-            try {
-                showProgress(50);
-                const posts = await searchReddit(q);
-                showProgress(80);
-                setStatus(`لقينا ${posts.length} منشور — جاري التحليل...`);
-
-                const scoring = computeTrafficLight(posts);
-                showProgress(100);
-
-                renderResult(q, scoring, posts);
-            } catch (e) {
-                document.getElementById('results').innerHTML = `<div class="error">${e.message}</div>`;
-            }
-
-            hideProgress();
-            document.getElementById('searchBtn').disabled = false;
-            setStatus('');
-        }
-
-        function renderResult(keyword, scoring, posts) {
-            const el = document.getElementById('results');
-            const s = scoring;
-            const cls = s.color;
-            const subsList = s.subreddits ? s.subreddits.map(r => `r/${r}`).join(', ') : '';
-            
-            // تصنيف نوع النيتش
-            const nicheType = classifyNicheType(keyword, 'manual');
-            let nicheBadge = '';
-            if (nicheType.type !== 'general') {
-                nicheBadge = `<span class="niche-badge" style="background:${nicheType.color}20;color:${nicheType.color};font-size:12px;padding:4px 10px">${nicheType.label}</span>`;
-            }
-
-            el.innerHTML = `
-            <div class="card ${cls}">
-                <div class="card-header">
-                    <span class="card-title">"${keyword}"</span>
-                    <div>
-                        ${nicheBadge}
-                        <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
-                    </div>
-                </div>
-                <p style="color:#94a3b8;font-size:13px">${s.label}</p>
-                ${subsList ? `<p style="color:#64748b;font-size:11px;margin-top:4px">${subsList}</p>` : ''}
-                <div class="stats">
-                    <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">منشور</div></div>
-                    <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
-                    <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
-                    <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
-                    <div class="stat"><div class="stat-val">${s.interactive}</div><div class="stat-lbl">تفاعلي</div></div>
-                </div>
-                <div class="stats" style="border-top:1px solid #334155;padding-top:12px;margin-top:12px">
-                    <div class="stat"><div class="stat-val" style="color:#3b82f6">${s.demandScore}</div><div class="stat-lbl">درجة الطلب</div></div>
-                    <div class="stat"><div class="stat-val" style="color:#8b5cf6">${s.trendScore}</div><div class="stat-lbl">درجة الاتجاه</div></div>
-                    <div class="stat"><div class="stat-val" style="color:#22c55e">${s.opportunityScore}</div><div class="stat-lbl">درجة الفرصة</div></div>
-                </div>
-                <div class="posts">
-                    ${posts.slice(0, 10).map(p => `
-                    <div class="post">
-                        <div class="post-title">${p.title}</div>
-                        <div class="post-stats">r/${p.subreddit} · by u/${p.author}</div>
-                        <a class="post-link" href="${p.url}" target="_blank">فتح في Reddit ↗</a>
-                    </div>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // ===== الوضع التلقائي =====
-
-        let currentMode = 'manual';
-        let generatedIdeas = [];
-
-        function switchMode(mode) {
-            currentMode = mode;
-            document.getElementById('manualMode').classList.toggle('active', mode === 'manual');
-            document.getElementById('autoMode').classList.toggle('active', mode === 'auto');
-            document.getElementById('manualPanel').classList.toggle('hidden', mode !== 'manual');
-            document.getElementById('autoPanel').classList.toggle('hidden', mode !== 'auto');
-        }
-
-        // ===== جلب بيانات Google Trends =====
-        async function fetchGoogleTrends() {
-            try {
-                const url = 'https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
-                const data = await fetchWithProxyJSON(url);
-                if (!data) return [];
-                
-                const trends = data.default?.trendingSearchesDays?.[0]?.trendingSearches || [];
-                const ideas = [];
-                
-                const skipPatterns = ['news','celebrity','movie','song','game release','election','sports','score','win'];
-                
-                for (const trend of trends.slice(0, 20)) {
-                    const query = trend.title.query;
-                    const queryLower = query.toLowerCase();
-                    
-                    if (skipPatterns.some(p => queryLower.includes(p))) continue;
-                    
-                    const traffic = trend.formattedTraffic;
-                    const relatedQueries = (trend.relatedQueries || []).map(q => q.query);
-                    
-                    ideas.push({
-                        title: query,
-                        source: 'Google Trends',
-                        traffic: traffic,
-                        related: relatedQueries.slice(0, 3),
-                        type: 'trend'
-                    });
-                    
-                    for (const related of relatedQueries.slice(0, 2)) {
-                        if (related.length > 3 && related.length < 50) {
-                            ideas.push({
-                                title: related,
-                                source: 'Google Trends',
-                                traffic: traffic,
-                                related: [],
-                                type: 'trend'
-                            });
-                        }
-                    }
-                }
-                
-                return ideas;
-            } catch(e) {
-                console.error('Google Trends error:', e);
-                return [];
-            }
-        }
-
-        // ===== جلب بيانات Reddit Unmet Demand =====
-        async function fetchRedditUnmetDemand() {
-            const searchPatterns = [
-                'does anyone know a product',
-                'looking for a product that',
-                'wish there was a product',
-                'is there a product for',
-                'anyone recommend a product',
-                'need help finding a product',
-                'looking for something that',
-                'does anyone use a product',
-                'frustrated with',
-                'tired of',
-                'would pay for',
-                'alternative to',
-                'better than',
-                'replacement for'
-            ];
-            
-            const allIdeas = [];
-            const seen = new Set();
-            
-            for (const pattern of searchPatterns) {
-                try {
-                    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(pattern)}&sort=relevance&limit=25&t=month`;
-                    const xml = await fetchWithProxy(url);
-                    if (!xml) continue;
-                    
-                    const posts = parseRSS(xml);
-                    for (const post of posts) {
-                        const titleKey = post.title.toLowerCase().slice(0, 50);
-                        if (!seen.has(titleKey)) {
-                            seen.add(titleKey);
-                            const nicheIdea = extractNicheFromPost(post);
-                            if (nicheIdea) {
-                                allIdeas.push({
-                                    title: nicheIdea,
-                                    originalTitle: post.title,
-                                    subreddit: post.subreddit,
-                                    url: post.url,
-                                    source: 'Reddit Unmet Demand',
-                                    type: 'demand',
-                                    demandScore: computeDemandScore(post.title, post.content)
-                                });
-                            }
-                        }
-                    }
-                } catch(e) { continue; }
-            }
-            
-            allIdeas.sort((a, b) => b.demandScore - a.demandScore);
-            return allIdeas.slice(0, 30);
-        }
-
-        // ===== استخراج فكرة النيتش من منشور Reddit =====
-        function extractNicheFromPost(post) {
-            const title = post.title;
-            const content = post.content || '';
-            const text = (title + ' ' + content).toLowerCase();
-            
-            const productKeywords = [
-                'product','tool','app','software','service','device','gadget',
-                'equipment','gear','supply','material','resource','platform'
-            ];
-            
-            const demandPatterns = [
-                /does anyone know (?:a |an )?(.+)/i,
-                /looking for (?:a |an )?(.+)/i,
-                /wish there was (?:a |an )?(.+)/i,
-                /is there (?:a |an )?(.+) for/i,
-                /anyone recommend (?:a |an )?(.+)/i,
-                /need (?:a |an )?(.+)/i,
-                /want (?:a |an )?(.+)/i,
-                /best (.+) for/i,
-                /alternative to (.+)/i,
-                /better than (.+)/i
-            ];
-            
-            for (const pattern of demandPatterns) {
-                const match = title.match(pattern);
-                if (match && match[1]) {
-                    let niche = match[1]
-                        .replace(/[?.!,;:]/g, '')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                    if (niche.length > 3 && niche.length < 60) return niche;
-                }
-            }
-            
-            const hasProductKeyword = productKeywords.some(kw => text.includes(kw));
-            if (hasProductKeyword) {
-                const words = title.split(' ');
-                const productIndex = words.findIndex(w => productKeywords.includes(w.toLowerCase()));
-                if (productIndex > 0) {
-                    const start = Math.max(0, productIndex - 2);
-                    const end = Math.min(words.length, productIndex + 3);
-                    return words.slice(start, end).join(' ');
-                }
-            }
-            
-            return null;
-        }
-
-        // ===== الخوارزمية الرئيسية: اكتشاف نيتشات من المصادر معاً =====
-        async function runFullDiscovery() {
-            const btn = document.getElementById('fetchIdeasBtn');
-            btn.disabled = true;
-            btn.innerHTML = '⏳ جاري البحث...';
-            
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
-            try {
-                // الخطوة 1: جلب من المصرين معاً بالتوازي
-                showProgress(5);
-                setStatus('📡 جاري الاتصال بـ Google Trends و Reddit...');
-                
-                const [trendsIdeas, redditIdeas] = await Promise.all([
-                    fetchGoogleTrends().catch(() => []),
-                    fetchRedditUnmetDemand().catch(() => [])
-                ]);
-                
-                showProgress(30);
-                setStatus(`📈 جلبنا ${trendsIdeas.length} من Google Trends + 🔍 ${redditIdeas.length} من Reddit`);
-
-                // الخطوة 2: دمج وتصنيف كل الأفكار
-                setStatus('🔄 جاري دمج وتصنيف الأفكار...');
-                showProgress(40);
-                
-                const allIdeas = [...trendsIdeas, ...redditIdeas];
-                generatedIdeas = mergeAndScoreIdeas(allIdeas);
-                
-                if (generatedIdeas.length === 0) {
-                    document.getElementById('results').innerHTML = '<div class="error">ما لقينا أفكار حالياً. جرّب مرة ثانية.</div>';
-                    return;
-                }
-
-                // الخطوة 3: تحليل أفضل 10 أفكار في Reddit
-                const topNiche = generatedIdeas.slice(0, 10);
-                const finalResults = [];
-                
-                for (let i = 0; i < topNiche.length; i++) {
-                    const idea = topNiche[i];
-                    setStatus(`🔍 [${i + 1}/${topNiche.length}] جاري تحليل: ${idea.title}`);
-                    showProgress(40 + (i / topNiche.length) * 50);
-                    
-                    try {
-                        const posts = await searchReddit(idea.title);
-                        const scoring = computeTrafficLight(posts);
-                        finalResults.push({
-                            keyword: idea.title,
-                            scoring,
-                            posts,
-                            ideaScore: idea.score,
-                            nicheType: idea.nicheType,
-                            sources: idea.sources
-                        });
-                    } catch(e) {
-                        // تخطي إذا ما لقى نتائج
-                        continue;
-                    }
-                }
-
-                // الخطوة 4: ترتيب حسب درجة الفرصة
-                showProgress(95);
-                setStatus('📊 جاري ترتيب النتائج...');
-                
-                finalResults.sort((a, b) => b.scoring.opportunityScore - a.scoring.opportunityScore);
-
-                showProgress(100);
-                setStatus(`✅ لقينا ${finalResults.length} نيتش واعد!`);
-                
-                renderDiscoveryResults(finalResults);
-
-            } catch(e) {
-                document.getElementById('results').innerHTML = `<div class="error">خطأ: ${e.message}</div>`;
-            }
-
-            hideProgress();
-            btn.disabled = false;
-            btn.innerHTML = '🔍 ابدأ الاكتشاف';
-            setTimeout(() => setStatus(''), 3000);
-        }
-
-        // ===== خوارزمية دمج وتقييم الأفكار =====
-        function mergeAndScoreIdeas(ideas) {
-            const merged = new Map();
-            
-            for (const idea of ideas) {
-                const normalizedTitle = normalizeNicheTitle(idea.title);
-                
-                if (merged.has(normalizedTitle)) {
-                    // إذا كانت الفكرة موجودة، قم بدمجها وزيادة درجتها
-                    const existing = merged.get(normalizedTitle);
-                    existing.score += 20;
-                    existing.sources.push(idea.source);
-                    existing.count += 1;
-                    // تحديث التصنيف إذا كان المصدر الجديد يعطي معلومة إضافية
-                    if (existing.nicheType.type === 'general') {
-                        existing.nicheType = classifyNicheType(
-                            existing.title, 
-                            idea.source, 
-                            idea.related || []
-                        );
-                    }
-                } else {
-                    // تصنيف نوع النيتش
-                    const nicheType = classifyNicheType(
-                        idea.title, 
-                        idea.source, 
-                        idea.related || []
-                    );
-                    
-                    // فكرة جديدة
-                    merged.set(normalizedTitle, {
-                        title: idea.title,
-                        normalizedTitle: normalizedTitle,
-                        score: calculateIdeaScore(idea),
-                        sources: [idea.source],
-                        count: 1,
-                        type: idea.type,
-                        demandScore: idea.demandScore || 0,
-                        subreddit: idea.subreddit,
-                        url: idea.url,
-                        nicheType: nicheType
-                    });
-                }
-            }
-            
-            // ترتيب حسب الدرجة
-            const sorted = Array.from(merged.values())
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 20);
-            
-            return sorted;
-        }
-
-        // ===== تطبيع عنوان النيتش =====
-        function normalizeNicheTitle(title) {
-            return title
-                .toLowerCase()
-                .replace(/[^a-z0-9\s]/g, '')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .slice(0, 50);
-        }
-
-        // ===== حساب درجة الفكرة =====
-        function calculateIdeaScore(idea) {
-            let score = 0;
-            
-            // درجة المصدر
-            if (idea.source === 'Google Trends') {
-                score += 30; // Google Trends يدل على اهتمام عالي
-            } else if (idea.source === 'Reddit Unmet Demand') {
-                score += 40; // Reddit Unmet Demand يدل على حاجة حقيقية
-            }
-            
-            // درجة الطلب
-            if (idea.demandScore) {
-                score += idea.demandScore * 0.3;
-            }
-            
-            // درجة الطول (الفكرة القصيرة أفضل)
-            if (idea.title.length < 20) {
-                score += 15;
-            } else if (idea.title.length < 40) {
-                score += 10;
-            }
-            
-            // درجة الكلمات المفتاحية
-            const text = idea.title.toLowerCase();
-            const positiveWords = ['best','top','new','easy','fast','cheap','free','better'];
-            const negativeWords = ['worst','bad','slow','expensive','broken','fake'];
-            
-            for (const word of positiveWords) {
-                if (text.includes(word)) score += 5;
-            }
-            for (const word of negativeWords) {
-                if (text.includes(word)) score -= 5;
-            }
-            
-            return Math.round(score);
-        }
-
-        // ===== عرض نتائج الاكتشاف =====
-        function renderDiscoveryResults(results) {
-            const el = document.getElementById('results');
-            
-            if (!results.length) {
-                el.innerHTML = '<div class="error">ما لقينا نتائج. جرّب مرة ثانية.</div>';
-                return;
-            }
-
-            const header = `
-            <div style="text-align:center;margin-bottom:20px;padding:16px;background:#1e293b;border-radius:12px">
-                <h2 style="color:#22c55e;font-size:20px;margin-bottom:5px">🎯 نتائج الاكتشاف</h2>
-                <p style="color:#94a3b8;font-size:13px">${results.length} نيتش واعد - مرتبة من الأفضل للأسوأ</p>
-            </div>`;
-
-            const cards = results.map((r, idx) => {
-                const s = r.scoring;
-                const cls = s.color;
-                const subsList = s.subreddits ? s.subreddits.slice(0, 3).map(x => `r/${x}`).join(', ') : '';
-                
-                let nicheBadge = '';
-                if (r.nicheType && r.nicheType.type !== 'general') {
-                    nicheBadge = `<span class="niche-badge" style="background:${r.nicheType.color}20;color:${r.nicheType.color};font-size:12px;padding:4px 10px">${r.nicheType.label}</span>`;
-                }
-                
-                const sourcesBadges = r.sources ? r.sources.map(s => 
-                    s === 'Google Trends' ? '<span style="background:#1e3a5f;padding:2px 6px;border-radius:4px;font-size:10px;color:#60a5fa">📈 Trends</span>' :
-                    '<span style="background:#1e3a5f;padding:2px 6px;border-radius:4px;font-size:10px;color:#60a5fa">🔍 Reddit</span>'
-                ).join(' ') : '';
-
-                return `
-                <div class="card ${cls}" style="margin-bottom:16px">
-                    <div class="card-header">
-                        <span class="card-title" style="font-size:16px">#${idx + 1} "${r.keyword}"</span>
-                        <div>
-                            ${nicheBadge}
-                            <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
-                        </div>
-                    </div>
-                    <p style="color:#94a3b8;font-size:12px;margin:4px 0 8px">${s.label}</p>
-                    <div style="margin-bottom:8px">${sourcesBadges}</div>
-                    ${subsList ? `<p style="color:#64748b;font-size:11px;margin-bottom:8px">subreddits: ${subsList}</p>` : ''}
-                    <div class="stats">
-                        <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">منشور</div></div>
-                        <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
-                        <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
-                        <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
-                    </div>
-                    <div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #334155;justify-content:center">
-                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px">
-                            <div style="color:#3b82f6;font-size:20px;font-weight:bold">${s.demandScore}</div>
-                            <div style="color:#64748b;font-size:10px">الطلب</div>
-                        </div>
-                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px">
-                            <div style="color:#8b5cf6;font-size:20px;font-weight:bold">${s.trendScore}</div>
-                            <div style="color:#64748b;font-size:10px">الاتجاه</div>
-                        </div>
-                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px;border:2px solid #22c55e">
-                            <div style="color:#22c55e;font-size:24px;font-weight:bold">${s.opportunityScore}</div>
-                            <div style="color:#64748b;font-size:10px">الفرصة 🎯</div>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-
-            el.innerHTML = header + cards;
-        }
-
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
-    </script>
+// ===================== INIT =====================
+updateNotifBadge();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+</script>
 </body>
 </html>
