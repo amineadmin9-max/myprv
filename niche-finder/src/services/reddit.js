@@ -1,108 +1,76 @@
 import axios from 'axios';
 
-const REDDIT_BASE = 'https://www.reddit.com';
-const USER_AGENT = 'NicheFinder/1.0 (Android App)';
+const REPO_RAW = 'https://raw.githubusercontent.com/amineadmin9-max/myprv/main/data';
 
-const api = axios.create({
-  baseURL: REDDIT_BASE,
-  headers: { 'User-Agent': USER_AGENT },
-  timeout: 15000,
-});
-
-export async function searchSubreddits(query, limit = 25) {
+export async function fetchLocalData(subreddit) {
   try {
-    const res = await api.get('/search.json', {
-      params: { query, type: 'sr', limit, nsfw: 'false' },
-    });
-    return res.data.data.children.map((c) => ({
-      name: c.data.display_name,
-      title: c.data.title,
-      subscribers: c.data.subscribers,
-      description: c.data.public_description,
-      active: c.data.accounts_active,
-    }));
+    const res = await axios.get(`${REPO_RAW}/r_${subreddit}.json`, { timeout: 10000 });
+    return res.data || [];
   } catch (e) {
-    console.error('searchSubreddits error:', e.message);
+    console.log(`No local data for r/${subreddit}`);
     return [];
   }
 }
 
-export async function getSubredditPosts(subreddit, sort = 'hot', limit = 100, timeframe = 'quarter') {
+export async function fetchAvailableSubreddits() {
   try {
-    const res = await api.get(`/r/${subreddit}/${sort}.json`, {
-      params: { limit, t: timeframe, raw_json: 1 },
-    });
-    return res.data.data.children.map((c) => ({
-      id: c.data.id,
-      title: c.data.title,
-      selftext: (c.data.selftext || '').slice(0, 1000),
-      score: c.data.score,
-      upvoteRatio: c.data.upvote_ratio,
-      numComments: c.data.num_comments,
-      created: c.data.created_utc,
-      permalink: `https://reddit.com${c.data.permalink}`,
-      author: c.data.author,
-      flair: c.data.link_flair_text || '',
-      isSelf: c.data.is_self,
-      domain: c.data.domain,
-      thumbnail: c.data.thumbnail,
-    }));
-  } catch (e) {
-    console.error(`getSubredditPosts(${subreddit}) error:`, e.message);
-    return [];
-  }
-}
-
-export async function getRelatedSubreddits(subreddit) {
-  try {
-    const res = await api.get(`/r/${subreddit}/about.json`);
-    const about = res.data.data;
-    const related = [];
-    if (about.community_description) {
-      const words = about.community_description.split(/\s+/).filter((w) => w.length > 4).slice(0, 5);
-      for (const word of words) {
-        const results = await searchSubreddits(word, 5);
-        related.push(...results);
-      }
-    }
-    const unique = [...new Map(related.map((r) => [r.name, r])).values()];
-    return unique.filter((r) => r.name !== subreddit).slice(0, 10);
+    const res = await axios.get(`${REPO_RAW}/index.json`, { timeout: 10000 });
+    return res.data || [];
   } catch (e) {
     return [];
   }
 }
 
-export async function searchUnmetDemand(query, limit = 50) {
-  const patterns = [
-    `${query} "does anyone know"`,
-    `${query} "is there something"`,
-    `${query} "I wish there was"`,
-    `${query} "recommend"`,
-    `${query} "struggling with"`,
+export async function searchReddit(subreddit, numPosts = 50) {
+  const urls = [
+    `https://www.reddit.com/r/${subreddit}/.rss?limit=${numPosts}`,
+    `https://old.reddit.com/r/${subreddit}/.rss?limit=${numPosts}`,
   ];
-  const allPosts = [];
-  for (const pattern of patterns) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  };
+
+  for (const url of urls) {
     try {
-      const res = await api.get('/search.json', {
-        params: { query: pattern, sort: 'relevance', limit: Math.ceil(limit / patterns.length), t: 'year', restrict_sr: 'false' },
-      });
-      const posts = res.data.data.children
-        .filter((c) => c.kind === 't3')
-        .map((c) => ({
-          id: c.data.id,
-          title: c.data.title,
-          selftext: (c.data.selftext || '').slice(0, 500),
-          score: c.data.score,
-          numComments: c.data.num_comments,
-          subreddit: c.data.subreddit,
-          permalink: `https://reddit.com${c.data.permalink}`,
-          created: c.data.created_utc,
-        }));
-      allPosts.push(...posts);
+      const r = await axios.get(url, { headers, timeout: 15000 });
+      if (r.status === 200 && (r.data.includes('<feed') || r.data.includes('<entry'))) {
+        return parseRSS(r.data, subreddit);
+      }
     } catch (e) {
       continue;
     }
   }
-  const unique = [...new Map(allPosts.map((p) => [p.id, p])).values()];
-  return unique.sort((a, b) => b.numComments - a.numComments).slice(0, limit);
+  return [];
+}
+
+function parseRSS(xmlText, subreddit) {
+  const posts = [];
+  const entries = xmlText.split('<entry>').slice(1);
+
+  for (const entry of entries) {
+    const titleM = entry.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+    const title = (titleM?.[1] || '').replace(/<[^>]+>/g, '').trim();
+
+    const authorM = entry.match(/<name>([^<]*)<\/name>/);
+    const author = (authorM?.[1] || 'unknown').replace('/u/', '');
+
+    const linkM = entry.match(/<link[^>]*href="([^"]*)"/);
+    const url = linkM?.[1] || '';
+
+    const contentM = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/);
+    const content = (contentM?.[1] || '').replace(/<[^>]+>/g, '').trim().slice(0, 500);
+
+    const updatedM = entry.match(/<updated>(.*?)<\/updated>/);
+    const updated = updatedM?.[1] || '';
+
+    if (title) {
+      posts.push({
+        title, author, url, content,
+        updated, subreddit,
+        score: 0, numComments: 0, isSelf: true, domain: 'self.' + subreddit,
+        selftext: content, permalink: url, flair: '',
+      });
+    }
+  }
+  return posts;
 }

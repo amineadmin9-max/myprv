@@ -3,16 +3,12 @@ name: Reddit Scraper
 on:
   workflow_dispatch:
     inputs:
-      subreddit:
-        description: 'Subreddit name (without r/)'
+      subreddits:
+        description: 'Comma-separated subreddit names'
         required: true
-        default: 'game'
-      num_posts:
-        description: 'Number of posts'
-        required: false
-        default: '25'
+        default: 'game,HomeGym,PetCare,RemoteWork,solar,BuyItForLife'
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */12 * * *'
 
 permissions:
   contents: write
@@ -33,12 +29,12 @@ jobs:
 
       - name: Scrape Reddit
         run: |
-          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddit || 'game' }}" "${{ github.event.inputs.num_posts || '25' }}"
+          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddits || 'game,HomeGym,PetCare,RemoteWork,solar,BuyItForLife' }}"
 
       - name: Commit results
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add data/*.json
-          git diff --cached --quiet || git commit -m "Update r/${{ github.event.inputs.subreddit || 'game' }} data"
+          git diff --cached --quiet || git commit -m "Update Reddit data"
           git push

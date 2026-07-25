@@ -3,9 +3,9 @@ import json
 import os
 import sys
 import time
-import re
 from datetime import datetime
 from html import unescape
+import re
 
 
 def clean_html(text):
@@ -14,29 +14,22 @@ def clean_html(text):
     return text.strip()
 
 
-def scrape_reddit(subreddit, num_posts=25):
+def scrape_reddit(subreddit, num_posts=50):
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     }
 
     rss_url = f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}"
-    print(f"Fetching RSS: {rss_url}")
 
     try:
         r = requests.get(rss_url, headers=headers, timeout=15)
-        print(f"Status: {r.status_code}, Content-Type: {r.headers.get('content-type', '')}")
         if r.status_code != 200:
-            print(f"Response: {r.text[:500]}")
             return []
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception:
         return []
 
-    xml_text = r.text
     posts = []
-
-    entries = re.findall(r"<entry>(.*?)</entry>", xml_text, re.DOTALL)
-    print(f"Found {len(entries)} entries")
+    entries = re.findall(r"<entry>(.*?)</entry>", r.text, re.DOTALL)
 
     for entry in entries[:num_posts]:
         title_m = re.search(r"<title[^>]*>(.*?)</title>", entry, re.DOTALL)
@@ -54,34 +47,54 @@ def scrape_reddit(subreddit, num_posts=25):
         updated_m = re.search(r"<updated>(.*?)</updated>", entry)
         updated = updated_m.group(1) if updated_m else ""
 
-        post = {
-            "title": title,
-            "author": author,
-            "url": url,
-            "content": content,
-            "updated": updated,
-            "subreddit": subreddit,
-        }
-        posts.append(post)
-        print(f"  [{len(posts)}] {title[:70]}")
+        if title:
+            posts.append({
+                "title": title,
+                "author": author,
+                "url": url,
+                "content": content,
+                "updated": updated,
+                "subreddit": subreddit,
+                "score": 0,
+                "numComments": 0,
+                "isSelf": True,
+                "domain": f"self.{subreddit}",
+                "selftext": content,
+                "permalink": url,
+                "flair": "",
+            })
 
-    return posts[:num_posts]
+    return posts
 
 
 def main():
-    subreddit = sys.argv[1] if len(sys.argv) > 1 else "game"
-    num_posts = int(sys.argv[2]) if len(sys.argv) > 2 else 25
-
-    print(f"Scraping r/{subreddit} - {num_posts} posts\n")
-    posts = scrape_reddit(subreddit, num_posts)
+    subreddits_arg = sys.argv[1] if len(sys.argv) > 1 else "game"
+    subreddits = [s.strip() for s in subreddits_arg.split(",") if s.strip()]
 
     os.makedirs("data", exist_ok=True)
-    filename = f"data/r_{subreddit}.json"
+    all_index = []
 
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(posts, f, ensure_ascii=False, indent=2)
+    for sub in subreddits:
+        print(f"Scraping r/{sub}...")
+        posts = scrape_reddit(sub, 50)
 
-    print(f"\nSaved {len(posts)} posts to {filename}")
+        filename = f"data/r_{sub}.json"
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(posts, f, ensure_ascii=False, indent=2)
+
+        all_index.append({
+            "name": sub,
+            "posts": len(posts),
+            "updated": datetime.now().isoformat(),
+        })
+        print(f"  Saved {len(posts)} posts")
+
+        time.sleep(2)
+
+    with open("data/index.json", "w", encoding="utf-8") as f:
+        json.dump(all_index, f, ensure_ascii=False, indent=2)
+
+    print(f"\nDone! Scraped {len(subreddits)} subreddits")
 
 
 if __name__ == "__main__":
