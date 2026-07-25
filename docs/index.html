@@ -333,7 +333,7 @@
 
 <script>
 // ===================== CONFIG =====================
-const PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
+const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
 const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
@@ -352,15 +352,29 @@ function setStatus(msg){document.getElementById('status').textContent=msg;}
 function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 
-async function callGemini(prompt,timeoutMs=20000){
+async function callGemini(prompt,timeoutMs=25000){
   const key=getGeminiKey();
   if(!key){geminiStats.total++;geminiStats.fail++;if(!geminiStats.firstError)geminiStats.firstError='No API key set in localStorage';return null;}
   geminiStats.total++;
   const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
   const body={contents:[{parts:[{text:prompt}]}]};
+  const fetchOpts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+  try{
+    const r=await fetch(url,{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
+    const rawText=await r.text();
+    if(rawText.startsWith('{')||rawText.startsWith('[')){
+      const d=JSON.parse(rawText);
+      if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){geminiStats.ok++;return d.candidates[0].content.parts[0].text.trim();}
+      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status}\nParsed JSON but no candidates\nRaw: ${JSON.stringify(d).slice(0,600)}`;
+    }else{
+      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
+    }
+  }catch(e){
+    if(!geminiStats.firstError)geminiStats.firstError=`Direct: ${e.constructor.name}: ${e.message}`;
+  }
   for(const proxy of PROXIES){
     try{
-      const r=await fetch(proxy+encodeURIComponent(url),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+      const r=await fetch(proxy+encodeURIComponent(url),{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
       const rawText=await r.text();
       if(!rawText.startsWith('{')&&!rawText.startsWith('[')){
         if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
@@ -368,7 +382,7 @@ async function callGemini(prompt,timeoutMs=20000){
       }
       const d=JSON.parse(rawText);
       if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){geminiStats.ok++;return d.candidates[0].content.parts[0].text.trim();}
-      if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status}\nParsed JSON but no candidates text\nRaw: ${JSON.stringify(d).slice(0,600)}`;
+      if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status}\nParsed JSON but no candidates\nRaw: ${JSON.stringify(d).slice(0,600)}`;
     }catch(e){
       if(!geminiStats.firstError){
         let detail=`Proxy: ${proxy}\n${e.constructor.name}: ${e.message||e.toString()}`;
