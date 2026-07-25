@@ -624,7 +624,6 @@ Return ONLY JSON: {"type":"trending|evergreen|hybrid","reason":"brief explanatio
   // Keyword fallback
   return classifyNicheType(topic,'keyword');
 }
-}
 
 async function computeTrafficLight(posts){
   if(!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
