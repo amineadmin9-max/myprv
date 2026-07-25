@@ -1,59 +1,86 @@
+import requests
 import json
 import os
 import sys
 import time
 from datetime import datetime
-import requests
+from html import unescape
+import re
 
 
-def scrape_reddit_json(subreddit, num_posts=50):
+def clean_html(text):
+    text = unescape(text or "")
+    text = re.sub(r"<[^>]+>", "", text)
+    return text.strip()
+
+
+def scrape_reddit(subreddit, num_posts=50):
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
     }
 
-    urls = [
-        f"https://www.reddit.com/r/{subreddit}/new.json?limit={num_posts}",
-        f"https://www.reddit.com/r/{subreddit}/hot.json?limit={num_posts}",
-    ]
+    rss_url = f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}"
 
-    for url in urls:
+    for attempt in range(3):
         try:
-            print(f"  Trying {url}")
-            r = requests.get(url, headers=headers, timeout=15)
-            print(f"  Status: {r.status_code}, Length: {len(r.text)}")
+            r = requests.get(rss_url, headers=headers, timeout=15)
+            print(f"  Attempt {attempt+1}: Status {r.status_code}, Length {len(r.text)}")
 
-            if r.status_code == 200:
-                data = r.json()
-                children = data.get("data", {}).get("children", [])
-                posts = []
-                for child in children[:num_posts]:
-                    d = child.get("data", {})
-                    posts.append({
-                        "title": d.get("title", ""),
-                        "author": d.get("author", "unknown"),
-                        "score": d.get("score", 0),
-                        "numComments": d.get("num_comments", 0),
-                        "url": f"https://reddit.com{d.get('permalink', '')}",
-                        "domain": d.get("domain", ""),
-                        "created": datetime.fromtimestamp(d.get("created_utc", 0)).isoformat() if d.get("created_utc") else "",
-                        "subreddit": d.get("subreddit", subreddit),
-                        "selftext": (d.get("selftext", "") or "")[:500],
-                        "permalink": f"https://reddit.com{d.get('permalink', '')}",
-                        "flair": d.get("link_flair_text", "") or "",
-                        "isSelf": d.get("is_self", True),
-                    })
-                if posts:
-                    return posts
-
+            if r.status_code == 200 and "<entry>" in r.text:
+                return parse_rss(r.text, subreddit, num_posts)
             elif r.status_code == 429:
-                print(f"  Rate limited, waiting 10s...")
-                time.sleep(10)
-
+                wait = 10 * (attempt + 1)
+                print(f"  Rate limited, waiting {wait}s...")
+                time.sleep(wait)
+            else:
+                break
         except Exception as e:
             print(f"  Error: {e}")
-            continue
+            break
 
     return []
+
+
+def parse_rss(xml_text, subreddit, num_posts):
+    posts = []
+    entries = re.findall(r"<entry>(.*?)</entry>", xml_text, re.DOTALL)
+    print(f"  Found {len(entries)} entries in RSS")
+
+    for entry in entries[:num_posts]:
+        title_m = re.search(r"<title[^>]*>(.*?)</title>", entry, re.DOTALL)
+        title = clean_html(title_m.group(1)) if title_m else ""
+
+        author_m = re.search(r"<name>([^<]*)</name>", entry)
+        author = author_m.group(1).replace("/u/", "") if author_m else "unknown"
+
+        link_m = re.search(r'<link[^>]*href="([^"]*)"', entry)
+        url = link_m.group(1) if link_m else ""
+
+        content_m = re.search(r"<content[^>]*>(.*?)</content>", entry, re.DOTALL)
+        content = clean_html(content_m.group(1))[:500] if content_m else ""
+
+        updated_m = re.search(r"<updated>(.*?)</updated>", entry)
+        updated = updated_m.group(1) if updated_m else ""
+
+        if title:
+            posts.append({
+                "title": title,
+                "author": author,
+                "url": url,
+                "content": content,
+                "updated": updated,
+                "subreddit": subreddit,
+                "score": 0,
+                "numComments": 0,
+                "isSelf": True,
+                "domain": f"self.{subreddit}",
+                "selftext": content,
+                "permalink": url,
+                "flair": "",
+            })
+
+    return posts
 
 
 def main():
@@ -65,7 +92,7 @@ def main():
 
     for sub in subreddits:
         print(f"\nScraping r/{sub}...")
-        posts = scrape_reddit_json(sub, 50)
+        posts = scrape_reddit(sub, 50)
 
         filename = f"data/r_{sub}.json"
         with open(filename, "w", encoding="utf-8") as f:
@@ -78,7 +105,7 @@ def main():
         })
         print(f"  Saved {len(posts)} posts")
 
-        time.sleep(5)
+        time.sleep(8)
 
     with open("data/index.json", "w", encoding="utf-8") as f:
         json.dump(all_index, f, ensure_ascii=False, indent=2)
