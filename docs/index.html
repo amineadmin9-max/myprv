@@ -111,13 +111,14 @@
             const ratio = promo / total;
             const avgComments = posts.reduce((s, p) => s + (p.numComments || 0), 0) / total;
             const avgScore = posts.reduce((s, p) => s + (p.score || 0), 0) / total;
-            const highEng = (avgComments + avgScore) / 2 > 20;
+            const hasEngData = avgComments > 0 || avgScore > 0;
+            const highEng = hasEngData ? (avgComments + avgScore) / 2 > 20 : true;
 
             let color, label;
-            if (ratio <= 0.01 && highEng) { color = 'green'; label = 'فرصة نظيفة - أقوى إشارة'; }
-            else if (ratio <= 0.15 && highEng) { color = 'yellow'; label = 'سوق مصدّق ومفتوح'; }
-            else if (ratio > 0.4) { color = 'red'; label = 'سوق مشبع بالترويج'; }
-            else { color = 'yellow'; label = 'حالة متوسطة'; }
+            if (ratio <= 0.01) { color = 'green'; label = 'فرصة نظيفة - أقوى إشارة'; }
+            else if (ratio <= 0.15) { color = 'green'; label = 'سوق مفتوح ونظيف نسبياً'; }
+            else if (ratio <= 0.4) { color = 'yellow'; label = 'سوق مصدّق - يحتاج تحليل أعمق'; }
+            else { color = 'red'; label = 'سوق مشبع بالترويج'; }
 
             const edu = posts.filter(p => classify(p.title, p.content || p.selftext || '').eduScore >= 50).length;
             const stories = posts.filter(p => classify(p.title, p.content || p.selftext || '').storyScore >= 50).length;
@@ -130,13 +131,16 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(xml, 'text/xml');
             const entries = doc.querySelectorAll('entry');
-            return Array.from(entries).map(e => ({
-                title: e.querySelector('title')?.textContent || '',
-                author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
-                url: e.querySelector('link')?.getAttribute('href') || '',
-                content: (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').slice(0, 500),
-                subreddit: sub, score: 0, numComments: 0
-            })).filter(p => p.title);
+            return Array.from(entries).map(e => {
+                const content = (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+                return {
+                    title: e.querySelector('title')?.textContent || '',
+                    author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
+                    url: e.querySelector('link')?.getAttribute('href') || '',
+                    content: content,
+                    subreddit: sub, score: 0, numComments: 0
+                };
+            }).filter(p => p.title);
         }
 
         async function fetchFromGitHub(sub) {
