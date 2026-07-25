@@ -364,10 +364,8 @@
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
-// VPS API (server-side LLM - recommended)
+// LLM (optional - app works without it)
 const VPS_API_URL=localStorage.getItem('nf_vps_api')||'';
-
-// Direct LLM Providers (client-side)
 const GROQ_BASE='https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL='llama-3.3-70b-versatile';
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -377,6 +375,7 @@ const OPENROUTER_MODEL='openrouter/free';
 function getGroqKey(){return localStorage.getItem('nf_groq_key')||'';}
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
+function hasAnyKey(){return VPS_API_URL||getGroqKey()||getGeminiKey()||getOpenRouterKey();}
 function getActiveProvider(){
   if(VPS_API_URL)return'vps';
   if(getGroqKey())return'groq';
@@ -454,10 +453,17 @@ async function _geminiFetch(prompt,timeoutMs){
 }
 
 async function callLLM(prompt,timeoutMs=30000){
+  if(!hasAnyKey()){
+    console.log('[LLM] No API key configured - using keyword fallback');
+    llmStats.total++;
+    llmStats.fail++;
+    return null;
+  }
+
   llmStats.total++;
   const provider=getActiveProvider();
 
-  // Try VPS API first (server-side, keys hidden)
+  // Try VPS API first
   if(provider==='vps'){
     console.log('[LLM] Trying VPS API...');
     try{
@@ -467,13 +473,12 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=data.model||'vps';
         llmStats.provider='VPS ('+data.provider+')';
-        console.log('[LLM] SUCCESS (VPS) — provider:',data.provider);
         return data.content;
       }
     }catch(e){console.log('[LLM] VPS failed:',e.message);}
   }
 
-  // Try Groq (fastest, most generous)
+  // Try Groq
   if(provider==='groq'||provider==='none'){
     if(getGroqKey()){
       console.log('[LLM] Trying Groq...');
@@ -482,7 +487,6 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=groqResult.realModel||GROQ_MODEL;
         llmStats.provider='Groq';
-        console.log('[LLM] SUCCESS (Groq)');
         return groqResult.content;
       }
     }
@@ -497,7 +501,6 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=geminiResult.realModel||'gemini-2.0-flash';
         llmStats.provider='Gemini';
-        console.log('[LLM] SUCCESS (Gemini)');
         return geminiResult.content;
       }
     }
@@ -512,7 +515,6 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=result.realModel||OPENROUTER_MODEL;
         llmStats.provider='OpenRouter';
-        console.log('[LLM] SUCCESS (OpenRouter)');
         return result.content;
       }
     }
@@ -573,12 +575,12 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 function renderLLMStats(){
   const s=llmStats;
   const provider=getActiveProvider();
-  const providerLabel=provider==='vps'?'VPS Server':provider==='groq'?'Groq (Free 14K+)':provider==='gemini'?'Gemini (Free 100)':provider==='openrouter'?'OpenRouter':'None (Keywords only)';
-  const providerColor=provider==='vps'?'var(--green)':provider==='groq'?'var(--green)':provider==='gemini'?'#8b5cf6':provider==='openrouter'?'var(--blue)':'var(--red-icon)';
-  const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'<div style="margin-top:8px;color:var(--green);font-size:11px">No errors captured</div>';
+  const providerLabel=provider==='vps'?'VPS Server':provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='openrouter'?'OpenRouter':'No API key (Keywords only)';
+  const providerColor=provider==='none'?'var(--text-dim)':'var(--green)';
+  const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Last used: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
   return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
-    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">AI Stats (this run)</div>
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">AI Stats</div>
     <div style="display:flex;justify-content:center;gap:20px;font-size:13px">
       <span>Total: <b style="color:var(--text)">${s.total}</b></span>
       <span style="color:var(--green)">OK: <b>${s.ok}</b></span>
@@ -657,14 +659,17 @@ Scoring:
 - story: 0=factual question, 100=personal experience
 - interactive: 0=statement, 100=engaging question`;
 
-  const result=await callOpenRouter(prompt);
-  if(!result)return null;
-  try{
-    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const arr=JSON.parse(cleaned);
-    if(!Array.isArray(arr))return null;
-    return arr.map(d=>({promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))}));
-  }catch(e){return null;}
+  const result=await callLLM(prompt);
+  if(result){
+    try{
+      const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const arr=JSON.parse(cleaned);
+      if(Array.isArray(arr))return arr.map(d=>({promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))}));
+    }catch(e){}
+  }
+
+  // Keyword fallback
+  return posts.map(p=>classify(p.title,p.content||p.selftext||''));
 }
 
 function computeDemandScore(title,content){
@@ -711,53 +716,43 @@ function classifyNicheType(title,source,cachedTrends){
 }
 
 async function classifyTrendingAI(topic,trendsIdeas){
-  const trendList=trendsIdeas.slice(0,20).map(t=>`- ${t.title} (${t.traffic||'N/A'})`).join('\n');
-  const prompt=`Classify this niche topic into ONE of these categories based on current Google Trends and topic characteristics.
+  // Try AI first
+  const prompt=`Classify this niche topic into ONE of these categories:
+- "trending": Rising momentum, time-sensitive, viral, new technology, seasonal
+- "evergreen": Persistent need, ongoing demand, essential product
+- "hybrid": Both trending and evergreen signals
 
 Niche topic: "${topic}"
 
-Current Google Trends (top 20):
-${trendList||'No trends data available'}
+Return ONLY JSON: {"type":"trending|evergreen|hybrid","reason":"brief explanation"}`;
 
-Classification rules:
-- "trending": Topic has rising momentum, appears in current trends, time-sensitive, viral, new technology, seasonal
-- "evergreen": Topic is a persistent need, not time-dependent, ongoing demand, evergreen hobby, essential product
-- "hybrid": Shows both trending signals AND evergreen demand
-
-IMPORTANT: You MUST return exactly ONE of: "trending", "evergreen", or "hybrid"
-
-Return ONLY a valid JSON object (no markdown, no code blocks):
-{"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":50}`;
-
-  const result=await callOpenRouter(prompt);
-  if(!result)return null;
-  try{
-    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const d=JSON.parse(cleaned);
-    if(d.type==='trending')return{type:'trending',label:'Trending',color:'#8b5cf6',reason:d.reason,confidence:d.confidence};
-    if(d.type==='hybrid')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:d.reason,confidence:d.confidence};
-    return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:d.reason,confidence:d.confidence};
-  }catch(e){
-    const lower=result.toLowerCase();
-    if(lower.includes('trending')&&!lower.includes('evergreen'))return{type:'trending',label:'Trending',color:'#8b5cf6',reason:'AI classified as trending',confidence:60};
-    if(lower.includes('hybrid'))return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:'AI classified as hybrid',confidence:60};
-    return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:'AI classified as evergreen',confidence:60};
+  const result=await callLLM(prompt);
+  if(result){
+    try{
+      const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const d=JSON.parse(cleaned);
+      if(d.type==='trending')return{type:'trending',label:'Trending',color:'#8b5cf6',reason:d.reason};
+      if(d.type==='hybrid')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:d.reason};
+      return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:d.reason};
+    }catch(e){}
   }
+
+  // Keyword fallback
+  return classifyNicheType(topic,'keyword');
+}
 }
 
 async function computeTrafficLight(posts){
   if(!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
   const total=posts.length;
 
-  let classResults=null;
-  try{
-    const batch=posts.slice(0,10);
-    classResults=await batchClassify(batch);
-  }catch(e){classResults=null;}
+  // Try AI batch classify, fallback to keyword
+  let classResults=await batchClassify(posts);
+  if(!classResults||!classResults.length)classResults=posts.map(p=>classify(p.title,p.content||p.selftext||''));
 
   const promo=posts.filter((p,i)=>{
-    if(classResults&&classResults[i])return classResults[i].promoScore>=40;
-    return classify(p.title,p.content||p.selftext||'').promoScore>=40;
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.promoScore>=40;
   }).length;
   const ratio=promo/total;
   const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
@@ -773,16 +768,16 @@ async function computeTrafficLight(posts){
   else if(ratio<=0.4){color='yellow';label='Moderate market - deeper analysis needed';}
   else{color='red';label='Saturated with promotions';}
   const edu=posts.filter((p,i)=>{
-    if(classResults&&classResults[i])return classResults[i].eduScore>=30;
-    return classify(p.title,p.content||p.selftext||'').eduScore>=30;
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.eduScore>=30;
   }).length;
   const stories=posts.filter((p,i)=>{
-    if(classResults&&classResults[i])return classResults[i].storyScore>=30;
-    return classify(p.title,p.content||p.selftext||'').storyScore>=30;
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.storyScore>=30;
   }).length;
   const interactive=posts.filter((p,i)=>{
-    if(classResults&&classResults[i])return classResults[i].interactiveScore>=30;
-    return classify(p.title,p.content||p.selftext||'').interactiveScore>=30;
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.interactiveScore>=30;
   }).length;
   const subreddits=[...new Set(posts.map(p=>p.subreddit))];
   return{color,label,total,promo,ratio:Math.round(ratio*100),avgComments:Math.round(avgComments),avgScore:Math.round(avgScore),edu,stories,interactive,subreddits,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore};
