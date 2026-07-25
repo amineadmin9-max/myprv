@@ -215,9 +215,14 @@
     <div class="modal-box">
       <div id="apiKeyFormView">
         <h2>AI API Keys</h2>
-        <p>Add your API keys. Groq is recommended (free, 14K+ req/day). Keys are stored locally only.</p>
+        <p>Enter your VPS API URL or individual provider keys.</p>
         <div class="field" style="margin-bottom:10px">
-          <label style="color:var(--green);font-weight:700">Groq (Recommended - Free 14K+/day)</label>
+          <label style="color:var(--green);font-weight:700">VPS API URL (Recommended)</label>
+          <input type="text" class="modal-input" id="vpsApiInput" placeholder="http://your-vps-ip:5000" style="font-family:sans-serif">
+        </div>
+        <div style="text-align:center;color:var(--text-dim);font-size:12px;margin:8px 0">— OR use keys directly —</div>
+        <div class="field" style="margin-bottom:10px">
+          <label style="color:var(--green);font-weight:700">Groq (Free 14K+/day)</label>
           <input type="password" class="modal-input" id="groqKeyInput" placeholder="gsk_...">
         </div>
         <div class="field" style="margin-bottom:10px">
@@ -359,7 +364,10 @@
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
-// LLM Providers
+// VPS API (server-side LLM - recommended)
+const VPS_API_URL=localStorage.getItem('nf_vps_api')||'';
+
+// Direct LLM Providers (client-side)
 const GROQ_BASE='https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL='llama-3.3-70b-versatile';
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -370,6 +378,7 @@ function getGroqKey(){return localStorage.getItem('nf_groq_key')||'';}
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
 function getActiveProvider(){
+  if(VPS_API_URL)return'vps';
   if(getGroqKey())return'groq';
   if(getGeminiKey())return'gemini';
   if(getOpenRouterKey())return'openrouter';
@@ -448,7 +457,23 @@ async function callLLM(prompt,timeoutMs=30000){
   llmStats.total++;
   const provider=getActiveProvider();
 
-  // Try Groq first (fastest, most generous free tier)
+  // Try VPS API first (server-side, keys hidden)
+  if(provider==='vps'){
+    console.log('[LLM] Trying VPS API...');
+    try{
+      const r=await fetch(VPS_API_URL+'/api/llm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,timeout:Math.floor(timeoutMs/1000)}),signal:AbortSignal.timeout(timeoutMs)});
+      const data=await r.json();
+      if(data.content){
+        llmStats.ok++;
+        llmStats.lastModel=data.model||'vps';
+        llmStats.provider='VPS ('+data.provider+')';
+        console.log('[LLM] SUCCESS (VPS) — provider:',data.provider);
+        return data.content;
+      }
+    }catch(e){console.log('[LLM] VPS failed:',e.message);}
+  }
+
+  // Try Groq (fastest, most generous)
   if(provider==='groq'||provider==='none'){
     if(getGroqKey()){
       console.log('[LLM] Trying Groq...');
@@ -457,10 +482,9 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=groqResult.realModel||GROQ_MODEL;
         llmStats.provider='Groq';
-        console.log('[LLM] SUCCESS (Groq) — model:',groqResult.realModel);
+        console.log('[LLM] SUCCESS (Groq)');
         return groqResult.content;
       }
-      console.log('[LLM] Groq failed, trying next...');
     }
   }
 
@@ -476,7 +500,6 @@ async function callLLM(prompt,timeoutMs=30000){
         console.log('[LLM] SUCCESS (Gemini)');
         return geminiResult.content;
       }
-      console.log('[LLM] Gemini failed, trying next...');
     }
   }
 
@@ -489,19 +512,13 @@ async function callLLM(prompt,timeoutMs=30000){
         llmStats.ok++;
         llmStats.lastModel=result.realModel||OPENROUTER_MODEL;
         llmStats.provider='OpenRouter';
-        console.log('[LLM] SUCCESS (OpenRouter) — model:',result.realModel);
+        console.log('[LLM] SUCCESS (OpenRouter)');
         return result.content;
       }
-      const status=result.status||0;
-      const rawErr=result.body||result.error||result.msg||'unknown';
-      const errMsg=`STATUS ${status} | ${rawErr}`;
-      console.error(`[LLM] FAILED (OpenRouter) — ${errMsg}`);
-      if(!llmStats.firstError)llmStats.firstError=errMsg;
     }
   }
 
-  // No provider or all failed
-  console.log('[LLM] All providers failed or no API key configured');
+  console.log('[LLM] All providers failed');
   llmStats.fail++;
   return null;
 }
@@ -509,17 +526,20 @@ async function callLLM(prompt,timeoutMs=30000){
 async function callOpenRouter(prompt,timeoutMs=30000){return callLLM(prompt,timeoutMs);}
 
 function saveAPIKeys(){
+  const vpsApi=document.getElementById('vpsApiInput').value.trim().replace(/\/$/,'');
   const groqKey=document.getElementById('groqKeyInput').value.trim();
   const geminiKey=document.getElementById('geminiKeyInput').value.trim();
   const openrouterKey=document.getElementById('apiKeyInput').value.trim();
+  if(vpsApi)localStorage.setItem('nf_vps_api',vpsApi);
+  else localStorage.removeItem('nf_vps_api');
   if(groqKey)localStorage.setItem('nf_groq_key',groqKey);
   if(geminiKey)localStorage.setItem('nf_gemini_key',geminiKey);
   if(openrouterKey)localStorage.setItem('nf_openrouter_key',openrouterKey);
-  if(!groqKey&&!geminiKey&&!openrouterKey){alert('Enter at least one API key');return;}
+  if(!vpsApi&&!groqKey&&!geminiKey&&!openrouterKey){alert('Enter at least one option');return;}
   document.getElementById('apiKeyFormView').style.display='none';
   const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('groqKeyInput').value='';document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('vpsApiInput').value='';document.getElementById('groqKeyInput').value='';document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
 }
 
 function saveAPIKey(){saveAPIKeys();}
@@ -533,6 +553,7 @@ function toggleDropdown(e){
 function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('apiKeyModal').classList.remove('hidden');
+  document.getElementById('vpsApiInput').value=VPS_API_URL;
   document.getElementById('groqKeyInput').value=getGroqKey();
   document.getElementById('geminiKeyInput').value=getGeminiKey();
   document.getElementById('apiKeyInput').value=getOpenRouterKey();
@@ -552,8 +573,8 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 function renderLLMStats(){
   const s=llmStats;
   const provider=getActiveProvider();
-  const providerLabel=provider==='groq'?'Groq (Free 14K+)':provider==='gemini'?'Gemini (Free 100)':provider==='openrouter'?'OpenRouter':'None (Keywords only)';
-  const providerColor=provider==='groq'?'var(--green)':provider==='gemini'?'#8b5cf6':provider==='openrouter'?'var(--blue)':'var(--red-icon)';
+  const providerLabel=provider==='vps'?'VPS Server':provider==='groq'?'Groq (Free 14K+)':provider==='gemini'?'Gemini (Free 100)':provider==='openrouter'?'OpenRouter':'None (Keywords only)';
+  const providerColor=provider==='vps'?'var(--green)':provider==='groq'?'var(--green)':provider==='gemini'?'#8b5cf6':provider==='openrouter'?'var(--blue)':'var(--red-icon)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'<div style="margin-top:8px;color:var(--green);font-size:11px">No errors captured</div>';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Last used: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
   return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">

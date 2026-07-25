@@ -8,6 +8,17 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# LLM API Keys (stored on server, not in browser)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+
+GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "openrouter/free"
+
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = "amineadmin9-max/myprv"
 GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/data"
@@ -115,7 +126,95 @@ def search():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "providers": {
+        "groq": bool(GROQ_API_KEY),
+        "gemini": bool(GEMINI_API_KEY),
+        "openrouter": bool(OPENROUTER_API_KEY)
+    }})
+
+
+@app.route("/api/llm", methods=["POST"])
+def llm_proxy():
+    data = request.get_json()
+    if not data or not data.get("prompt"):
+        return jsonify({"error": "prompt is required"}), 400
+
+    prompt = data["prompt"]
+    timeout = data.get("timeout", 30)
+
+    # Try Groq first (fastest, most generous)
+    if GROQ_API_KEY:
+        result = call_groq(prompt, timeout)
+        if result:
+            return jsonify({"content": result, "provider": "groq", "model": GROQ_MODEL})
+
+    # Try Gemini
+    if GEMINI_API_KEY:
+        result = call_gemini(prompt, timeout)
+        if result:
+            return jsonify({"content": result, "provider": "gemini", "model": "gemini-2.0-flash"})
+
+    # Try OpenRouter
+    if OPENROUTER_API_KEY:
+        result = call_openrouter(prompt, timeout)
+        if result:
+            return jsonify({"content": result, "provider": "openrouter", "model": OPENROUTER_MODEL})
+
+    return jsonify({"error": "All providers failed or no API keys configured"}), 503
+
+
+def call_groq(prompt, timeout=30):
+    try:
+        resp = requests.post(
+            GROQ_BASE,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.3, "max_tokens": 1024},
+            timeout=timeout
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+        print(f"[Groq] Error: {resp.status_code} - {resp.text[:200]}")
+    except Exception as e:
+        print(f"[Groq] Exception: {e}")
+    return None
+
+
+def call_gemini(prompt, timeout=30):
+    try:
+        resp = requests.post(
+            f"{GEMINI_BASE}?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}],
+                  "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024}},
+            timeout=timeout
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        print(f"[Gemini] Error: {resp.status_code} - {resp.text[:200]}")
+    except Exception as e:
+        print(f"[Gemini] Exception: {e}")
+    return None
+
+
+def call_openrouter(prompt, timeout=30):
+    try:
+        resp = requests.post(
+            OPENROUTER_BASE,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            json={"model": OPENROUTER_MODEL, "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.3, "max_tokens": 1024},
+            timeout=timeout
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+        print(f"[OpenRouter] Error: {resp.status_code} - {resp.text[:200]}")
+    except Exception as e:
+        print(f"[OpenRouter] Exception: {e}")
+    return None
 
 
 if __name__ == "__main__":
