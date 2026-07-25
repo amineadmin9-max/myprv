@@ -146,6 +146,10 @@
 
   .empty-state{text-align:center;padding:30px;color:var(--text-dim);font-size:14px;}
 
+  .gemini-settings{margin:12px 0;}
+  .gemini-toggle{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--card);border-radius:10px;cursor:pointer;font-size:12px;color:var(--text-dim);border:1px solid var(--border);}
+  .gemini-toggle:hover{border-color:var(--blue);}
+
 
 </style>
 </head>
@@ -172,6 +176,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       Search
     </button>
+  </div>
+
+  <div class="gemini-settings">
+    <div class="gemini-toggle" onclick="document.getElementById('geminiBox').classList.toggle('hidden')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Gemini API Key
+      <span id="geminiStatus" style="font-size:10px;margin-left:6px"></span>
+    </div>
+    <div id="geminiBox" class="hidden">
+      <input type="password" id="geminiKeyInput" placeholder="Paste your Gemini API key..." style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-top:6px">
+      <button onclick="saveGeminiKey()" style="margin-top:6px;padding:8px 16px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer">Save</button>
+    </div>
   </div>
 
   <div class="idea-card" onclick="runFullDiscovery()">
@@ -268,6 +284,7 @@
 <script>
 // ===================== CONFIG =====================
 const PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
+function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
 const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
 const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
@@ -281,6 +298,37 @@ function countBW(text,w){return w.filter(x=>text.toLowerCase().includes(x)).leng
 function setStatus(msg){document.getElementById('status').textContent=msg;}
 function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
+
+async function callGemini(prompt){
+  const key=getGeminiKey();
+  if(!key)return null;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const body={contents:[{parts:[{text:prompt}]}]};
+  for(const proxy of PROXIES){
+    try{
+      const r=await fetch(proxy+encodeURIComponent(url),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
+      const t=await r.text();
+      const d=JSON.parse(t);
+      if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text)return d.candidates[0].content.parts[0].text.trim();
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+function saveGeminiKey(){
+  const key=document.getElementById('geminiKeyInput').value.trim();
+  if(!key){alert('Enter a valid key');return;}
+  localStorage.setItem('nf_gemini_key',key);
+  updateGeminiStatus();
+}
+
+function updateGeminiStatus(){
+  const el=document.getElementById('geminiStatus');
+  const key=getGeminiKey();
+  if(el)el.textContent=key?'✓ Active':'';
+}
+
+updateGeminiStatus();
 
 // ===================== PAGES =====================
 function showPage(id){
@@ -307,6 +355,56 @@ function classify(title,selftext){
   const storyScore=Math.min(100,Math.round((countKW(text,STORY_KW)/2)*100));
   const interactiveScore=(text.match(/\?/g)||[]).length>0?70:10;
   return{promoScore,eduScore,storyScore,interactiveScore};
+}
+
+async function geminiClassifyPost(post){
+  const prompt=`Analyze this Reddit post and return a JSON object with promo analysis.
+Post title: "${post.title}"
+Post content: "${(post.content||post.selftext||'').slice(0,400)}"
+Subreddit: r/${post.subreddit||'unknown'}
+
+Return ONLY valid JSON, no other text:
+{"promo":0-100,"edu":0-100,"story":0-100,"interactive":0-100,"reason":"brief reason"}
+
+Scoring guide:
+- promo: 0=pure discussion, 100=obvious advertisement/spam
+- edu: 0=no educational value, 100=highly informative/tutorial
+- story: 0=factual question, 100=personal experience/story
+- interactive: 0=statement, 100=engaging question`;
+
+  const result=await callGemini(prompt);
+  if(!result)return null;
+  try{
+    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const d=JSON.parse(cleaned);
+    return{promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))};
+  }catch(e){return null;}
+}
+
+async function geminiBatchClassify(posts){
+  const prompt=`Analyze these ${posts.length} Reddit posts and classify each for promotional content.
+For each post, return a JSON array with promo scores.
+
+Posts:
+${posts.map((p,i)=>`${i+1}. "${p.title}" (r/${p.subreddit||'unknown'}) - ${(p.content||p.selftext||'').slice(0,150)}`).join('\n')}
+
+Return ONLY a valid JSON array of objects, no other text:
+[{"i":1,"promo":0-100,"edu":0-100,"story":0-100,"interactive":0-100},...]
+
+Scoring:
+- promo: 0=pure discussion, 100=obvious advertisement/spam
+- edu: 0=no educational value, 100=highly informative
+- story: 0=factual question, 100=personal experience
+- interactive: 0=statement, 100=engaging question`;
+
+  const result=await callGemini(prompt);
+  if(!result)return null;
+  try{
+    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const arr=JSON.parse(cleaned);
+    if(!Array.isArray(arr))return null;
+    return arr.map(d=>({promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))}));
+  }catch(e){return null;}
 }
 
 function computeDemandScore(title,content){
@@ -346,10 +444,48 @@ function classifyNicheType(title,source,cachedTrends){
   return{type:'general',label:'General',color:'#64748b'};
 }
 
-function computeTrafficLight(posts){
+async function geminiClassifyTrending(topic,trendsIdeas){
+  const trendList=trendsIdeas.slice(0,20).map(t=>`- ${t.title} (${t.traffic||'N/A'})`).join('\n');
+  const prompt=`Analyze if this niche topic is "Trending" or "Evergreen" based on current Google Trends data.
+
+Niche topic: "${topic}"
+
+Current Google Trends (top 20):
+${trendList||'No trends data available'}
+
+Rules:
+- "Trending" = topic has rising momentum, appears in current trends, or is time-sensitive
+- "Evergreen" = topic is a persistent need, not time-dependent, from ongoing demand
+- "Hybrid" = shows both trending signals and evergreen demand
+
+Return ONLY a JSON object:
+{"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":0-100}`;
+
+  const result=await callGemini(prompt);
+  if(!result)return null;
+  try{
+    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const d=JSON.parse(cleaned);
+    if(d.type==='trending')return{type:'trending',label:'Trending',color:'#8b5cf6',reason:d.reason,confidence:d.confidence};
+    if(d.type==='hybrid')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:d.reason,confidence:d.confidence};
+    return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:d.reason,confidence:d.confidence};
+  }catch(e){return null;}
+}
+
+async function computeTrafficLight(posts){
   if(!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
   const total=posts.length;
-  const promo=posts.filter(p=>classify(p.title,p.content||p.selftext||'').promoScore>=40).length;
+
+  let classResults=null;
+  try{
+    const batch=posts.slice(0,15);
+    classResults=await geminiBatchClassify(batch);
+  }catch(e){classResults=null;}
+
+  const promo=posts.filter((p,i)=>{
+    if(classResults&&classResults[i])return classResults[i].promoScore>=40;
+    return classify(p.title,p.content||p.selftext||'').promoScore>=40;
+  }).length;
   const ratio=promo/total;
   const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
   const avgScore=posts.reduce((s,p)=>s+(p.score||0),0)/total;
@@ -363,9 +499,18 @@ function computeTrafficLight(posts){
   else if(ratio<=0.15&&highEng){color='green';label='Open and clean market';}
   else if(ratio<=0.4){color='yellow';label='Moderate market - deeper analysis needed';}
   else{color='red';label='Saturated with promotions';}
-  const edu=posts.filter(p=>classify(p.title,p.content||p.selftext||'').eduScore>=30).length;
-  const stories=posts.filter(p=>classify(p.title,p.content||p.selftext||'').storyScore>=30).length;
-  const interactive=posts.filter(p=>classify(p.title,p.content||p.selftext||'').interactiveScore>=30).length;
+  const edu=posts.filter((p,i)=>{
+    if(classResults&&classResults[i])return classResults[i].eduScore>=30;
+    return classify(p.title,p.content||p.selftext||'').eduScore>=30;
+  }).length;
+  const stories=posts.filter((p,i)=>{
+    if(classResults&&classResults[i])return classResults[i].storyScore>=30;
+    return classify(p.title,p.content||p.selftext||'').storyScore>=30;
+  }).length;
+  const interactive=posts.filter((p,i)=>{
+    if(classResults&&classResults[i])return classResults[i].interactiveScore>=30;
+    return classify(p.title,p.content||p.selftext||'').interactiveScore>=30;
+  }).length;
   const subreddits=[...new Set(posts.map(p=>p.subreddit))];
   return{color,label,total,promo,ratio:Math.round(ratio*100),avgComments:Math.round(avgComments),avgScore:Math.round(avgScore),edu,stories,interactive,subreddits,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore};
 }
@@ -449,15 +594,35 @@ const Q_PATTERNS=[
   /best .+ for/i,
 ];
 
+async function geminiExtractTopic(post){
+  const prompt=`Analyze this Reddit post and extract a clean, concise niche topic name (2-5 words).
+Post title: "${post.title}"
+Post content: "${(post.content||'').slice(0,300)}"
+Subreddit: r/${post.subreddit}
+
+Rules:
+- Return ONLY the topic name, nothing else
+- Must be a real product/category/topic (not "sub", "reddit", "question")
+- Remove all question words, prefixes, filler
+- Example: "Does anyone know a good ultralight tent under $200" → "affordable ultralight tents"
+- Example: "Is there a subreddit for sustainable kitchen tools?" → "sustainable kitchen tools"
+- If the post is about finding a subreddit (not a product/topic), return "SKIP"
+- Return max 5 words`;
+
+  const result=await callGemini(prompt);
+  if(!result)return null;
+  const cleaned=result.replace(/^["']|["']$/g,'').replace(/\n/g,' ').trim();
+  if(cleaned==='SKIP'||cleaned.length<3||cleaned.length>60)return null;
+  return cleaned;
+}
+
 function processSeedPost(post,seen,allSeeds){
   const key=post.title.toLowerCase().slice(0,60);
   if(seen.has(key))return;
   seen.add(key);
   const isQ=Q_PATTERNS.some(p=>p.test(post.title))||/\?/.test(post.title);
   if(!isQ)return;
-  const cleanTopic=extractCleanTopic(post.title,post.content||'');
-  if(!cleanTopic||cleanTopic.length<3)return;
-  allSeeds.push({title:cleanTopic,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});
+  allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});
 }
 
 const GARBAGE=new Set(['sub','subreddit','reddit','does','anyone','know','there','something','anything','looking','need','want','find','recommend','suggest','better','alternative','product','tool','app','software','community','group','channel','please','really','actually','also','just','like','would','could','should','might','maybe','good','great','best','nice','new','old']);
@@ -536,8 +701,29 @@ async function fetchSeedsFromReddit(){
       }
     }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
   }
-  allSeeds.sort((a,b)=>b.demandScore-a.demandScore);
-  return allSeeds.slice(0,30);
+
+  setStatus(`Analyzing ${allSeeds.length} posts with Gemini...`);
+  const enriched=[];
+  for(let i=0;i<allSeeds.length;i++){
+    const seed=allSeeds[i];
+    setStatus(`[${i+1}/${allSeeds.length}] Analyzing: ${seed.originalTitle.slice(0,60)}...`);
+    try{
+      const geminiTopic=await geminiExtractTopic(seed.post||{title:seed.originalTitle,content:seed.content,subreddit:seed.subreddit});
+      if(geminiTopic){
+        seed.title=geminiTopic;
+        enriched.push(seed);
+      }else{
+        const fallback=extractCleanTopic(seed.originalTitle,seed.content);
+        if(fallback){seed.title=fallback;enriched.push(seed);}
+      }
+    }catch(e){
+      const fallback=extractCleanTopic(seed.originalTitle,seed.content);
+      if(fallback){seed.title=fallback;enriched.push(seed);}
+    }
+  }
+
+  enriched.sort((a,b)=>b.demandScore-a.demandScore);
+  return enriched.slice(0,30);
 }
 
 // ===================== RELATED SUBREDDITS =====================
@@ -588,7 +774,7 @@ async function handleSearch(){
   try{
     showProgress(50);const posts=await searchReddit(q);
     showProgress(80);setStatus(`Found ${posts.length} posts - analyzing...`);
-    const scoring=computeTrafficLight(posts);showProgress(100);
+    const scoring=await computeTrafficLight(posts);showProgress(100);
     renderSearchResult(q,scoring,posts);
   }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
@@ -659,8 +845,15 @@ async function runFullDiscovery(){
       showProgress(60+(i/top.length)*35);
       try{
         const posts=await searchReddit(top[i].title);
-        const scoring=computeTrafficLight(posts);
-        results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType:classifyNicheType(top[i].title,top[i].sources?.[0]||'manual',cachedTrendsIdeas),sources:top[i].sources,relatedSubs:top[i].relatedSubs||[]});
+        const scoring=await computeTrafficLight(posts);
+
+        let nicheType=classifyNicheType(top[i].title,top[i].sources?.[0]||'manual',cachedTrendsIdeas);
+        try{
+          const geminiType=await geminiClassifyTrending(top[i].title,cachedTrendsIdeas);
+          if(geminiType)nicheType=geminiType;
+        }catch(e){}
+
+        results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType,sources:top[i].sources,relatedSubs:top[i].relatedSubs||[]});
       }catch(e){continue;}
     }
     results.sort((a,b)=>b.scoring.opportunityScore-a.scoring.opportunityScore);
@@ -763,7 +956,7 @@ async function runAllMonitors(){
   for(const m of monitors){
     try{
       const posts=await searchReddit(m.sub);
-      const scoring=computeTrafficLight(posts);
+      const scoring=await computeTrafficLight(posts);
       const now=new Date();
       m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
       saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
