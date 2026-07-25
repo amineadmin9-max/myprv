@@ -2,83 +2,58 @@ import json
 import os
 import sys
 import time
-import re
 from datetime import datetime
-from playwright.sync_api import sync_playwright
+import requests
 
 
-def scrape_reddit_playwright(subreddit, num_posts=50):
-    posts = []
-    url = f"https://www.reddit.com/r/{subreddit}/new/"
+def scrape_reddit_json(subreddit, num_posts=50):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    }
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800},
-        )
-        page = context.new_page()
-        page.set_default_timeout(30000)
+    urls = [
+        f"https://www.reddit.com/r/{subreddit}/new.json?limit={num_posts}",
+        f"https://www.reddit.com/r/{subreddit}/hot.json?limit={num_posts}",
+    ]
 
+    for url in urls:
         try:
-            print(f"  Opening {url}")
-            page.goto(url, wait_until="networkidle")
-            page.wait_for_timeout(5000)
+            print(f"  Trying {url}")
+            r = requests.get(url, headers=headers, timeout=15)
+            print(f"  Status: {r.status_code}, Length: {len(r.text)}")
 
-            last_height = 0
-            for attempt in range(8):
-                html = page.content()
+            if r.status_code == 200:
+                data = r.json()
+                children = data.get("data", {}).get("children", [])
+                posts = []
+                for child in children[:num_posts]:
+                    d = child.get("data", {})
+                    posts.append({
+                        "title": d.get("title", ""),
+                        "author": d.get("author", "unknown"),
+                        "score": d.get("score", 0),
+                        "numComments": d.get("num_comments", 0),
+                        "url": f"https://reddit.com{d.get('permalink', '')}",
+                        "domain": d.get("domain", ""),
+                        "created": datetime.fromtimestamp(d.get("created_utc", 0)).isoformat() if d.get("created_utc") else "",
+                        "subreddit": d.get("subreddit", subreddit),
+                        "selftext": (d.get("selftext", "") or "")[:500],
+                        "permalink": f"https://reddit.com{d.get('permalink', '')}",
+                        "flair": d.get("link_flair_text", "") or "",
+                        "isSelf": d.get("is_self", True),
+                    })
+                if posts:
+                    return posts
 
-                if attempt == 0:
-                    print(f"  HTML length: {len(html)}")
-
-                shreddit_posts = page.query_selector_all("shreddit-post")
-                print(f"  Attempt {attempt}: {len(shreddit_posts)} shreddit-post elements")
-
-                for sp in shreddit_posts[:num_posts]:
-                    try:
-                        title = sp.get_attribute("post-title") or ""
-                        author = sp.get_attribute("author") or "unknown"
-                        score = int(sp.get_attribute("score") or "0")
-                        num_comments = int(sp.get_attribute("comment-count") or "0")
-                        permalink = sp.get_attribute("permalink") or ""
-
-                        if title and not any(p["title"] == title for p in posts):
-                            posts.append({
-                                "title": title.strip(),
-                                "author": author.strip(),
-                                "score": score,
-                                "numComments": num_comments,
-                                "url": f"https://reddit.com{permalink}" if permalink else "",
-                                "domain": "",
-                                "created": "",
-                                "subreddit": subreddit,
-                                "selftext": "",
-                                "permalink": f"https://reddit.com{permalink}" if permalink else "",
-                                "flair": "",
-                                "isSelf": True,
-                            })
-                    except Exception:
-                        continue
-
-                if len(posts) >= num_posts:
-                    break
-
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(3000)
-                new_height = page.evaluate("document.body.scrollHeight")
-                if new_height == last_height:
-                    break
-                last_height = new_height
-
-                print(f"  Collected {len(posts)} posts so far...")
+            elif r.status_code == 429:
+                print(f"  Rate limited, waiting 10s...")
+                time.sleep(10)
 
         except Exception as e:
             print(f"  Error: {e}")
-        finally:
-            browser.close()
+            continue
 
-    return posts[:num_posts]
+    return []
 
 
 def main():
@@ -90,7 +65,7 @@ def main():
 
     for sub in subreddits:
         print(f"\nScraping r/{sub}...")
-        posts = scrape_reddit_playwright(sub, 50)
+        posts = scrape_reddit_json(sub, 50)
 
         filename = f"data/r_{sub}.json"
         with open(filename, "w", encoding="utf-8") as f:
