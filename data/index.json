@@ -1,32 +1,32 @@
 [
   {
-    "name": "game",
+    "name": "homegym",
     "posts": 50,
-    "updated": "2026-07-25T00:23:19.540454"
+    "updated": "2026-07-25T00:25:03.985435"
   },
   {
-    "name": "HomeGym",
+    "name": "pets",
     "posts": 0,
-    "updated": "2026-07-25T00:23:21.598078"
+    "updated": "2026-07-25T00:25:06.048913"
   },
   {
-    "name": "PetCare",
+    "name": "workfromhome",
     "posts": 0,
-    "updated": "2026-07-25T00:23:23.641377"
-  },
-  {
-    "name": "RemoteWork",
-    "posts": 0,
-    "updated": "2026-07-25T00:23:25.691159"
+    "updated": "2026-07-25T00:25:08.107849"
   },
   {
     "name": "solar",
     "posts": 0,
-    "updated": "2026-07-25T00:23:27.739591"
+    "updated": "2026-07-25T00:25:10.213243"
   },
   {
-    "name": "BuyItForLife",
+    "name": "Frugal",
     "posts": 0,
-    "updated": "2026-07-25T00:23:29.818488"
+    "updated": "2026-07-25T00:25:12.272369"
+  },
+  {
+    "name": "Education",
+    "posts": 0,
+    "updated": "2026-07-25T00:25:14.330354"
   }
 ]
