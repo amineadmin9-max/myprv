@@ -1,4 +1,4 @@
-const CACHE = 'niche-finder-v1';
+const CACHE = 'niche-finder-v2';
 const ASSETS = ['index.html', 'manifest.json'];
 
 self.addEventListener('install', e => {
