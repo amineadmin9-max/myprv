@@ -6,7 +6,7 @@ on:
       subreddits:
         description: 'Comma-separated subreddit names'
         required: true
-        default: 'game,HomeGym,PetCare,RemoteWork,solar,BuyItForLife'
+        default: 'game,technology,science,Frugal,homegym,RemoteWork'
   schedule:
     - cron: '0 */12 * * *'
 
@@ -25,11 +25,14 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
 
       - name: Scrape Reddit
         run: |
-          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddits || 'game,HomeGym,PetCare,RemoteWork,solar,BuyItForLife' }}"
+          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddits || 'game,technology,science,Frugal,homegym,RemoteWork' }}"
 
       - name: Commit results
         run: |

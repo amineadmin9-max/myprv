@@ -1,87 +1,103 @@
-import requests
 import json
 import os
 import sys
 import time
 from datetime import datetime
-from html import unescape
-import re
+from playwright.sync_api import sync_playwright
 
 
-def clean_html(text):
-    text = unescape(text or "")
-    text = re.sub(r"<[^>]+>", "", text)
-    return text.strip()
+def scrape_reddit_playwright(subreddit, num_posts=50):
+    posts = []
+    url = f"https://old.reddit.com/r/{subreddit}/new/"
 
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_default_timeout(30000)
 
-def scrape_reddit(subreddit, num_posts=50):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept": "application/rss+xml, application/xml, text/xml, */*",
-    }
-
-    urls = [
-        f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}",
-    ]
-
-    for rss_url in urls:
         try:
-            r = requests.get(rss_url, headers=headers, timeout=15)
-            print(f"  URL: {rss_url} -> Status: {r.status_code}, Length: {len(r.text)}")
-            if r.status_code == 200 and "<entry>" in r.text:
-                return parse_rss(r.text, subreddit, num_posts)
-            elif r.status_code == 429:
-                print(f"  Rate limited, waiting...")
-                time.sleep(5)
-                r2 = requests.get(rss_url, headers=headers, timeout=15)
-                if r2.status_code == 200 and "<entry>" in r2.text:
-                    return parse_rss(r2.text, subreddit, num_posts)
+            print(f"  Opening {url}")
+            page.goto(url, wait_until="domcontentloaded")
+            page.wait_for_timeout(3000)
+
+            last_height = 0
+            scroll_attempts = 0
+
+            while len(posts) < num_posts and scroll_attempts < 10:
+                articles = page.query_selector_all("div.thing.link")
+                for article in articles:
+                    try:
+                        title_el = article.query_selector("a.title")
+                        title = title_el.inner_text() if title_el else ""
+                        href = title_el.get_attribute("href") if title_el else ""
+
+                        author_el = article.query_selector("a.author")
+                        author = author_el.inner_text() if author_el else "unknown"
+
+                        score_el = article.query_selector("div.score.unvoted")
+                        score_text = score_el.inner_text() if score_el else "0"
+                        try:
+                            score = int(score_text.replace("•", "0").strip())
+                        except:
+                            score = 0
+
+                        comments_el = article.query_selector("a.comments")
+                        comments_text = comments_el.inner_text() if comments_el else "0"
+                        try:
+                            num_comments = int(comments_text.split()[0])
+                        except:
+                            num_comments = 0
+
+                        time_el = article.query_selector("time")
+                        created = time_el.get_attribute("title") if time_el else ""
+
+                        domain_el = article.query_selector("span.domain > a")
+                        domain = domain_el.inner_text() if domain_el else ""
+
+                        post = {
+                            "title": title.strip(),
+                            "author": author.strip(),
+                            "score": score,
+                            "numComments": num_comments,
+                            "url": href.strip() if href else "",
+                            "domain": domain.strip(),
+                            "created": created.strip(),
+                            "subreddit": subreddit,
+                            "selftext": "",
+                            "permalink": href.strip() if href else "",
+                            "flair": "",
+                            "isSelf": "self." in domain if domain else True,
+                        }
+
+                        if post["title"] and not any(p["title"] == post["title"] for p in posts):
+                            posts.append(post)
+                            if len(posts) % 10 == 0:
+                                print(f"    Collected {len(posts)} posts...")
+
+                    except Exception as e:
+                        continue
+
+                    if len(posts) >= num_posts:
+                        break
+
+                if len(posts) >= num_posts:
+                    break
+
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2000)
+                new_height = page.evaluate("document.body.scrollHeight")
+                if new_height == last_height:
+                    scroll_attempts += 1
+                else:
+                    scroll_attempts = 0
+                last_height = new_height
+
         except Exception as e:
             print(f"  Error: {e}")
-            continue
+        finally:
+            browser.close()
 
-    print(f"  All URLs failed for r/{subreddit}")
-    return []
-
-
-def parse_rss(xml_text, subreddit, num_posts):
-    posts = []
-    entries = re.findall(r"<entry>(.*?)</entry>", xml_text, re.DOTALL)
-
-    for entry in entries[:num_posts]:
-        title_m = re.search(r"<title[^>]*>(.*?)</title>", entry, re.DOTALL)
-        title = clean_html(title_m.group(1)) if title_m else ""
-
-        author_m = re.search(r"<name>([^<]*)</name>", entry)
-        author = author_m.group(1).replace("/u/", "") if author_m else "unknown"
-
-        link_m = re.search(r'<link[^>]*href="([^"]*)"', entry)
-        url = link_m.group(1) if link_m else ""
-
-        content_m = re.search(r"<content[^>]*>(.*?)</content>", entry, re.DOTALL)
-        content = clean_html(content_m.group(1))[:500] if content_m else ""
-
-        updated_m = re.search(r"<updated>(.*?)</updated>", entry)
-        updated = updated_m.group(1) if updated_m else ""
-
-        if title:
-            posts.append({
-                "title": title,
-                "author": author,
-                "url": url,
-                "content": content,
-                "updated": updated,
-                "subreddit": subreddit,
-                "score": 0,
-                "numComments": 0,
-                "isSelf": True,
-                "domain": f"self.{subreddit}",
-                "selftext": content,
-                "permalink": url,
-                "flair": "",
-            })
-
-    return posts
+    return posts[:num_posts]
 
 
 def main():
@@ -93,7 +109,7 @@ def main():
 
     for sub in subreddits:
         print(f"Scraping r/{sub}...")
-        posts = scrape_reddit(sub, 50)
+        posts = scrape_reddit_playwright(sub, 50)
 
         filename = f"data/r_{sub}.json"
         with open(filename, "w", encoding="utf-8") as f:
@@ -106,7 +122,7 @@ def main():
         })
         print(f"  Saved {len(posts)} posts")
 
-        time.sleep(8)
+        time.sleep(3)
 
     with open("data/index.json", "w", encoding="utf-8") as f:
         json.dump(all_index, f, ensure_ascii=False, indent=2)
