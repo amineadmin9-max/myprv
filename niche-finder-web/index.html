@@ -48,6 +48,24 @@
         .spinner { border: 3px solid #334155; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .hidden { display: none; }
+        .mode-toggle { display: flex; gap: 8px; margin-bottom: 15px; }
+        .mode-btn { flex: 1; padding: 12px; border-radius: 12px; border: 2px solid #334155; background: #1e293b; color: #94a3b8; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .mode-btn.active { border-color: #3b82f6; background: #1e3a5f; color: #f8fafc; }
+        .mode-btn:hover { border-color: #3b82f6; }
+        .auto-panel { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 15px; }
+        .auto-panel h3 { font-size: 14px; margin-bottom: 10px; color: #3b82f6; }
+        .auto-panel p { font-size: 12px; color: #94a3b8; margin-bottom: 10px; line-height: 1.5; }
+        .source-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .source-chip { background: #0f172a; border: 1px solid #334155; border-radius: 20px; padding: 6px 12px; font-size: 12px; color: #94a3b8; cursor: pointer; transition: all 0.2s; }
+        .source-chip:hover { border-color: #3b82f6; color: #f8fafc; }
+        .source-chip.selected { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .trending-list { max-height: 200px; overflow-y: auto; }
+        .trending-item { padding: 8px 12px; background: #0f172a; border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; }
+        .trending-item:hover { background: #1e3a5f; }
+        .trending-item.selected { background: #1e3a5f; border: 1px solid #3b82f6; }
+        .trending-item .source { font-size: 10px; color: #64748b; }
+        .generate-btn { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .generate-btn:disabled { opacity: 0.5; }
     </style>
 </head>
 <body>
@@ -55,8 +73,35 @@
         <h1>Niche Finder</h1>
         <p class="subtitle">ابحث عن نيتشات Affiliate رابحة</p>
 
-        <input type="text" id="searchInput" placeholder="مثال: home gym, pet care...">
-        <button id="searchBtn" onclick="handleSearch()">بحث</button>
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="manualMode" onclick="switchMode('manual')">✍️ فكرة مباشرة</button>
+            <button class="mode-btn" id="autoMode" onclick="switchMode('auto')">🤖 توليد تلقائي</button>
+        </div>
+
+        <div id="manualPanel">
+            <input type="text" id="searchInput" placeholder="مثال: home gym, pet care...">
+            <button id="searchBtn" onclick="handleSearch()">بحث</button>
+        </div>
+
+        <div id="autoPanel" class="hidden">
+            <div class="auto-panel">
+                <h3>🔥 مصادر توليد الأفكار</h3>
+                <p>اختر المصدر لإيجاد أفكار نيتشات واعدة تلقائياً:</p>
+                <div class="source-chips">
+                    <div class="source-chip selected" data-source="trends" onclick="toggleSource(this)">📈 Google Trends</div>
+                    <div class="source-chip selected" data-source="reddit" onclick="toggleSource(this)">🔍 Reddit Unmet Demand</div>
+                </div>
+            </div>
+            <div id="autoResults" class="hidden">
+                <div class="auto-panel">
+                    <h3>💡 أفكار مولّدة</h3>
+                    <div class="trending-list" id="trendingList"></div>
+                    <button class="generate-btn" id="generateBtn" onclick="analyzeSelected()">تحليل المحدد</button>
+                </div>
+            </div>
+            <button class="generate-btn" id="fetchIdeasBtn" onclick="fetchAutoIdeas()">توليد أفكار</button>
+        </div>
+
         <div class="status" id="status"></div>
 
         <div id="seedsSection">
@@ -232,6 +277,172 @@
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        let currentMode = 'manual';
+        let selectedSources = ['trends', 'reddit'];
+        let generatedIdeas = [];
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('manualMode').classList.toggle('active', mode === 'manual');
+            document.getElementById('autoMode').classList.toggle('active', mode === 'auto');
+            document.getElementById('manualPanel').classList.toggle('hidden', mode !== 'manual');
+            document.getElementById('autoPanel').classList.toggle('hidden', mode !== 'auto');
+        }
+
+        function toggleSource(el) {
+            const source = el.dataset.source;
+            el.classList.toggle('selected');
+            if (selectedSources.includes(source)) {
+                selectedSources = selectedSources.filter(s => s !== source);
+            } else {
+                selectedSources.push(source);
+            }
+        }
+
+        async function fetchGoogleTrends() {
+            try {
+                const url = 'https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
+                const r = await fetch(PROXY + encodeURIComponent(url));
+                if (!r.ok) return [];
+                const text = await r.text();
+                const data = JSON.parse(text);
+                const trends = data.default?.trendingSearchesDays?.[0]?.trendingSearches || [];
+                return trends.slice(0, 15).map(t => ({
+                    title: t.title.query,
+                    traffic: t.formattedTraffic,
+                    source: 'Google Trends',
+                    related: (t.relatedQueries || []).map(q => q.query).slice(0, 3)
+                }));
+            } catch(e) {
+                console.error('Google Trends error:', e);
+                return [];
+            }
+        }
+
+        async function fetchRedditUnmetDemand() {
+            const queries = [
+                'does anyone know a product',
+                'looking for a product that',
+                'wish there was a product',
+                'is there a product for',
+                'anyone recommend a product',
+                'need help finding a product'
+            ];
+            
+            const allIdeas = [];
+            const seen = new Set();
+            
+            for (const query of queries.slice(0, 4)) {
+                try {
+                    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=relevance&limit=25&t=month`;
+                    const r = await fetch(PROXY + encodeURIComponent(url));
+                    if (!r.ok) continue;
+                    const text = await r.text();
+                    if (!text.includes('<entry>')) continue;
+                    
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/xml');
+                    const entries = doc.querySelectorAll('entry');
+                    
+                    for (const e of entries) {
+                        const title = e.querySelector('title')?.textContent || '';
+                        const link = e.querySelector('link')?.getAttribute('href') || '';
+                        const subM = link.match(/reddit\.com\/r\/([^/]+)/);
+                        
+                        if (title && !seen.has(title)) {
+                            seen.add(title);
+                            allIdeas.push({
+                                title: title,
+                                subreddit: subM ? subM[1] : 'unknown',
+                                url: link,
+                                source: 'Reddit Unmet Demand'
+                            });
+                        }
+                    }
+                } catch(e) { continue; }
+            }
+            
+            return allIdeas.slice(0, 20);
+        }
+
+        async function fetchAutoIdeas() {
+            if (selectedSources.length === 0) {
+                setStatus('اختر مصدر واحد على الأقل');
+                return;
+            }
+
+            const btn = document.getElementById('fetchIdeasBtn');
+            btn.disabled = true;
+            btn.textContent = 'جاري التوليد...';
+            setStatus('جاري جمع الأفكار من المصادر المحددة...');
+
+            try {
+                const promises = [];
+                if (selectedSources.includes('trends')) promises.push(fetchGoogleTrends());
+                if (selectedSources.includes('reddit')) promises.push(fetchRedditUnmetDemand());
+                
+                const results = await Promise.all(promises);
+                generatedIdeas = results.flat();
+                
+                if (generatedIdeas.length === 0) {
+                    setStatus('ما لقينا أفكار حالياً. جرّب تغيير المصادر.');
+                } else {
+                    setStatus(`لقينا ${generatedIdeas.length} فكرة! اختر ما تريد تحليله.`);
+                    renderTrendingList();
+                }
+            } catch(e) {
+                setStatus('خطأ في جمع الأفكار: ' + e.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'توليد أفكار';
+        }
+
+        function renderTrendingList() {
+            const el = document.getElementById('trendingList');
+            const container = document.getElementById('autoResults');
+            container.classList.remove('hidden');
+            
+            el.innerHTML = generatedIdeas.map((idea, i) => `
+                <div class="trending-item" data-index="${i}" onclick="selectIdea(this)">
+                    <div>${idea.title}</div>
+                    <div class="source">${idea.source}${idea.subreddit ? ' · r/' + idea.subreddit : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectIdea(el) {
+            el.classList.toggle('selected');
+        }
+
+        async function analyzeSelected() {
+            const selected = document.querySelectorAll('.trending-item.selected');
+            if (selected.length === 0) {
+                setStatus('اختر فكرة واحدة على الأقل');
+                return;
+            }
+
+            document.getElementById('autoResults').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            const results = [];
+            for (let i = 0; i < selected.length; i++) {
+                const idx = parseInt(selected[i].dataset.index);
+                const idea = generatedIdeas[idx];
+                const keyword = idea.title.split(' ').slice(0, 3).join(' ');
+                
+                setStatus(`جاري تحليل ${i + 1}/${selected.length}: ${keyword}`);
+                
+                const r = await analyzeSub(keyword.replace(/\s+/g, ''));
+                if (r) results.push(r);
+            }
+
+            results.sort((a, b) => ({ green: 0, yellow: 1, red: 2 }[a.scoring.color] || 3) - ({ green: 0, yellow: 1, red: 2 }[b.scoring.color] || 3));
+            renderResults(results);
+            setStatus('');
         }
 
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
