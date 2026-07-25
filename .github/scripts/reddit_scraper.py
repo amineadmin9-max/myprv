@@ -106,7 +106,7 @@ def main():
         })
         print(f"  Saved {len(posts)} posts")
 
-        time.sleep(2)
+        time.sleep(8)
 
     with open("data/index.json", "w", encoding="utf-8") as f:
         json.dump(all_index, f, ensure_ascii=False, indent=2)
