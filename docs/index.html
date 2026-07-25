@@ -351,12 +351,13 @@ function countBW(text,w){return w.filter(x=>text.toLowerCase().includes(x)).leng
 function setStatus(msg){document.getElementById('status').textContent=msg;}
 function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function callGemini(prompt,timeoutMs=25000){
   const key=getGeminiKey();
   if(!key){geminiStats.total++;geminiStats.fail++;if(!geminiStats.firstError)geminiStats.firstError='No API key set in localStorage';return null;}
   geminiStats.total++;
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`;
   const body={contents:[{parts:[{text:prompt}]}]};
   const fetchOpts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
   try{
@@ -870,6 +871,7 @@ async function fetchSeedsFromReddit(){
           setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${p.title.slice(0,50)}...`);
           await processSeedPost({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},seen,allSeeds);
           geminiValidated++;
+          await delay(250);
         }
       }else{
         const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
@@ -879,6 +881,7 @@ async function fetchSeedsFromReddit(){
           setStatus(`Filtering [${geminiValidated}/${GEMINI_CAP}]: ${post.title.slice(0,50)}...`);
           await processSeedPost(post,seen,allSeeds);
           geminiValidated++;
+          await delay(250);
         }}
       }
     }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
@@ -902,6 +905,7 @@ async function fetchSeedsFromReddit(){
       const fallback=extractCleanTopic(seed.originalTitle,seed.content);
       if(fallback){seed.title=fallback;enriched.push(seed);}
     }
+    await delay(250);
   }
 
   enriched.sort((a,b)=>b.demandScore-a.demandScore);
