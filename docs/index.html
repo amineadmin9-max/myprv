@@ -334,7 +334,11 @@
 <script>
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
-function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
+// const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+// function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
+const LLM_BASE='https://api.deepseek.com/v1/chat/completions';
+const LLM_MODEL='deepseek-chat';
+const LLM_KEY='sk-650eb287574247908a035aa3072c993e';
 const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
 const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
 const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
@@ -353,20 +357,18 @@ function showProgress(pct){document.getElementById('progressBar').classList.remo
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
-async function callGemini(prompt,timeoutMs=25000){
-  const key=getGeminiKey();
-  if(!key){geminiStats.total++;geminiStats.fail++;if(!geminiStats.firstError)geminiStats.firstError='No API key set in localStorage';return null;}
+async function callDeepSeek(prompt,timeoutMs=30000){
   geminiStats.total++;
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`;
-  const body={contents:[{parts:[{text:prompt}]}]};
-  const fetchOpts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+  const body={model:LLM_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  const headers={'Content-Type':'application/json','Authorization':`Bearer ${LLM_KEY}`};
+  const fetchOpts={method:'POST',headers,body:JSON.stringify(body)};
   try{
-    const r=await fetch(url,{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
+    const r=await fetch(LLM_BASE,{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
     const rawText=await r.text();
     if(rawText.startsWith('{')||rawText.startsWith('[')){
       const d=JSON.parse(rawText);
-      if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){geminiStats.ok++;return d.candidates[0].content.parts[0].text.trim();}
-      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status}\nParsed JSON but no candidates\nRaw: ${JSON.stringify(d).slice(0,600)}`;
+      if(d.choices&&d.choices[0]?.message?.content){geminiStats.ok++;return d.choices[0].message.content.trim();}
+      if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status}\nParsed but no content\nRaw: ${JSON.stringify(d).slice(0,600)}`;
     }else{
       if(!geminiStats.firstError)geminiStats.firstError=`Direct: HTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
     }
@@ -375,15 +377,15 @@ async function callGemini(prompt,timeoutMs=25000){
   }
   for(const proxy of PROXIES){
     try{
-      const r=await fetch(proxy+encodeURIComponent(url),{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
+      const r=await fetch(proxy+encodeURIComponent(LLM_BASE),{...fetchOpts,signal:AbortSignal.timeout(timeoutMs)});
       const rawText=await r.text();
       if(!rawText.startsWith('{')&&!rawText.startsWith('[')){
         if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status} ${r.statusText}\nBody: ${rawText.slice(0,600)}`;
         continue;
       }
       const d=JSON.parse(rawText);
-      if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){geminiStats.ok++;return d.candidates[0].content.parts[0].text.trim();}
-      if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status}\nParsed JSON but no candidates\nRaw: ${JSON.stringify(d).slice(0,600)}`;
+      if(d.choices&&d.choices[0]?.message?.content){geminiStats.ok++;return d.choices[0].message.content.trim();}
+      if(!geminiStats.firstError)geminiStats.firstError=`Proxy: ${proxy}\nHTTP ${r.status}\nParsed but no content\nRaw: ${JSON.stringify(d).slice(0,600)}`;
     }catch(e){
       if(!geminiStats.firstError){
         let detail=`Proxy: ${proxy}\n${e.constructor.name}: ${e.message||e.toString()}`;
@@ -396,6 +398,7 @@ async function callGemini(prompt,timeoutMs=25000){
   geminiStats.fail++;
   return null;
 }
+// async function callGemini(prompt,timeoutMs=25000){ /* SEE callDeepSeek above */ }
 
 function saveGeminiKey(){
   const key=document.getElementById('geminiKeyInput').value.trim();
@@ -486,7 +489,7 @@ Scoring guide:
 - story: 0=factual question, 100=personal experience/story
 - interactive: 0=statement, 100=engaging question`;
 
-  const result=await callGemini(prompt);
+  const result=await callDeepSeek(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -511,7 +514,7 @@ Scoring:
 - story: 0=factual question, 100=personal experience
 - interactive: 0=statement, 100=engaging question`;
 
-  const result=await callGemini(prompt);
+  const result=await callDeepSeek(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -575,7 +578,7 @@ Rules:
 Return ONLY a JSON object:
 {"type":"trending|evergreen|hybrid","reason":"brief explanation","confidence":0-100}`;
 
-  const result=await callGemini(prompt);
+  const result=await callDeepSeek(prompt);
   if(!result)return null;
   try{
     const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
@@ -732,7 +735,7 @@ Rules:
 - If unsure, return "SKIP"`;
 
   for(let attempt=1;attempt<=2;attempt++){
-    const result=await callGemini(prompt,45000);
+    const result=await callDeepSeek(prompt,45000);
     if(result){
       const cleaned=result.replace(/^["']|["']$/g,'').replace(/\n/g,' ').trim();
       if(cleaned==='SKIP'||cleaned.length<3||cleaned.length>60){
@@ -780,7 +783,7 @@ Post title: "${post.title}"
 Post content: "${(post.content||'').slice(0,300)}"
 
 Answer only "yes" or "no".`;
-  const result=await callGemini(prompt,10000);
+  const result=await callDeepSeek(prompt,10000);
   if(result){
     const answer=result.toLowerCase().trim();
     if(answer.includes('no')&&!answer.includes('yes')){
