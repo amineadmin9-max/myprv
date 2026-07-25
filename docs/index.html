@@ -146,19 +146,10 @@
 
   .empty-state{text-align:center;padding:30px;color:var(--text-dim);font-size:14px;}
 
-  .devbar{position:fixed;top:0;right:0;z-index:50;display:flex;gap:6px;padding:6px;background:#000;border-radius:0 0 0 10px;}
-  .devbar button{background:#222;color:#aaa;border:1px solid #444;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;font-family:monospace;}
-  .devbar button.active{background:var(--blue);color:#fff;}
+
 </style>
 </head>
 <body>
-
-<div class="devbar">
-  <button data-target="page-search" class="active">Search</button>
-  <button data-target="page-list">Schedule</button>
-  <button data-target="page-create">Create</button>
-  <button data-target="page-notifications">Notifs</button>
-</div>
 
 <!-- PAGE: Search / Niche Finder -->
 <div class="page active" id="page-search">
@@ -299,15 +290,9 @@ function showPage(id){
   document.getElementById(id).classList.add('active');
   document.getElementById('nav-search').classList.toggle('active',id==='page-search');
   document.getElementById('nav-list').classList.toggle('active',id!=='page-search');
-  document.querySelectorAll('.devbar button').forEach(b=>{
-    b.classList.toggle('active',b.dataset.target===id);
-  });
   if(id==='page-list'||id==='page-create') renderMonitors();
   if(id==='page-notifications') renderNotifications();
 }
-document.querySelectorAll('.devbar button').forEach(btn=>{
-  btn.addEventListener('click',()=>showPage(btn.dataset.target));
-});
 
 // ===================== SCORING =====================
 function classify(title,selftext){
