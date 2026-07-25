@@ -18,8 +18,8 @@
         button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #3b82f6; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         button:disabled { opacity: 0.5; }
         .status { text-align: center; color: #94a3b8; margin: 10px 0; font-size: 13px; min-height: 20px; }
-        .seeds { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
-        .seed { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 8px 14px; font-size: 13px; color: #94a3b8; cursor: pointer; }
+        .progress-bar { width: 100%; height: 4px; background: #334155; border-radius: 2px; margin: 10px 0; overflow: hidden; }
+        .progress-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s; }
         .legend { background: #1e293b; border-radius: 12px; padding: 16px; margin: 20px 0; }
         .legend-title { font-weight: bold; margin-bottom: 10px; }
         .legend-item { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; color: #94a3b8; }
@@ -48,6 +48,7 @@
         .spinner { border: 3px solid #334155; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .hidden { display: none; }
+        .error { color: #f87171; text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
@@ -55,23 +56,10 @@
         <h1>Niche Finder</h1>
         <p class="subtitle">ابحث عن نيتشات Affiliate رابحة</p>
 
-        <input type="text" id="searchInput" placeholder="مثال: home gym, pet care...">
+        <input type="text" id="searchInput" placeholder="اكتب كلمة للبحث في Reddit...">
         <button id="searchBtn" onclick="handleSearch()">بحث</button>
         <div class="status" id="status"></div>
-
-        <div id="seedsSection">
-            <p style="font-weight:bold; margin:15px 0 10px;">أفكار للبحث:</p>
-            <div class="seeds">
-                <span class="seed" onclick="search('homegym')">home gym</span>
-                <span class="seed" onclick="search('Frugal')">frugal</span>
-                <span class="seed" onclick="search('technology')">technology</span>
-                <span class="seed" onclick="search('science')">science</span>
-                <span class="seed" onclick="search('game')">gaming</span>
-                <span class="seed" onclick="search('RemoteWork')">remote work</span>
-                <span class="seed" onclick="search('solar')">solar energy</span>
-                <span class="seed" onclick="search('Education')">education</span>
-            </div>
-        </div>
+        <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
         <div class="legend">
             <div class="legend-title">دليل الألوان:</div>
@@ -84,8 +72,7 @@
     </div>
 
     <script>
-        const PROXY = 'https://api.allorigins.win/raw?url=';
-        const GITHUB_RAW = 'https://raw.githubusercontent.com/amineadmin9-max/myprv/main/data';
+        const SERVER_URL = localStorage.getItem('server_url') || '';
 
         const PROMO_KW = ['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
         const DISCUSSION_KW = ['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
@@ -124,118 +111,108 @@
             const stories = posts.filter(p => classify(p.title, p.content || p.selftext || '').storyScore >= 50).length;
             const interactive = posts.filter(p => classify(p.title, p.content || p.selftext || '').interactiveScore >= 50).length;
 
-            return { color, label, total, promo, ratio: Math.round(ratio * 100), avgComments: Math.round(avgComments), avgScore: Math.round(avgScore), edu, stories, interactive };
-        }
+            const subreddits = [...new Set(posts.map(p => p.subreddit))];
 
-        function parseRSS(xml, sub) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(xml, 'text/xml');
-            const entries = doc.querySelectorAll('entry');
-            return Array.from(entries).map(e => {
-                const content = (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
-                return {
-                    title: e.querySelector('title')?.textContent || '',
-                    author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
-                    url: e.querySelector('link')?.getAttribute('href') || '',
-                    content: content,
-                    subreddit: sub, score: 0, numComments: 0
-                };
-            }).filter(p => p.title);
-        }
-
-        async function fetchFromGitHub(sub) {
-            try {
-                const r = await fetch(`${GITHUB_RAW}/r_${sub}.json`);
-                if (r.ok) return await r.json();
-            } catch(e) {}
-            return [];
-        }
-
-        async function fetchFromReddit(sub) {
-            try {
-                const r = await fetch(PROXY + encodeURIComponent(`https://www.reddit.com/r/${sub}/.rss?limit=50`));
-                if (r.ok) {
-                    const text = await r.text();
-                    if (text.includes('<entry>')) return parseRSS(text, sub);
-                }
-            } catch(e) {}
-            return [];
-        }
-
-        async function analyzeSub(sub) {
-            setStatus(`جاري تحليل r/${sub}...`);
-            let posts = await fetchFromGitHub(sub);
-            if (!posts.length) {
-                setStatus(`سحب من r/${sub}...`);
-                posts = await fetchFromReddit(sub);
-            }
-            if (!posts.length) return null;
-            return { name: sub, scoring: computeTrafficLight(posts), posts };
+            return { color, label, total, promo, ratio: Math.round(ratio * 100), avgComments: Math.round(avgComments), avgScore: Math.round(avgScore), edu, stories, interactive, subreddits };
         }
 
         function setStatus(msg) { document.getElementById('status').textContent = msg; }
+        function showProgress(pct) {
+            const bar = document.getElementById('progressBar');
+            const fill = document.getElementById('progressFill');
+            bar.classList.remove('hidden');
+            fill.style.width = pct + '%';
+        }
+        function hideProgress() { document.getElementById('progressBar').classList.add('hidden'); }
 
         async function handleSearch() {
             const q = document.getElementById('searchInput').value.trim();
             if (!q) return;
+
+            if (!SERVER_URL) {
+                const url = prompt('أدخل رابط السيرفر\nمثال: http://IP:5000');
+                if (!url) return;
+                localStorage.setItem('server_url', url.replace(/\/+$/, ''));
+                location.reload();
+                return;
+            }
+
             document.getElementById('searchBtn').disabled = true;
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-            const subs = q.split(/[\s,]+/).filter(Boolean);
-            const results = [];
-            for (const sub of subs) {
-                const r = await analyzeSub(sub);
-                if (r) results.push(r);
+            setStatus('جاري إرسال الطلب...');
+            showProgress(10);
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+                const resp = await fetch(`${SERVER_URL}/api/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword: q }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                showProgress(90);
+
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.error || `Server error: ${resp.status}`);
+                }
+
+                const data = await resp.json();
+                showProgress(100);
+
+                if (!data.posts || !data.posts.length) {
+                    document.getElementById('results').innerHTML = '<p style="text-align:center;color:#64748b">ما لقيناش نتائج</p>';
+                } else {
+                    const scoring = computeTrafficLight(data.posts);
+                    renderSingleResult(data.keyword, scoring, data.posts);
+                }
+            } catch (e) {
+                let msg = e.message;
+                if (e.name === 'AbortError') msg = 'انتهت المهلة — السيرفر استغرق وقت طويل';
+                document.getElementById('results').innerHTML = `<div class="error">خطأ: ${msg}</div>`;
             }
 
-            if (!results.length) {
-                const r = await analyzeSub(q.replace(/\s+/g, ''));
-                if (r) results.push(r);
-            }
-
-            results.sort((a, b) => ({ green: 0, yellow: 1, red: 2 }[a.scoring.color] || 3) - ({ green: 0, yellow: 1, red: 2 }[b.scoring.color] || 3));
-            renderResults(results);
+            hideProgress();
             document.getElementById('searchBtn').disabled = false;
             setStatus('');
         }
 
-        function search(sub) {
-            document.getElementById('searchInput').value = sub;
-            handleSearch();
-        }
-
-        function renderResults(results) {
+        function renderSingleResult(keyword, scoring, posts) {
             const el = document.getElementById('results');
-            if (!results.length) { el.innerHTML = '<p style="text-align:center;color:#64748b">ما لقيناش نتائج</p>'; return; }
-            el.innerHTML = results.map(r => {
-                const s = r.scoring;
-                const cls = s.color;
-                return `
-                <div class="card ${cls}">
-                    <div class="card-header">
-                        <span class="card-title">r/${r.name}</span>
-                        <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
-                    </div>
-                    <p style="color:#94a3b8;font-size:13px">${s.label}</p>
-                    <div class="stats">
-                        <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">بوستات</div></div>
-                        <div class="stat"><div class="stat-val">${s.avgComments}</div><div class="stat-lbl">تعليقات</div></div>
-                        <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
-                        <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
-                        <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
-                        <div class="stat"><div class="stat-val">${s.interactive}</div><div class="stat-lbl">تفاعلي</div></div>
-                    </div>
-                    <div class="posts">
-                        ${r.posts.slice(0, 5).map(p => `
-                        <div class="post">
-                            <div class="post-title">${p.title}</div>
-                            <div class="post-stats">by u/${p.author}</div>
-                            <a class="post-link" href="${p.url}" target="_blank">فتح في Reddit ↗</a>
-                        </div>`).join('')}
-                    </div>
-                </div>`;
-            }).join('');
+            const s = scoring;
+            const cls = s.color;
+            const subsList = s.subreddits ? s.subreddits.map(r => `r/${r}`).join(', ') : '';
+
+            el.innerHTML = `
+            <div class="card ${cls}">
+                <div class="card-header">
+                    <span class="card-title">"${keyword}"</span>
+                    <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
+                </div>
+                <p style="color:#94a3b8;font-size:13px">${s.label}</p>
+                ${subsList ? `<p style="color:#64748b;font-size:11px;margin-top:4px">${subsList}</p>` : ''}
+                <div class="stats">
+                    <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">منشور</div></div>
+                    <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
+                    <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
+                    <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
+                    <div class="stat"><div class="stat-val">${s.interactive}</div><div class="stat-lbl">تفاعلي</div></div>
+                </div>
+                <div class="posts">
+                    ${posts.slice(0, 10).map(p => `
+                    <div class="post">
+                        <div class="post-title">${p.title}</div>
+                        <div class="post-stats">r/${p.subreddit} · by u/${p.author}</div>
+                        <a class="post-link" href="${p.url}" target="_blank">فتح في Reddit ↗</a>
+                    </div>`).join('')}
+                </div>
+            </div>`;
         }
 
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
