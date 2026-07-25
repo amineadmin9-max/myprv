@@ -88,7 +88,18 @@ def main():
     subreddits = [s.strip() for s in subreddits_arg.split(",") if s.strip()]
 
     os.makedirs("data", exist_ok=True)
+
+    # Load existing index to merge
+    index_path = "data/index.json"
     all_index = []
+    if os.path.exists(index_path):
+        with open(index_path, "r") as f:
+            try:
+                all_index = json.load(f)
+            except:
+                all_index = []
+
+    existing_names = {e["name"] for e in all_index}
 
     for sub in subreddits:
         print(f"\nScraping r/{sub}...")
@@ -98,16 +109,22 @@ def main():
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(posts, f, ensure_ascii=False, indent=2)
 
-        all_index.append({
+        entry = {
             "name": sub,
             "posts": len(posts),
             "updated": datetime.now().isoformat(),
-        })
+        }
+
+        if sub in existing_names:
+            all_index = [e for e in all_index if e["name"] != sub]
+        all_index.append(entry)
+        existing_names.add(sub)
+
         print(f"  Saved {len(posts)} posts")
 
         time.sleep(8)
 
-    with open("data/index.json", "w", encoding="utf-8") as f:
+    with open(index_path, "w", encoding="utf-8") as f:
         json.dump(all_index, f, ensure_ascii=False, indent=2)
 
     print(f"\nDone! Scraped {len(subreddits)} subreddits")
