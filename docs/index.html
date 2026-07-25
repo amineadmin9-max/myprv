@@ -88,22 +88,18 @@
         </div>
 
         <div id="autoPanel" class="hidden">
-            <div class="auto-panel">
-                <h3>🔥 مصادر توليد الأفكار</h3>
-                <p>اختر المصدر لإيجاد أفكار نيتشات واعدة تلقائياً:</p>
-                <div class="seed-chips">
-                    <div class="seed-chip selected" data-source="trends" onclick="toggleSource(this)">📈 Google Trends</div>
-                    <div class="seed-chip selected" data-source="reddit" onclick="toggleSource(this)">🔍 Reddit Unmet Demand</div>
+            <div class="auto-panel" style="text-align:center">
+                <h3>🚀 اكتشف نيتشات واعدة</h3>
+                <p style="margin-bottom:15px">الأداة تبحث تلقائياً في <b>Google Trends</b> و <b>Reddit</b> وتدمج النتائج في خوارزمية ذكية</p>
+                <div style="display:flex;gap:8px;justify-content:center;margin-bottom:15px;flex-wrap:wrap">
+                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">📈 مواضيع صاعدة</span>
+                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">🔍 احتياجات غير مُلبّاة</span>
+                    <span style="background:#1e3a5f;padding:4px 10px;border-radius:8px;font-size:11px;color:#60a5fa">🏷️ تصنيف Evergreen/Trending</span>
                 </div>
+                <button class="generate-btn" id="fetchIdeasBtn" onclick="runFullDiscovery()" style="font-size:20px;padding:18px">
+                    🔍 ابدأ الاكتشاف
+                </button>
             </div>
-            <div id="autoResults" class="hidden">
-                <div class="auto-panel">
-                    <h3>💡 أفكار مولّدة</h3>
-                    <div class="trending-list" id="trendingList"></div>
-                    <button class="generate-btn" id="generateBtn" onclick="analyzeSelected()">تحليل المحدد</button>
-                </div>
-            </div>
-            <button class="generate-btn" id="fetchIdeasBtn" onclick="fetchAutoIdeas()">توليد أفكار</button>
         </div>
 
         <div class="status" id="status"></div>
@@ -510,10 +506,9 @@
             </div>`;
         }
 
-        // ===== الوضع التلقائي - خوارزمية متطورة =====
+        // ===== الوضع التلقائي =====
 
         let currentMode = 'manual';
-        let selectedSources = ['trends', 'reddit'];
         let generatedIdeas = [];
 
         function switchMode(mode) {
@@ -524,260 +519,85 @@
             document.getElementById('autoPanel').classList.toggle('hidden', mode !== 'auto');
         }
 
-        function toggleSource(el) {
-            const source = el.dataset.source;
-            el.classList.toggle('selected');
-            if (selectedSources.includes(source)) {
-                selectedSources = selectedSources.filter(s => s !== source);
-            } else {
-                selectedSources.push(source);
-            }
-        }
-
-        // ===== جلب بيانات Google Trends =====
-        async function fetchGoogleTrends() {
-            try {
-                const url = 'https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
-                const data = await fetchWithProxyJSON(url);
-                if (!data) return [];
-                
-                const trends = data.default?.trendingSearchesDays?.[0]?.trendingSearches || [];
-                const ideas = [];
-                
-                for (const trend of trends.slice(0, 20)) {
-                    const query = trend.title.query;
-                    const traffic = trend.formattedTraffic;
-                    const relatedQueries = (trend.relatedQueries || []).map(q => q.query);
-                    
-                    // تحليل كل trend لاكتشاف النيتش
-                    const nicheKeywords = extractNicheFromTrend(query, relatedQueries);
-                    
-                    for (const keyword of nicheKeywords) {
-                        ideas.push({
-                            title: keyword,
-                            source: 'Google Trends',
-                            traffic: traffic,
-                            related: relatedQueries.slice(0, 3),
-                            type: 'trend'
-                        });
-                    }
-                }
-                
-                return ideas;
-            } catch(e) {
-                console.error('Google Trends error:', e);
-                return [];
-            }
-        }
-
-        // ===== استخراج كلمات النيتش من Google Trends =====
-        function extractNicheFromTrend(query, relatedQueries) {
-            const keywords = [];
-            const queryLower = query.toLowerCase();
-            
-            // فلترة الاتجاهات غير المتعلقة بالمنتجات
-            const skipPatterns = ['news','celebrity','movie','song','game release','election','sports','score','win'];
-            if (skipPatterns.some(p => queryLower.includes(p))) {
-                return [];
-            }
-            
-            // استخراج النيتش من الاستعلام الرئيسي
-            keywords.push(query);
-            
-            // استخراج من الاستعلامات المرتبطة
-            for (const related of relatedQueries.slice(0, 3)) {
-                if (related.length > 3 && related.length < 50) {
-                    keywords.push(related);
-                }
-            }
-            
-            return keywords.slice(0, 4);
-        }
-
-        // ===== جلب بيانات Reddit Unmet Demand =====
-        async function fetchRedditUnmetDemand() {
-            const searchPatterns = [
-                // أنماط الطلب المباشر
-                'does anyone know a product',
-                'looking for a product that',
-                'wish there was a product',
-                'is there a product for',
-                'anyone recommend a product',
-                'need help finding a product',
-                'looking for something that',
-                'does anyone use a product',
-                
-                // أنماط المشاكل
-                'frustrated with',
-                'tired of',
-                'hate when',
-                'annoying that',
-                'broken',
-                'doesn\'t work',
-                
-                // أنماط الرغبة
-                'wish i could',
-                'if only there',
-                'would pay for',
-                'shut up and take my money',
-                'take my money',
-                
-                // أنماط البحث عن بدائل
-                'alternative to',
-                'better than',
-                'replacement for',
-                'instead of'
-            ];
-            
-            const allIdeas = [];
-            const seen = new Set();
-            
-            for (const pattern of searchPatterns) {
-                try {
-                    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(pattern)}&sort=relevance&limit=25&t=month`;
-                    const xml = await fetchWithProxy(url);
-                    if (!xml) continue;
-                    
-                    const posts = parseRSS(xml);
-                    for (const post of posts) {
-                        const titleKey = post.title.toLowerCase().slice(0, 50);
-                        if (!seen.has(titleKey)) {
-                            seen.add(titleKey);
-                            
-                            // تحليل المنشور لاكتشاف النيتش
-                            const nicheIdea = extractNicheFromPost(post);
-                            if (nicheIdea) {
-                                allIdeas.push({
-                                    title: nicheIdea,
-                                    originalTitle: post.title,
-                                    subreddit: post.subreddit,
-                                    url: post.url,
-                                    source: 'Reddit Unmet Demand',
-                                    type: 'demand',
-                                    demandScore: computeDemandScore(post.title, post.content)
-                                });
-                            }
-                        }
-                    }
-                } catch(e) { continue; }
-            }
-            
-            // ترتيب حسب درجة الطلب
-            allIdeas.sort((a, b) => b.demandScore - a.demandScore);
-            
-            return allIdeas.slice(0, 30);
-        }
-
-        // ===== استخراج فكرة النيتش من منشور Reddit =====
-        function extractNicheFromPost(post) {
-            const title = post.title;
-            const content = post.content || '';
-            const text = (title + ' ' + content).toLowerCase();
-            
-            // البحث عن كلمات مفتاحية تدل على منتج أو خدمة
-            const productKeywords = [
-                'product','tool','app','software','service','device','gadget',
-                'equipment','gear','supply','material','resource','platform'
-            ];
-            
-            const hasProductKeyword = productKeywords.some(kw => text.includes(kw));
-            
-            // البحث عن أنماط الطلب
-            const demandPatterns = [
-                /does anyone know (?:a |an )?(.+)/i,
-                /looking for (?:a |an )?(.+)/i,
-                /wish there was (?:a |an )?(.+)/i,
-                /is there (?:a |an )?(.+) for/i,
-                /anyone recommend (?:a |an )?(.+)/i,
-                /need (?:a |an )?(.+)/i,
-                /want (?:a |an )?(.+)/i,
-                /best (.+) for/i,
-                /alternative to (.+)/i,
-                /better than (.+)/i
-            ];
-            
-            for (const pattern of demandPatterns) {
-                const match = title.match(pattern);
-                if (match && match[1]) {
-                    // تنظيف الكلمة المستخرجة
-                    let niche = match[1]
-                        .replace(/[?.!,;:]/g, '')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                    
-                    if (niche.length > 3 && niche.length < 60) {
-                        return niche;
-                    }
-                }
-            }
-            
-            // إذا لم يتم العثور على نمط، استخدم الكلمات المفتاحية
-            if (hasProductKeyword) {
-                // استخراج الكلمات المحيطة بكلمة المنتج
-                const words = title.split(' ');
-                const productIndex = words.findIndex(w => productKeywords.includes(w.toLowerCase()));
-                if (productIndex > 0) {
-                    const start = Math.max(0, productIndex - 2);
-                    const end = Math.min(words.length, productIndex + 3);
-                    return words.slice(start, end).join(' ');
-                }
-            }
-            
-            return null;
-        }
-
-        // ===== الخوارزمية الرئيسية لتوليد الأفكار =====
-        async function fetchAutoIdeas() {
-            if (selectedSources.length === 0) {
-                setStatus('اختر مصدر واحد على الأقل');
-                return;
-            }
-
+        // ===== الخوارزمية الرئيسية: اكتشاف نيتشات من المصادر معاً =====
+        async function runFullDiscovery() {
             const btn = document.getElementById('fetchIdeasBtn');
             btn.disabled = true;
-            btn.textContent = 'جاري التوليد...';
-            setStatus('جاري جمع الأفكار من المصادر المحددة...');
-            showProgress(10);
+            btn.innerHTML = '⏳ جاري البحث...';
+            
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
             try {
-                const allIdeas = [];
+                // الخطوة 1: جلب من المصرين معاً بالتوازي
+                showProgress(5);
+                setStatus('📡 جاري الاتصال بـ Google Trends و Reddit...');
                 
-                // جلب من Google Trends
-                if (selectedSources.includes('trends')) {
-                    setStatus('جاري جلب بيانات Google Trends...');
-                    showProgress(20);
-                    const trendsIdeas = await fetchGoogleTrends();
-                    allIdeas.push(...trendsIdeas);
-                }
+                const [trendsIdeas, redditIdeas] = await Promise.all([
+                    fetchGoogleTrends().catch(() => []),
+                    fetchRedditUnmetDemand().catch(() => [])
+                ]);
                 
-                // جلب من Reddit Unmet Demand
-                if (selectedSources.includes('reddit')) {
-                    setStatus('جاري تحليل احتياجات Reddit...');
-                    showProgress(50);
-                    const redditIdeas = await fetchRedditUnmetDemand();
-                    allIdeas.push(...redditIdeas);
-                }
+                showProgress(30);
+                setStatus(`📈 جلبنا ${trendsIdeas.length} من Google Trends + 🔍 ${redditIdeas.length} من Reddit`);
+
+                // الخطوة 2: دمج وتصنيف كل الأفكار
+                setStatus('🔄 جاري دمج وتصنيف الأفكار...');
+                showProgress(40);
                 
-                // دمج وتقييم الأفكار
-                setStatus('جاري دمج وتقييم الأفكار...');
-                showProgress(80);
+                const allIdeas = [...trendsIdeas, ...redditIdeas];
                 generatedIdeas = mergeAndScoreIdeas(allIdeas);
                 
-                showProgress(100);
-                
                 if (generatedIdeas.length === 0) {
-                    setStatus('ما لقينا أفكار حالياً. جرّب تغيير المصادر.');
-                } else {
-                    setStatus(`لقينا ${generatedIdeas.length} فكرة! اختر ما تريد تحليله.`);
-                    renderTrendingList();
+                    document.getElementById('results').innerHTML = '<div class="error">ما لقينا أفكار حالياً. جرّب مرة ثانية.</div>';
+                    return;
                 }
+
+                // الخطوة 3: تحليل أفضل 10 أفكار في Reddit
+                const topNiche = generatedIdeas.slice(0, 10);
+                const finalResults = [];
+                
+                for (let i = 0; i < topNiche.length; i++) {
+                    const idea = topNiche[i];
+                    setStatus(`🔍 [${i + 1}/${topNiche.length}] جاري تحليل: ${idea.title}`);
+                    showProgress(40 + (i / topNiche.length) * 50);
+                    
+                    try {
+                        const posts = await searchReddit(idea.title);
+                        const scoring = computeTrafficLight(posts);
+                        finalResults.push({
+                            keyword: idea.title,
+                            scoring,
+                            posts,
+                            ideaScore: idea.score,
+                            nicheType: idea.nicheType,
+                            sources: idea.sources
+                        });
+                    } catch(e) {
+                        // تخطي إذا ما لقى نتائج
+                        continue;
+                    }
+                }
+
+                // الخطوة 4: ترتيب حسب درجة الفرصة
+                showProgress(95);
+                setStatus('📊 جاري ترتيب النتائج...');
+                
+                finalResults.sort((a, b) => b.scoring.opportunityScore - a.scoring.opportunityScore);
+
+                showProgress(100);
+                setStatus(`✅ لقينا ${finalResults.length} نيتش واعد!`);
+                
+                renderDiscoveryResults(finalResults);
+
             } catch(e) {
-                setStatus('خطأ في جمع الأفكار: ' + e.message);
+                document.getElementById('results').innerHTML = `<div class="error">خطأ: ${e.message}</div>`;
             }
 
             hideProgress();
             btn.disabled = false;
-            btn.textContent = 'توليد أفكار';
+            btn.innerHTML = '🔍 ابدأ الاكتشاف';
+            setTimeout(() => setStatus(''), 3000);
         }
 
         // ===== خوارزمية دمج وتقييم الأفكار =====
@@ -881,131 +701,72 @@
             return Math.round(score);
         }
 
-        // ===== عرض قائمة الاتجاهات =====
-        function renderTrendingList() {
-            const el = document.getElementById('trendingList');
-            const container = document.getElementById('autoResults');
-            container.classList.remove('hidden');
+        // ===== عرض نتائج الاكتشاف =====
+        function renderDiscoveryResults(results) {
+            const el = document.getElementById('results');
             
-            el.innerHTML = generatedIdeas.map((idea, i) => {
-                const sourceIcon = idea.sources.includes('Google Trends') ? '📈' : '🔍';
-                const demandBadge = idea.demandScore > 50 ? '<span style="color:#22c55e;font-size:10px">● طلب عالي</span>' : '';
-                
-                // شارة نوع النيتش
-                let nicheBadge = '';
-                if (idea.nicheType && idea.nicheType.type !== 'general') {
-                    nicheBadge = `<span class="niche-badge" style="background:${idea.nicheType.color}20;color:${idea.nicheType.color}">${idea.nicheType.label}</span>`;
-                }
-                
-                return `
-                <div class="trending-item" data-index="${i}" onclick="selectIdea(this)">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <span>${idea.title} ${nicheBadge}</span>
-                        <span style="font-size:11px;color:#3b82f6;font-weight:bold">${idea.score} نقطة</span>
-                    </div>
-                    <div class="source">${sourceIcon} ${idea.sources.join(' + ')} ${demandBadge}</div>
-                </div>`;
-            }).join('');
-        }
-
-        function selectIdea(el) {
-            el.classList.toggle('selected');
-        }
-
-        // ===== تحليل الأفكار المحددة =====
-        async function analyzeSelected() {
-            const selected = document.querySelectorAll('.trending-item.selected');
-            if (selected.length === 0) {
-                setStatus('اختر فكرة واحدة على الأقل');
+            if (!results.length) {
+                el.innerHTML = '<div class="error">ما لقينا نتائج. جرّب مرة ثانية.</div>';
                 return;
             }
 
-            const keywords = Array.from(selected).map(el => {
-                const idx = parseInt(el.dataset.index);
-                return generatedIdeas[idx].title;
-            });
+            const header = `
+            <div style="text-align:center;margin-bottom:20px;padding:16px;background:#1e293b;border-radius:12px">
+                <h2 style="color:#22c55e;font-size:20px;margin-bottom:5px">🎯 نتائج الاكتشاف</h2>
+                <p style="color:#94a3b8;font-size:13px">${results.length} نيتش واعد - مرتبة من الأفضل للأسوأ</p>
+            </div>`;
 
-            document.getElementById('autoResults').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-            showProgress(10);
-            setStatus(`جاري تحليل ${keywords.length} أفكار...`);
-
-            try {
-                const allResults = [];
-                for (let i = 0; i < keywords.length; i++) {
-                    setStatus(`جاري تحليل ${i + 1}/${keywords.length}: ${keywords[i]}`);
-                    showProgress(10 + (i / keywords.length) * 70);
-                    
-                    try {
-                        const posts = await searchReddit(keywords[i]);
-                        const scoring = computeTrafficLight(posts);
-                        allResults.push({ 
-                            keyword: keywords[i], 
-                            scoring, 
-                            posts,
-                            ideaScore: generatedIdeas.find(idea => idea.title === keywords[i])?.score || 0
-                        });
-                    } catch(e) {
-                        // تخطي الأفكار التي لا توجد لها نتائج
-                        continue;
-                    }
-                }
-
-                // ترتيب حسب درجة الفرصة
-                allResults.sort((a, b) => b.scoring.opportunityScore - a.scoring.opportunityScore);
-
-                showProgress(100);
-                renderMultiResults(allResults);
-            } catch(e) {
-                document.getElementById('results').innerHTML = `<div class="error">${e.message}</div>`;
-            }
-
-            hideProgress();
-            setStatus('');
-        }
-
-        function renderMultiResults(results) {
-            const el = document.getElementById('results');
-            el.innerHTML = results.map(r => {
+            const cards = results.map((r, idx) => {
                 const s = r.scoring;
                 const cls = s.color;
-                const subsList = s.subreddits ? s.subreddits.map(x => `r/${x}`).join(', ') : '';
-                
-                // الحصول على تصنيف النيتش من القائمة الأصلية
-                const originalIdea = generatedIdeas.find(idea => idea.title === r.keyword);
-                const nicheType = originalIdea?.nicheType;
+                const subsList = s.subreddits ? s.subreddits.slice(0, 3).map(x => `r/${x}`).join(', ') : '';
                 
                 let nicheBadge = '';
-                if (nicheType && nicheType.type !== 'general') {
-                    nicheBadge = `<span class="niche-badge" style="background:${nicheType.color}20;color:${nicheType.color};font-size:12px;padding:4px 10px">${nicheType.label}</span>`;
+                if (r.nicheType && r.nicheType.type !== 'general') {
+                    nicheBadge = `<span class="niche-badge" style="background:${r.nicheType.color}20;color:${r.nicheType.color};font-size:12px;padding:4px 10px">${r.nicheType.label}</span>`;
                 }
                 
+                const sourcesBadges = r.sources ? r.sources.map(s => 
+                    s === 'Google Trends' ? '<span style="background:#1e3a5f;padding:2px 6px;border-radius:4px;font-size:10px;color:#60a5fa">📈 Trends</span>' :
+                    '<span style="background:#1e3a5f;padding:2px 6px;border-radius:4px;font-size:10px;color:#60a5fa">🔍 Reddit</span>'
+                ).join(' ') : '';
+
                 return `
-                <div class="card ${cls}">
+                <div class="card ${cls}" style="margin-bottom:16px">
                     <div class="card-header">
-                        <span class="card-title">"${r.keyword}"</span>
+                        <span class="card-title" style="font-size:16px">#${idx + 1} "${r.keyword}"</span>
                         <div>
                             ${nicheBadge}
                             <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
                         </div>
                     </div>
-                    <p style="color:#94a3b8;font-size:13px">${s.label}</p>
-                    ${subsList ? `<p style="color:#64748b;font-size:11px;margin-top:4px">${subsList}</p>` : ''}
+                    <p style="color:#94a3b8;font-size:12px;margin:4px 0 8px">${s.label}</p>
+                    <div style="margin-bottom:8px">${sourcesBadges}</div>
+                    ${subsList ? `<p style="color:#64748b;font-size:11px;margin-bottom:8px">subreddits: ${subsList}</p>` : ''}
                     <div class="stats">
                         <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">منشور</div></div>
                         <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
                         <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
                         <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
-                        <div class="stat"><div class="stat-val">${s.interactive}</div><div class="stat-lbl">تفاعلي</div></div>
                     </div>
-                    <div class="stats" style="border-top:1px solid #334155;padding-top:12px;margin-top:12px">
-                        <div class="stat"><div class="stat-val" style="color:#3b82f6">${s.demandScore}</div><div class="stat-lbl">درجة الطلب</div></div>
-                        <div class="stat"><div class="stat-val" style="color:#8b5cf6">${s.trendScore}</div><div class="stat-lbl">درجة الاتجاه</div></div>
-                        <div class="stat"><div class="stat-val" style="color:#22c55e;font-size:22px">${s.opportunityScore}</div><div class="stat-lbl">درجة الفرصة</div></div>
+                    <div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #334155;justify-content:center">
+                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px">
+                            <div style="color:#3b82f6;font-size:20px;font-weight:bold">${s.demandScore}</div>
+                            <div style="color:#64748b;font-size:10px">الطلب</div>
+                        </div>
+                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px">
+                            <div style="color:#8b5cf6;font-size:20px;font-weight:bold">${s.trendScore}</div>
+                            <div style="color:#64748b;font-size:10px">الاتجاه</div>
+                        </div>
+                        <div style="text-align:center;padding:8px 16px;background:#0f172a;border-radius:8px;border:2px solid #22c55e">
+                            <div style="color:#22c55e;font-size:24px;font-weight:bold">${s.opportunityScore}</div>
+                            <div style="color:#64748b;font-size:10px">الفرصة 🎯</div>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
+
+            el.innerHTML = header + cards;
         }
 
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
