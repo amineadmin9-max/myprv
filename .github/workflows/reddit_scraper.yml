@@ -3,10 +3,14 @@ name: Reddit Scraper
 on:
   workflow_dispatch:
     inputs:
+      keyword:
+        description: 'Search keyword (real-time search)'
+        required: false
+        default: ''
       subreddits:
-        description: 'Comma-separated subreddit names'
-        required: true
-        default: 'game,technology,science,Frugal'
+        description: 'Comma-separated subreddit names (batch scrape)'
+        required: false
+        default: ''
   schedule:
     - cron: '0 */12 * * *'
 
@@ -27,9 +31,20 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Scrape Reddit
+      - name: Keyword search
+        if: github.event.inputs.keyword != ''
         run: |
-          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddits || 'game,technology,science,Frugal' }}"
+          python3 .github/scripts/reddit_search.py "${{ github.event.inputs.keyword }}"
+
+      - name: Batch scrape
+        if: github.event.inputs.keyword == '' && github.event.inputs.subreddits != ''
+        run: |
+          python3 .github/scripts/reddit_scraper.py "${{ github.event.inputs.subreddits }}"
+
+      - name: Default batch scrape
+        if: github.event.inputs.keyword == '' && github.event.inputs.subreddits == ''
+        run: |
+          python3 .github/scripts/reddit_scraper.py "game,technology,science,Frugal,homegym,RemoteWork"
 
       - name: Commit results
         run: |
