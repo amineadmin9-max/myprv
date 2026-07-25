@@ -72,7 +72,11 @@
     </div>
 
     <script>
-        const SERVER_URL = localStorage.getItem('server_url') || '';
+        const PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
 
         const PROMO_KW = ['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
         const DISCUSSION_KW = ['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
@@ -110,18 +114,57 @@
             const edu = posts.filter(p => classify(p.title, p.content || p.selftext || '').eduScore >= 50).length;
             const stories = posts.filter(p => classify(p.title, p.content || p.selftext || '').storyScore >= 50).length;
             const interactive = posts.filter(p => classify(p.title, p.content || p.selftext || '').interactiveScore >= 50).length;
-
             const subreddits = [...new Set(posts.map(p => p.subreddit))];
 
             return { color, label, total, promo, ratio: Math.round(ratio * 100), avgComments: Math.round(avgComments), avgScore: Math.round(avgScore), edu, stories, interactive, subreddits };
         }
 
+        function parseRSS(xml) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            const entries = doc.querySelectorAll('entry');
+            return Array.from(entries).map(e => {
+                const content = (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+                const url = e.querySelector('link')?.getAttribute('href') || '';
+                const subM = url.match(/reddit\.com\/r\/([^/]+)/);
+                return {
+                    title: e.querySelector('title')?.textContent || '',
+                    author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
+                    url: url,
+                    content: content,
+                    subreddit: subM ? subM[1] : 'unknown',
+                    score: 0,
+                    numComments: 0
+                };
+            }).filter(p => p.title);
+        }
+
+        async function fetchWithProxy(url) {
+            for (const proxy of PROXIES) {
+                try {
+                    const resp = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(15000) });
+                    const text = await resp.text();
+                    if (text.includes('<entry>') || text.includes('<feed')) {
+                        return text;
+                    }
+                } catch(e) { continue; }
+            }
+            return null;
+        }
+
+        async function searchReddit(keyword) {
+            const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=50&t=month`;
+            const xml = await fetchWithProxy(url);
+            if (!xml) throw new Error('ما قدرنا نوصل لـ Reddit. جرّب كلمة ثانية.');
+            const posts = parseRSS(xml);
+            if (!posts.length) throw new Error('ما لقينا نتائج لهالكلمة.');
+            return posts;
+        }
+
         function setStatus(msg) { document.getElementById('status').textContent = msg; }
         function showProgress(pct) {
-            const bar = document.getElementById('progressBar');
-            const fill = document.getElementById('progressFill');
-            bar.classList.remove('hidden');
-            fill.style.width = pct + '%';
+            document.getElementById('progressBar').classList.remove('hidden');
+            document.getElementById('progressFill').style.width = pct + '%';
         }
         function hideProgress() { document.getElementById('progressBar').classList.add('hidden'); }
 
@@ -129,53 +172,24 @@
             const q = document.getElementById('searchInput').value.trim();
             if (!q) return;
 
-            if (!SERVER_URL) {
-                const url = prompt('أدخل رابط السيرفر\nمثال: http://IP:5000');
-                if (!url) return;
-                localStorage.setItem('server_url', url.replace(/\/+$/, ''));
-                location.reload();
-                return;
-            }
-
             document.getElementById('searchBtn').disabled = true;
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
-            setStatus('جاري إرسال الطلب...');
-            showProgress(10);
+            showProgress(20);
+            setStatus('جاري البحث في Reddit...');
 
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 120000);
+                showProgress(50);
+                const posts = await searchReddit(q);
+                showProgress(80);
+                setStatus(`لقينا ${posts.length} منشور — جاري التحليل...`);
 
-                const resp = await fetch(`${SERVER_URL}/api/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keyword: q }),
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
-                showProgress(90);
-
-                if (!resp.ok) {
-                    const err = await resp.json().catch(() => ({}));
-                    throw new Error(err.error || `Server error: ${resp.status}`);
-                }
-
-                const data = await resp.json();
+                const scoring = computeTrafficLight(posts);
                 showProgress(100);
 
-                if (!data.posts || !data.posts.length) {
-                    document.getElementById('results').innerHTML = '<p style="text-align:center;color:#64748b">ما لقيناش نتائج</p>';
-                } else {
-                    const scoring = computeTrafficLight(data.posts);
-                    renderSingleResult(data.keyword, scoring, data.posts);
-                }
+                renderResult(q, scoring, posts);
             } catch (e) {
-                let msg = e.message;
-                if (e.name === 'AbortError') msg = 'انتهت المهلة — السيرفر استغرق وقت طويل';
-                document.getElementById('results').innerHTML = `<div class="error">خطأ: ${msg}</div>`;
+                document.getElementById('results').innerHTML = `<div class="error">${e.message}</div>`;
             }
 
             hideProgress();
@@ -183,7 +197,7 @@
             setStatus('');
         }
 
-        function renderSingleResult(keyword, scoring, posts) {
+        function renderResult(keyword, scoring, posts) {
             const el = document.getElementById('results');
             const s = scoring;
             const cls = s.color;
