@@ -274,8 +274,6 @@ const STORY_KW=['my experience','i tried','before and after','journey','story','
 const DEMAND_KW=['does anyone know','looking for','wish there was','is there a product','anyone recommend','need help finding','looking for something','does anyone use','where can i find','how do i get','any suggestions','what do you use','best product for','alternative to','better than','frustrated with','tired of','hate when','annoying that','wish i could','if only there','would pay for','shut up and take my money'];
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
-const TRENDING_INDICATORS=['trending','viral','hot','breaking','just launched','new release','this week','today','tonight','just happened','limited edition','flash sale','black friday','cyber monday','holiday','christmas','easter','valentine','summer sale','2024','2025','2026','new year','season','episode','finale','celebrity','scandal','drama','controversy','debate','election','vote','poll','launch','release','preorder','coming soon','announced'];
-const EVERGREEN_INDICATORS=['how to','guide','tutorial','beginner','learn','course','best practices','tips','tricks','hacks','diy','do it yourself','review','comparison','vs','versus','alternative','health','fitness','weight','diet','nutrition','exercise','money','finance','budget','saving','invest','retire','relationship','dating','marriage','family','parenting','home','garden','cooking','recipe','meal prep','pet','dog','cat','animal','care','education','study','exam','degree','career','job','technology','software','app','tool','device','travel','vacation','trip','adventure','hobby','craft','art','music','photo','video','safety','security','protection','insurance','maintenance','repair','fix','troubleshoot','productivity','efficiency','workflow','automation','mental health','stress','anxiety','sleep','meditation','sustainability','eco','green','renewable','solar'];
 
 // ===================== HELPERS =====================
 function countKW(text,kw){return kw.filter(k=>text.toLowerCase().includes(k)).length;}
@@ -297,7 +295,14 @@ function showPage(id){
 // ===================== SCORING =====================
 function classify(title,selftext){
   const text=(title+' '+(selftext||'')).toLowerCase();
-  const promoScore=Math.min(100,Math.round((countKW(text,PROMO_KW)/4)*100));
+  let promoSignals=0;
+  promoSignals+=countKW(text,PROMO_KW);
+  if(/amazon\.com|ebay\.com|etsy\.com|shopify|gumroad|patreon|aliexpress/i.test(text))promoSignals+=2;
+  if(/\b(?:my |i (?:made|built|created|launched|developed)|check out|visit my|follow me)\b/i.test(text))promoSignals+=2;
+  if(/\b(?:limited(?! data)|hurry|don'?t miss|act now|only \d+ left|expires|last chance|flash sale)\b/i.test(text))promoSignals+=2;
+  if(/\b(?:discount|coupon|referral|affiliate|promo code)\b/i.test(text))promoSignals+=1;
+  if(/\$\d+/.test(text))promoSignals+=1;
+  const promoScore=Math.min(100,Math.round((promoSignals/5)*100));
   const eduScore=Math.min(100,Math.round((countKW(text,DISCUSSION_KW)/3)*100));
   const storyScore=Math.min(100,Math.round((countKW(text,STORY_KW)/2)*100));
   const interactiveScore=(text.match(/\?/g)||[]).length>0?70:10;
@@ -323,20 +328,21 @@ function computeTrendScore(title,content){
   return Math.min(100,score);
 }
 
-function classifyNicheType(title,source){
-  const text=title.toLowerCase();
-  let trending=0,evergreen=0;
-  for(const w of TRENDING_INDICATORS)if(text.includes(w))trending+=10;
-  for(const w of EVERGREEN_INDICATORS)if(text.includes(w))evergreen+=10;
-  if(source==='Google Trends')trending+=20;
-  else if(source==='Reddit Unmet Demand')evergreen+=15;
-  if(text.includes('how to')||text.includes('best'))evergreen+=15;
-  if(text.includes('new'))trending+=10;
-  const max=Math.max(trending,evergreen);
-  if(max<10)return{type:'general',label:'General',color:'#64748b'};
-  if(trending>evergreen*1.5)return{type:'trending',label:'Trending',color:'#8b5cf6'};
-  if(evergreen>trending*1.5)return{type:'evergreen',label:'Evergreen',color:'#10b981'};
-  return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
+function classifyNicheType(title,source,cachedTrends){
+  const trends=cachedTrends||[];
+  const titleLower=title.toLowerCase();
+  const topicWords=titleLower.split(/\s+/).filter(w=>w.length>3);
+  let inTrends=false;
+  for(const t of trends){
+    const tLower=t.title.toLowerCase();
+    if(topicWords.length&&topicWords.some(w=>tLower.includes(w))){inTrends=true;break;}
+    if(tLower.includes(titleLower)){inTrends=true;break;}
+  }
+  if(source==='Google Trends')inTrends=true;
+  if(inTrends&&source==='Reddit Unmet Demand')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
+  if(inTrends)return{type:'trending',label:'Trending',color:'#8b5cf6'};
+  if(source==='Reddit Unmet Demand')return{type:'evergreen',label:'Evergreen',color:'#10b981'};
+  return{type:'general',label:'General',color:'#64748b'};
 }
 
 function computeTrafficLight(posts){
@@ -400,6 +406,8 @@ async function searchReddit(keyword){
 }
 
 // ===================== GOOGLE TRENDS =====================
+let cachedTrendsIdeas=[];
+
 async function fetchGoogleTrends(){
   try{
     const url='https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
@@ -408,7 +416,7 @@ async function fetchGoogleTrends(){
     const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
     const ideas=[];
     const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
-    for(const t of trends.slice(0,20)){
+    for(const t of trends.slice(0,25)){
       const q=t.title.query;const ql=q.toLowerCase();
       if(skip.some(s=>ql.includes(s)))continue;
       ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
@@ -416,47 +424,86 @@ async function fetchGoogleTrends(){
         if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
       }
     }
+    cachedTrendsIdeas=ideas;
     return ideas;
-  }catch(e){console.error('Trends error:',e);return[];}
+  }catch(e){console.error('Trends error:',e);cachedTrendsIdeas=[];return[];}
 }
 
-// ===================== REDDIT UNMET DEMAND =====================
-async function fetchRedditUnmetDemand(){
-  const patterns=['does anyone know a product','looking for a product that','wish there was a product','is there a product for','anyone recommend a product','need help finding a product','looking for something that','does anyone use a product','frustrated with','tired of','would pay for','alternative to','better than','replacement for'];
-  const allIdeas=[];const seen=new Set();
-  for(const p of patterns){
+// ===================== SEED DISCOVERY (specific subreddits) =====================
+const SEED_SUBS=['findareddit','whatisthisthing','DoesAnybodyElse','AskReddit'];
+const SEED_Q='looking for OR recommend OR wish OR does anyone know OR is there OR alternative OR need OR product OR tool OR app';
+
+const Q_PATTERNS=[
+  /does anyone know (?:a |an |of )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,
+  /looking for (?:a |an )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,
+  /wish there was (?:a |an )?/i,
+  /is there (?:a |an |something|anything|any )/i,
+  /anyone recommend (?:a |an )?/i,
+  /need (?:a |an )?(?:good |great |decent )?/i,
+  /where can (?:i|we) (?:find|get|buy)/i,
+  /how (?:do|can) (?:i|we) (?:find|get|buy|make)/i,
+  /what (?:do|would) (?:i|we|you) (?:use|recommend|suggest)/i,
+  /alternative to/i,
+  /better than/i,
+  /best .+ for/i,
+];
+
+function processSeedPost(post,seen,allSeeds){
+  const key=post.title.toLowerCase().slice(0,60);
+  if(seen.has(key))return;
+  seen.add(key);
+  const isQ=Q_PATTERNS.some(p=>p.test(post.title))||/\?/.test(post.title);
+  if(!isQ)return;
+  const cleanTopic=extractCleanTopic(post.title,post.content||'');
+  if(!cleanTopic||cleanTopic.length<3)return;
+  allSeeds.push({title:cleanTopic,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});
+}
+
+function extractCleanTopic(title,content){
+  let topic=title;
+  topic=topic.replace(/^(?:does anyone know|looking for|is there|wish there was|anyone recommend|need|want|where can (?:i|we) (?:find|get|buy)|how (?:do|can) (?:i|we) (?:find|get|buy|make)|what (?:do|would) (?:i|we|you) (?:use|recommend|suggest))\s+(?:a |an |the |some |any )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,'');
+  topic=topic.replace(/\s+(?:for|under|over|around|that|which|with)\b.*$/i,'');
+  topic=topic.replace(/\s*\?+\s*$/,'');
+  topic=topic.replace(/\$[\d,]+/g,'');
+  topic=topic.replace(/\b(?:20\d{2})\b/g,'');
+  topic=topic.replace(/\b(?:under|over|around|about)\s+\$?\d+/gi,'');
+  topic=topic.replace(/[?.!,;:]+$/g,'');
+  topic=topic.replace(/\s+/g,' ').trim();
+  if(topic.length<3||topic.length>60)return null;
+  return topic;
+}
+
+async function fetchSeedsFromReddit(){
+  const allSeeds=[];const seen=new Set();
+  for(const sub of SEED_SUBS){
     try{
-      const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(p)}&sort=relevance&limit=25&t=month`;
-      const xml=await fetchWithProxy(url);if(!xml)continue;
-      const posts=parseRSS(xml);
-      for(const post of posts){
-        const key=post.title.toLowerCase().slice(0,50);
-        if(!seen.has(key)){
-          seen.add(key);
-          const niche=extractNicheFromPost(post);
-          if(niche)allIdeas.push({title:niche,originalTitle:post.title,subreddit:post.subreddit,url:post.url,source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content)});
+      const url=`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=25&t=month`;
+      const data=await fetchWithProxyJSON(url);
+      if(data?.data?.children){
+        for(const child of data.data.children){
+          const p=child.data;
+          if(p.stickied||p.score<0)continue;
+          processSeedPost({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},seen,allSeeds);
         }
+      }else{
+        const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=25&t=month`;
+        const xml=await fetchWithProxy(rssUrl);
+        if(xml){const posts=parseRSS(xml);for(const post of posts)processSeedPost(post,seen,allSeeds);}
       }
-    }catch(e){continue;}
+    }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
   }
-  allIdeas.sort((a,b)=>b.demandScore-a.demandScore);
-  return allIdeas.slice(0,30);
+  allSeeds.sort((a,b)=>b.demandScore-a.demandScore);
+  return allSeeds.slice(0,30);
 }
 
-function extractNicheFromPost(post){
-  const title=post.title;
-  const patterns=[/does anyone know (?:a |an )?(.+)/i,/looking for (?:a |an )?(.+)/i,/wish there was (?:a |an )?(.+)/i,/is there (?:a |an )?(.+) for/i,/anyone recommend (?:a |an )?(.+)/i,/need (?:a |an )?(.+)/i,/want (?:a |an )?(.+)/i,/best (.+) for/i,/alternative to (.+)/i,/better than (.+)/i];
-  for(const p of patterns){
-    const m=title.match(p);
-    if(m&&m[1]){const n=m[1].replace(/[?.!,;:]/g,'').replace(/\s+/g,' ').trim();if(n.length>3&&n.length<60)return n;}
-  }
-  const pk=['product','tool','app','software','service','device','gadget','equipment','gear','supply','resource','platform'];
-  const text=(title+' '+(post.content||'')).toLowerCase();
-  if(pk.some(k=>text.includes(k))){
-    const words=title.split(' ');const i=words.findIndex(w=>pk.includes(w.toLowerCase()));
-    if(i>0)return words.slice(Math.max(0,i-2),Math.min(words.length,i+3)).join(' ');
-  }
-  return null;
+// ===================== RELATED SUBREDDITS =====================
+async function findRelatedSubreddits(topic){
+  try{
+    const url=`https://www.reddit.com/subreddits/search.json?q=${encodeURIComponent(topic)}&limit=5`;
+    const data=await fetchWithProxyJSON(url);
+    if(!data?.data?.children)return[];
+    return data.data.children.map(c=>({name:c.data.display_name,description:(c.data.public_description||'').slice(0,200),subscribers:c.data.subscribers||0})).filter(s=>s.subscribers>100).slice(0,3);
+  }catch(e){return[];}
 }
 
 // ===================== MERGE & SCORE IDEAS =====================
@@ -480,7 +527,7 @@ function mergeAndScoreIdeas(ideas){
     if(merged.has(key)){
       const e=merged.get(key);e.score+=20;e.sources.push(idea.source);e.count+=1;
     }else{
-      merged.set(key,{title:idea.title,normalizedTitle:key,score:calculateIdeaScore(idea),sources:[idea.source],count:1,type:idea.type,demandScore:idea.demandScore||0,subreddit:idea.subreddit,url:idea.url,related:idea.related||[],nicheType:classifyNicheType(idea.title,idea.source)});
+      merged.set(key,{title:idea.title,normalizedTitle:key,score:calculateIdeaScore(idea),sources:[idea.source],count:1,type:idea.type,demandScore:idea.demandScore||0,subreddit:idea.subreddit,url:idea.url,related:idea.related||[],nicheType:classifyNicheType(idea.title,idea.source,cachedTrendsIdeas)});
     }
   }
   return Array.from(merged.values()).sort((a,b)=>b.score-a.score).slice(0,20);
@@ -543,17 +590,34 @@ async function runFullDiscovery(){
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   try{
-    showProgress(5);setStatus('Connecting to Google Trends and Reddit...');
-    const[trends,reddit]=await Promise.all([fetchGoogleTrends().catch(()=>[]),fetchRedditUnmetDemand().catch(()=>[])]);
-    showProgress(30);setStatus(`Got ${trends.length} from Trends + ${reddit.length} from Reddit`);
-    showProgress(40);setStatus('Merging and classifying...');
-    const all=[...trends,...reddit];const ideas=mergeAndScoreIdeas(all);
+    showProgress(5);setStatus('Fetching seeds from Reddit communities...');
+    const seeds=await fetchSeedsFromReddit();
+    showProgress(20);setStatus(`Found ${seeds.length} seed topics from r/findareddit, r/whatisthisthing, r/DoesAnybodyElse, r/AskReddit`);
+
+    showProgress(25);setStatus('Checking Google Trends...');
+    const trends=await fetchGoogleTrends();
+    showProgress(35);setStatus(`Got ${trends.length} trending topics from Google Trends`);
+
+    showProgress(40);setStatus('Finding related subreddits...');
+    for(let i=0;i<seeds.length;i++){
+      setStatus(`[${i+1}/${seeds.length}] Finding communities for: ${seeds[i].title}`);
+      showProgress(40+(i/seeds.length)*10);
+      seeds[i].relatedSubs=await findRelatedSubreddits(seeds[i].title);
+    }
+
+    showProgress(55);setStatus('Merging and classifying...');
+    const all=[...trends,...seeds];const ideas=mergeAndScoreIdeas(all);
     if(!ideas.length){document.getElementById('results').innerHTML='<div class="error">No ideas found. Try again.</div>';return;}
+
     const top=ideas.slice(0,10);const results=[];
     for(let i=0;i<top.length;i++){
       setStatus(`[${i+1}/${top.length}] Analyzing: ${top[i].title}`);
-      showProgress(40+(i/top.length)*50);
-      try{const posts=await searchReddit(top[i].title);const scoring=computeTrafficLight(posts);results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType:top[i].nicheType,sources:top[i].sources});}catch(e){continue;}
+      showProgress(60+(i/top.length)*35);
+      try{
+        const posts=await searchReddit(top[i].title);
+        const scoring=computeTrafficLight(posts);
+        results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType:classifyNicheType(top[i].title,top[i].sources?.[0]||'manual',cachedTrendsIdeas),sources:top[i].sources,relatedSubs:top[i].relatedSubs||[]});
+      }catch(e){continue;}
     }
     results.sort((a,b)=>b.scoring.opportunityScore-a.scoring.opportunityScore);
     showProgress(100);setStatus(`Done! Found ${results.length} viable niches.`);
@@ -573,6 +637,7 @@ function renderDiscoveryResults(results){
     const s=r.scoring;const c=s.color;
     let nb='';if(r.nicheType&&r.nicheType.type!=='general')nb=`<span class="niche-badge" style="background:${r.nicheType.color}20;color:${r.nicheType.color};font-size:11px;padding:3px 8px">${r.nicheType.label}</span>`;
     const srcs=r.sources?r.sources.map(s=>s==='Google Trends'?'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Trends</span>':'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Reddit</span>').join(' '):'';
+    const subs=r.relatedSubs&&r.relatedSubs.length?`<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:4px">${r.relatedSubs.map(s=>`<span style="background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:8px;font-size:10px;color:var(--text-dim)">r/${s.name}</span>`).join('')}</div>`:'';
     return`<div class="card card-${c}">
       <div class="card-header">
         <span class="card-title" style="font-size:16px">#${idx+1} "${r.keyword}"</span>
@@ -580,6 +645,7 @@ function renderDiscoveryResults(results){
       </div>
       <p style="color:var(--text-dim);font-size:12px;margin:4px 0 8px">${s.label}</p>
       <div style="margin-bottom:8px">${srcs}</div>
+      ${subs}
       <div class="result-stats">
         <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
         <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
