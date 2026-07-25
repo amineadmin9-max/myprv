@@ -17,19 +17,31 @@ def clean_html(text):
 def scrape_reddit(subreddit, num_posts=50):
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
     }
 
-    rss_url = f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}"
+    urls = [
+        f"https://www.reddit.com/r/{subreddit}/.rss?limit={num_posts}",
+        f"https://old.reddit.com/r/{subreddit}/.rss?limit={num_posts}",
+    ]
 
-    try:
-        r = requests.get(rss_url, headers=headers, timeout=15)
-        if r.status_code != 200:
-            return []
-    except Exception:
-        return []
+    for rss_url in urls:
+        try:
+            r = requests.get(rss_url, headers=headers, timeout=15)
+            print(f"  URL: {rss_url} -> Status: {r.status_code}, Length: {len(r.text)}")
+            if r.status_code == 200 and "<entry>" in r.text:
+                return parse_rss(r.text, subreddit, num_posts)
+        except Exception as e:
+            print(f"  Error: {e}")
+            continue
 
+    print(f"  All URLs failed for r/{subreddit}")
+    return []
+
+
+def parse_rss(xml_text, subreddit, num_posts):
     posts = []
-    entries = re.findall(r"<entry>(.*?)</entry>", r.text, re.DOTALL)
+    entries = re.findall(r"<entry>(.*?)</entry>", xml_text, re.DOTALL)
 
     for entry in entries[:num_posts]:
         title_m = re.search(r"<title[^>]*>(.*?)</title>", entry, re.DOTALL)
