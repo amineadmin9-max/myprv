@@ -377,17 +377,25 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function _hfFetch(prompt,timeoutMs){
   const key=getHFKey();
   const body={model:HF_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
-  try{
-    const r=await fetch(HF_BASE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
-    const rawText=await r.text();
-    if(rawText.startsWith('{')){
-      const d=JSON.parse(rawText);
-      if(d.choices&&d.choices[0]?.message?.content){
-        return{content:d.choices[0].message.content.trim(),realModel:d.model||HF_MODEL};
+  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
+  // Try direct first, then CORS proxy
+  const urls=[HF_BASE,...PROXIES.map(p=>p+encodeURIComponent(HF_BASE))];
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+      const rawText=await r.text();
+      if(rawText.startsWith('{')){
+        const d=JSON.parse(rawText);
+        if(d.choices&&d.choices[0]?.message?.content){
+          return{content:d.choices[0].message.content.trim(),realModel:d.model||HF_MODEL};
+        }
       }
-    }
-    return{status:r.status,body:rawText};
-  }catch(e){return{error:e.constructor.name,msg:e.message};}
+      // If proxy returned HTML error, try next
+      if(rawText.includes('<!')||rawText.includes('error'))continue;
+      return{status:r.status,body:rawText};
+    }catch(e){continue;}
+  }
+  return{error:'FetchError',msg:'All endpoints failed'};
 }
 
 async function callLLM(prompt,timeoutMs=30000){
