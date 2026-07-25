@@ -146,6 +146,19 @@
 
   .empty-state{text-align:center;padding:30px;color:var(--text-dim);font-size:14px;}
 
+  .section-title{font-weight:800;font-size:17px;margin:26px 0 12px;display:flex;align-items:baseline;gap:8px;color:#f2f4ff;}
+  .section-title .dash{color:#5b6389;font-weight:600;font-size:14px;}
+
+  .niche-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;transition:transform .15s ease,border-color .15s ease;}
+  .niche-card:active{transform:scale(0.985);}
+  .niche-card-left{flex:1;}
+  .niche-card-title{font-weight:700;font-size:16.5px;color:#fbfbff;margin-bottom:6px;}
+  .niche-card-meta{font-family:'Consolas','SF Mono',monospace;font-size:12.5px;color:#67719c;letter-spacing:.2px;}
+  .niche-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;margin-left:14px;}
+  .niche-dot.green{background:var(--green);box-shadow:0 0 10px rgba(34,197,94,.6);}
+  .niche-dot.yellow{background:var(--yellow);box-shadow:0 0 10px rgba(234,179,8,.55);}
+  .niche-dot.red{background:var(--red-icon);box-shadow:0 0 10px rgba(255,85,102,.55);}
+
   .menu-dots{position:relative;cursor:pointer;padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
   .menu-dots:active{background:var(--border);}
   .menu-dots svg{width:22px;height:22px;color:var(--text-dim);}
@@ -968,35 +981,39 @@ async function handleSearch(){
 function renderSearchResult(keyword,scoring,posts){
   const el=document.getElementById('results');const s=scoring;const c=s.color;
   const nt=classifyNicheType(keyword,'manual');
-  let nb='';if(nt.type!=='general')nb=`<span class="niche-badge" style="background:${nt.color}20;color:${nt.color}">${nt.label}</span>`;
+  const emoji=nt.type==='trending'?'🔥':nt.type==='hybrid'?'🔥🌳':'🌳';
+  const typeLabel=nt.label||'General';
   const subs=s.subreddits?s.subreddits.slice(0,3).map(x=>'r/'+x).join(', '):'';
-  el.innerHTML=`
-  <div class="card card-${c}">
-    <div class="card-header">
-      <span class="card-title">"${keyword}"</span>
-      <div>${nb}<span class="card-badge ${c}">${{green:'Green',yellow:'Yellow',red:'Red'}[c]||''}</span></div>
+
+  let html=`<div class="section-title">Search Results <span class="dash">— "${keyword}"</span></div>`;
+  html+=`<div class="niche-card">
+    <div class="niche-card-left">
+      <div class="niche-card-title">${keyword}</div>
+      <div class="niche-card-meta">${subs||'Reddit'} &nbsp;·&nbsp; ${emoji} ${typeLabel} &nbsp;·&nbsp; ${s.label}</div>
     </div>
-    <p style="color:var(--text-dim);font-size:13px;margin:4px 0">${s.label}</p>
-    ${subs?`<p style="color:var(--text-dim);font-size:11px">${subs}</p>`:''}
-    <div class="result-stats">
-      <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
-      <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
-      <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Educational</div></div>
-      <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
-    </div>
-    <div class="result-scores">
-      <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
-      <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
-      <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
-    </div>
-    <div class="result-posts">${posts.slice(0,8).map(p=>`
-      <div class="result-post">
-        <div class="result-post-title">${p.title}</div>
-        <div class="result-post-meta">r/${p.subreddit} - u/${p.author}</div>
-        <a class="result-post-link" href="${p.url}" target="_blank">Open in Reddit</a>
-      </div>`).join('')}
-    </div>
+    <div class="niche-dot ${c}"></div>
   </div>`;
+
+  html+=`<div class="result-stats">
+    <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
+    <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
+    <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Educational</div></div>
+    <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
+  </div>
+  <div class="result-scores">
+    <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
+    <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
+    <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
+  </div>
+  <div class="result-posts">${posts.slice(0,8).map(p=>`
+    <div class="result-post">
+      <div class="result-post-title">${p.title}</div>
+      <div class="result-post-meta">r/${p.subreddit} - u/${p.author}</div>
+      <a class="result-post-link" href="${p.url}" target="_blank">Open in Reddit</a>
+    </div>`).join('')}
+  </div>`;
+
+  el.innerHTML=html;
 }
 
 // ===================== FULL DISCOVERY =====================
@@ -1052,37 +1069,40 @@ async function runFullDiscovery(){
 function renderDiscoveryResults(results){
   const el=document.getElementById('results');
   if(!results.length){el.innerHTML=renderLLMStats()+'<div class="error">No results found.</div>';return;}
-  const header=renderLLMStats()+`<div style="text-align:center;margin-bottom:20px;padding:16px;background:var(--card);border-radius:20px;border:1px solid var(--border)">
-    <h2 style="color:var(--green);font-size:20px;margin-bottom:5px">Discovery Results</h2>
-    <p style="color:var(--text-dim);font-size:13px">${results.length} viable niches found - ranked best to worst</p>
-  </div>`;
-  const cards=results.map((r,idx)=>{
-    const s=r.scoring;const c=s.color;
-    let nb='';if(r.nicheType&&r.nicheType.type!=='general')nb=`<span class="niche-badge" style="background:${r.nicheType.color}20;color:${r.nicheType.color};font-size:11px;padding:3px 8px">${r.nicheType.label}</span>`;
-    const srcs=r.sources?r.sources.map(s=>s==='Google Trends'?'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Trends</span>':'<span style="background:var(--blue-light);padding:2px 6px;border-radius:4px;font-size:10px;color:#7fa1ff">Reddit</span>').join(' '):'';
-    const subs=r.relatedSubs&&r.relatedSubs.length?`<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:4px">${r.relatedSubs.map(s=>`<span style="background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:8px;font-size:10px;color:var(--text-dim)">r/${s.name}</span>`).join('')}</div>`:'';
-    return`<div class="card card-${c}">
-      <div class="card-header">
-        <span class="card-title" style="font-size:16px">#${idx+1} "${r.keyword}"</span>
-        <div>${nb}<span class="card-badge ${c}">${{green:'Green',yellow:'Yellow',red:'Red'}[c]||''}</span></div>
+
+  const evergreen=results.filter(r=>r.nicheType&&(r.nicheType.type==='evergreen'||r.nicheType.type==='hybrid'));
+  const trending=results.filter(r=>r.nicheType&&r.nicheType.type==='trending');
+  const other=results.filter(r=>!r.nicheType||r.nicheType.type==='general');
+
+  function makeCard(r){
+    const c=r.scoring.color;
+    const emoji=r.nicheType?.type==='trending'?'🔥':r.nicheType?.type==='hybrid'?'🔥🌳':'🌳';
+    const typeLabel=r.nicheType?.label||'General';
+    return`<div class="niche-card">
+      <div class="niche-card-left">
+        <div class="niche-card-title">${r.keyword}</div>
+        <div class="niche-card-meta">${r.sources?.[0]||'Discovery'} &nbsp;·&nbsp; ${emoji} ${typeLabel} &nbsp;·&nbsp; Click for details</div>
       </div>
-      <p style="color:var(--text-dim);font-size:12px;margin:4px 0 8px">${s.label}</p>
-      <div style="margin-bottom:8px">${srcs}</div>
-      ${subs}
-      <div class="result-stats">
-        <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
-        <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
-        <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Edu</div></div>
-        <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
-      </div>
-      <div class="result-scores">
-        <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
-        <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
-        <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
-      </div>
+      <div class="niche-dot ${c}"></div>
     </div>`;
-  }).join('');
-  el.innerHTML=header+cards;
+  }
+
+  let html=renderLLMStats();
+
+  if(evergreen.length){
+    html+=`<div class="section-title">Evergreen 🌳 <span class="dash">— Steady Demand, Brand Core</span></div>`;
+    html+=evergreen.map(makeCard).join('');
+  }
+  if(trending.length){
+    html+=`<div class="section-title">Trending 🔥 <span class="dash">— Surging Momentum, Seasonal Content</span></div>`;
+    html+=trending.map(makeCard).join('');
+  }
+  if(other.length){
+    html+=`<div class="section-title">General 💡 <span class="dash">— Other Opportunities</span></div>`;
+    html+=other.map(makeCard).join('');
+  }
+
+  el.innerHTML=html;
 }
 
 // ===================== MONITORS =====================
