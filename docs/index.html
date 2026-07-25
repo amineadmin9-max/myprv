@@ -210,14 +210,18 @@
     </div>
   </div>
 
-  <!-- Modal: OpenRouter API Key -->
+  <!-- Modal: API Keys -->
   <div class="modal-overlay hidden" id="apiKeyModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <div id="apiKeyFormView">
         <h2>AI API Keys</h2>
-        <p>Add your API keys below. Gemini is free (100 req/day). Your keys are stored locally only.</p>
-        <div class="field" style="margin-bottom:12px">
-          <label style="color:var(--green);font-weight:700">Google Gemini (Free)</label>
+        <p>Add your API keys. Groq is recommended (free, 14K+ req/day). Keys are stored locally only.</p>
+        <div class="field" style="margin-bottom:10px">
+          <label style="color:var(--green);font-weight:700">Groq (Recommended - Free 14K+/day)</label>
+          <input type="password" class="modal-input" id="groqKeyInput" placeholder="gsk_...">
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label style="color:#8b5cf6">Gemini (Free 100/day)</label>
           <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIza...">
         </div>
         <div class="field">
@@ -356,13 +360,17 @@
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
 // LLM Providers
+const GROQ_BASE='https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL='llama-3.3-70b-versatile';
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL='openrouter/free';
 
+function getGroqKey(){return localStorage.getItem('nf_groq_key')||'';}
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
 function getActiveProvider(){
+  if(getGroqKey())return'groq';
   if(getGeminiKey())return'gemini';
   if(getOpenRouterKey())return'openrouter';
   return'none';
@@ -403,6 +411,22 @@ async function _llmFetch(model,prompt,timeoutMs){
   }catch(e){return{error:e.constructor.name,msg:e.message};}
 }
 
+async function _groqFetch(prompt,timeoutMs){
+  const key=getGroqKey();
+  const body={model:GROQ_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  try{
+    const r=await fetch(GROQ_BASE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+    const rawText=await r.text();
+    if(rawText.startsWith('{')){
+      const d=JSON.parse(rawText);
+      if(d.choices&&d.choices[0]?.message?.content){
+        return{content:d.choices[0].message.content.trim(),realModel:d.model||GROQ_MODEL};
+      }
+    }
+    return{status:r.status,body:rawText};
+  }catch(e){return{error:e.constructor.name,msg:e.message};}
+}
+
 async function _geminiFetch(prompt,timeoutMs){
   const key=getGeminiKey();
   const url=GEMINI_BASE+'?key='+key;
@@ -424,62 +448,80 @@ async function callLLM(prompt,timeoutMs=30000){
   llmStats.total++;
   const provider=getActiveProvider();
 
-  // Try Gemini first
-  if(provider==='gemini'||(provider==='none'&&getGeminiKey())){
-    console.log('[LLM] Trying Gemini...');
-    const geminiResult=await _geminiFetch(prompt,timeoutMs);
-    if(geminiResult&&geminiResult.content){
-      llmStats.ok++;
-      llmStats.lastModel=geminiResult.realModel||'gemini-2.0-flash';
-      llmStats.provider='Gemini';
-      console.log('[LLM] SUCCESS (Gemini)');
-      return geminiResult.content;
+  // Try Groq first (fastest, most generous free tier)
+  if(provider==='groq'||provider==='none'){
+    if(getGroqKey()){
+      console.log('[LLM] Trying Groq...');
+      const groqResult=await _groqFetch(prompt,timeoutMs);
+      if(groqResult&&groqResult.content){
+        llmStats.ok++;
+        llmStats.lastModel=groqResult.realModel||GROQ_MODEL;
+        llmStats.provider='Groq';
+        console.log('[LLM] SUCCESS (Groq) — model:',groqResult.realModel);
+        return groqResult.content;
+      }
+      console.log('[LLM] Groq failed, trying next...');
     }
-    console.log('[LLM] Gemini failed, trying OpenRouter...');
   }
 
-  // Fallback to OpenRouter
-  if(getOpenRouterKey()){
-    console.log('[LLM] Trying OpenRouter...');
-    const result=await _llmFetch(OPENROUTER_MODEL,prompt,timeoutMs);
-    if(result&&result.content){
-      llmStats.ok++;
-      llmStats.lastModel=result.realModel||OPENROUTER_MODEL;
-      llmStats.provider='OpenRouter';
-      console.log('[LLM] SUCCESS (OpenRouter) — model:',result.realModel);
-      return result.content;
+  // Try Gemini
+  if(provider==='gemini'||provider==='none'){
+    if(getGeminiKey()){
+      console.log('[LLM] Trying Gemini...');
+      const geminiResult=await _geminiFetch(prompt,timeoutMs);
+      if(geminiResult&&geminiResult.content){
+        llmStats.ok++;
+        llmStats.lastModel=geminiResult.realModel||'gemini-2.0-flash';
+        llmStats.provider='Gemini';
+        console.log('[LLM] SUCCESS (Gemini)');
+        return geminiResult.content;
+      }
+      console.log('[LLM] Gemini failed, trying next...');
     }
-    const status=result.status||0;
-    const rawErr=result.body||result.error||result.msg||'unknown';
-    const errMsg=`STATUS ${status} | ${rawErr}`;
-    console.error(`[LLM] FAILED (OpenRouter) — ${errMsg}`);
-    if(!llmStats.firstError)llmStats.firstError=errMsg;
+  }
+
+  // Try OpenRouter
+  if(provider==='openrouter'||provider==='none'){
+    if(getOpenRouterKey()){
+      console.log('[LLM] Trying OpenRouter...');
+      const result=await _llmFetch(OPENROUTER_MODEL,prompt,timeoutMs);
+      if(result&&result.content){
+        llmStats.ok++;
+        llmStats.lastModel=result.realModel||OPENROUTER_MODEL;
+        llmStats.provider='OpenRouter';
+        console.log('[LLM] SUCCESS (OpenRouter) — model:',result.realModel);
+        return result.content;
+      }
+      const status=result.status||0;
+      const rawErr=result.body||result.error||result.msg||'unknown';
+      const errMsg=`STATUS ${status} | ${rawErr}`;
+      console.error(`[LLM] FAILED (OpenRouter) — ${errMsg}`);
+      if(!llmStats.firstError)llmStats.firstError=errMsg;
+    }
   }
 
   // No provider or all failed
-  if(provider==='none'&&!getOpenRouterKey()){
-    console.log('[LLM] No API key configured');
-  }
+  console.log('[LLM] All providers failed or no API key configured');
   llmStats.fail++;
   return null;
 }
 
-// Keep old name for compatibility
 async function callOpenRouter(prompt,timeoutMs=30000){return callLLM(prompt,timeoutMs);}
 
 function saveAPIKeys(){
+  const groqKey=document.getElementById('groqKeyInput').value.trim();
   const geminiKey=document.getElementById('geminiKeyInput').value.trim();
   const openrouterKey=document.getElementById('apiKeyInput').value.trim();
+  if(groqKey)localStorage.setItem('nf_groq_key',groqKey);
   if(geminiKey)localStorage.setItem('nf_gemini_key',geminiKey);
   if(openrouterKey)localStorage.setItem('nf_openrouter_key',openrouterKey);
-  if(!geminiKey&&!openrouterKey){alert('Enter at least one API key');return;}
+  if(!groqKey&&!geminiKey&&!openrouterKey){alert('Enter at least one API key');return;}
   document.getElementById('apiKeyFormView').style.display='none';
   const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('groqKeyInput').value='';document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
 }
 
-// Keep old name for compatibility
 function saveAPIKey(){saveAPIKeys();}
 
 function toggleDropdown(e){
@@ -491,6 +533,7 @@ function toggleDropdown(e){
 function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('apiKeyModal').classList.remove('hidden');
+  document.getElementById('groqKeyInput').value=getGroqKey();
   document.getElementById('geminiKeyInput').value=getGeminiKey();
   document.getElementById('apiKeyInput').value=getOpenRouterKey();
 }
@@ -509,7 +552,8 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 function renderLLMStats(){
   const s=llmStats;
   const provider=getActiveProvider();
-  const providerLabel=provider==='gemini'?'Gemini (Free)':provider==='openrouter'?'OpenRouter':'None';
+  const providerLabel=provider==='groq'?'Groq (Free 14K+)':provider==='gemini'?'Gemini (Free 100)':provider==='openrouter'?'OpenRouter':'None (Keywords only)';
+  const providerColor=provider==='groq'?'var(--green)':provider==='gemini'?'#8b5cf6':provider==='openrouter'?'var(--blue)':'var(--red-icon)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'<div style="margin-top:8px;color:var(--green);font-size:11px">No errors captured</div>';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Last used: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
   return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
@@ -519,7 +563,7 @@ function renderLLMStats(){
       <span style="color:var(--green)">OK: <b>${s.ok}</b></span>
       <span style="color:var(--red-icon)">Fail: <b>${s.fail}</b></span>
     </div>
-    <div style="margin-top:4px;font-size:10px;color:var(--text-dim);text-align:center">Provider: <b style="color:${provider==='gemini'?'var(--green)':'var(--text)'}">${providerLabel}</b></div>
+    <div style="margin-top:4px;font-size:10px;color:var(--text-dim);text-align:center">Provider: <b style="color:${providerColor}">${providerLabel}</b></div>
     ${modelHtml}
     ${errHtml}
   </div>`;
