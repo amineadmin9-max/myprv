@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Niche Finder</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; }
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; padding-top: 50px; }
+        h1 { text-align: center; font-size: 28px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 25px; font-size: 14px; }
+        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; font-size: 16px; margin-bottom: 10px; }
+        button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #3b82f6; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        button:disabled { opacity: 0.5; }
+        .status { text-align: center; color: #94a3b8; margin: 10px 0; font-size: 13px; min-height: 20px; }
+        .seeds { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+        .seed { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 8px 14px; font-size: 13px; color: #94a3b8; cursor: pointer; }
+        .legend { background: #1e293b; border-radius: 12px; padding: 16px; margin: 20px 0; }
+        .legend-title { font-weight: bold; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; color: #94a3b8; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .results { margin-top: 20px; }
+        .card { background: #1e293b; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 2px solid; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-title { font-size: 18px; font-weight: bold; }
+        .badge { border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: bold; }
+        .stats { display: flex; justify-content: space-between; margin: 12px 0; }
+        .stat { text-align: center; }
+        .stat-val { font-size: 18px; font-weight: bold; }
+        .stat-lbl { font-size: 10px; color: #64748b; }
+        .posts { margin-top: 12px; }
+        .post { background: #0f172a; border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+        .post-title { font-size: 13px; margin-bottom: 6px; line-height: 1.4; }
+        .post-stats { font-size: 11px; color: #94a3b8; }
+        .post-link { color: #3b82f6; font-size: 12px; text-decoration: none; }
+        .green { border-color: #22c55e; }
+        .yellow { border-color: #eab308; }
+        .red { border-color: #ef4444; }
+        .green-bg { background: #052e16; color: #4ade80; }
+        .yellow-bg { background: #422006; color: #facc15; }
+        .red-bg { background: #450a0a; color: #f87171; }
+        .loading { text-align: center; padding: 40px; }
+        .spinner { border: 3px solid #334155; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Niche Finder</h1>
+        <p class="subtitle">ابحث عن نيتشات Affiliate رابحة</p>
+
+        <input type="text" id="searchInput" placeholder="مثال: home gym, pet care...">
+        <button id="searchBtn" onclick="handleSearch()">بحث</button>
+        <div class="status" id="status"></div>
+
+        <div id="seedsSection">
+            <p style="font-weight:bold; margin:15px 0 10px;">أفكار للبحث:</p>
+            <div class="seeds">
+                <span class="seed" onclick="search('homegym')">home gym</span>
+                <span class="seed" onclick="search('Frugal')">frugal</span>
+                <span class="seed" onclick="search('technology')">technology</span>
+                <span class="seed" onclick="search('science')">science</span>
+                <span class="seed" onclick="search('game')">gaming</span>
+                <span class="seed" onclick="search('RemoteWork')">remote work</span>
+                <span class="seed" onclick="search('solar')">solar energy</span>
+                <span class="seed" onclick="search('Education')">education</span>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-title">دليل الألوان:</div>
+            <div class="legend-item"><div class="dot" style="background:#22c55e"></div>أخضر - فرصة نظيفة</div>
+            <div class="legend-item"><div class="dot" style="background:#eab308"></div>أصفر - سوق مصدّق</div>
+            <div class="legend-item"><div class="dot" style="background:#ef4444"></div>أحمر - مشبع بالترويج</div>
+        </div>
+
+        <div class="results hidden" id="results"></div>
+    </div>
+
+    <script>
+        const PROXY = 'https://api.allorigins.win/raw?url=';
+        const GITHUB_RAW = 'https://raw.githubusercontent.com/amineadmin9-max/myprv/main/data';
+
+        const PROMO_KW = ['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
+        const DISCUSSION_KW = ['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
+        const STORY_KW = ['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
+
+        function countKW(text, kw) { return kw.filter(k => text.toLowerCase().includes(k)).length; }
+
+        function classify(title, selftext) {
+            const text = (title + ' ' + (selftext || '')).toLowerCase();
+            const promoHits = countKW(text, PROMO_KW);
+            const promoScore = Math.min(100, Math.round((promoHits / 4) * 100));
+            const eduScore = Math.min(100, Math.round((countKW(text, DISCUSSION_KW) / 3) * 100));
+            const storyScore = Math.min(100, Math.round((countKW(text, STORY_KW) / 2) * 100));
+            const hasQ = (text.match(/\?/g) || []).length > 0;
+            const interactiveScore = hasQ ? 70 : 10;
+            return { promoScore, eduScore, storyScore, interactiveScore };
+        }
+
+        function computeTrafficLight(posts) {
+            if (!posts.length) return { color: 'gray', label: 'بيانات غير كافية' };
+            const total = posts.length;
+            const promo = posts.filter(p => classify(p.title, p.content || p.selftext || '').promoScore >= 60).length;
+            const ratio = promo / total;
+            const avgComments = posts.reduce((s, p) => s + (p.numComments || 0), 0) / total;
+            const avgScore = posts.reduce((s, p) => s + (p.score || 0), 0) / total;
+            const highEng = (avgComments + avgScore) / 2 > 20;
+
+            let color, label;
+            if (ratio <= 0.01 && highEng) { color = 'green'; label = 'فرصة نظيفة - أقوى إشارة'; }
+            else if (ratio <= 0.15 && highEng) { color = 'yellow'; label = 'سوق مصدّق ومفتوح'; }
+            else if (ratio > 0.4) { color = 'red'; label = 'سوق مشبع بالترويج'; }
+            else { color = 'yellow'; label = 'حالة متوسطة'; }
+
+            const edu = posts.filter(p => classify(p.title, p.content || p.selftext || '').eduScore >= 50).length;
+            const stories = posts.filter(p => classify(p.title, p.content || p.selftext || '').storyScore >= 50).length;
+            const interactive = posts.filter(p => classify(p.title, p.content || p.selftext || '').interactiveScore >= 50).length;
+
+            return { color, label, total, promo, ratio: Math.round(ratio * 100), avgComments: Math.round(avgComments), avgScore: Math.round(avgScore), edu, stories, interactive };
+        }
+
+        function parseRSS(xml, sub) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            const entries = doc.querySelectorAll('entry');
+            return Array.from(entries).map(e => ({
+                title: e.querySelector('title')?.textContent || '',
+                author: (e.querySelector('name')?.textContent || 'unknown').replace('/u/', ''),
+                url: e.querySelector('link')?.getAttribute('href') || '',
+                content: (e.querySelector('content')?.textContent || '').replace(/<[^>]+>/g, '').slice(0, 500),
+                subreddit: sub, score: 0, numComments: 0
+            })).filter(p => p.title);
+        }
+
+        async function fetchFromGitHub(sub) {
+            try {
+                const r = await fetch(`${GITHUB_RAW}/r_${sub}.json`);
+                if (r.ok) return await r.json();
+            } catch(e) {}
+            return [];
+        }
+
+        async function fetchFromReddit(sub) {
+            try {
+                const r = await fetch(PROXY + encodeURIComponent(`https://www.reddit.com/r/${sub}/.rss?limit=50`));
+                if (r.ok) {
+                    const text = await r.text();
+                    if (text.includes('<entry>')) return parseRSS(text, sub);
+                }
+            } catch(e) {}
+            return [];
+        }
+
+        async function analyzeSub(sub) {
+            setStatus(`جاري تحليل r/${sub}...`);
+            let posts = await fetchFromGitHub(sub);
+            if (!posts.length) {
+                setStatus(`سحب من r/${sub}...`);
+                posts = await fetchFromReddit(sub);
+            }
+            if (!posts.length) return null;
+            return { name: sub, scoring: computeTrafficLight(posts), posts };
+        }
+
+        function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+        async function handleSearch() {
+            const q = document.getElementById('searchInput').value.trim();
+            if (!q) return;
+            document.getElementById('searchBtn').disabled = true;
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('results').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            const subs = q.split(/[\s,]+/).filter(Boolean);
+            const results = [];
+            for (const sub of subs) {
+                const r = await analyzeSub(sub);
+                if (r) results.push(r);
+            }
+
+            if (!results.length) {
+                const r = await analyzeSub(q.replace(/\s+/g, ''));
+                if (r) results.push(r);
+            }
+
+            results.sort((a, b) => ({ green: 0, yellow: 1, red: 2 }[a.scoring.color] || 3) - ({ green: 0, yellow: 1, red: 2 }[b.scoring.color] || 3));
+            renderResults(results);
+            document.getElementById('searchBtn').disabled = false;
+            setStatus('');
+        }
+
+        function search(sub) {
+            document.getElementById('searchInput').value = sub;
+            handleSearch();
+        }
+
+        function renderResults(results) {
+            const el = document.getElementById('results');
+            if (!results.length) { el.innerHTML = '<p style="text-align:center;color:#64748b">ما لقيناش نتائج</p>'; return; }
+            el.innerHTML = results.map(r => {
+                const s = r.scoring;
+                const cls = s.color;
+                return `
+                <div class="card ${cls}">
+                    <div class="card-header">
+                        <span class="card-title">r/${r.name}</span>
+                        <span class="badge ${cls}-bg">${{green:'🟢 أخضر',yellow:'🟡 أصفر',red:'🔴 أحمر'}[cls]||'⚪'}</span>
+                    </div>
+                    <p style="color:#94a3b8;font-size:13px">${s.label}</p>
+                    <div class="stats">
+                        <div class="stat"><div class="stat-val">${s.total}</div><div class="stat-lbl">بوستات</div></div>
+                        <div class="stat"><div class="stat-val">${s.avgComments}</div><div class="stat-lbl">تعليقات</div></div>
+                        <div class="stat"><div class="stat-val">${s.ratio}%</div><div class="stat-lbl">ترويج</div></div>
+                        <div class="stat"><div class="stat-val">${s.edu}</div><div class="stat-lbl">تعليمي</div></div>
+                        <div class="stat"><div class="stat-val">${s.stories}</div><div class="stat-lbl">قصص</div></div>
+                        <div class="stat"><div class="stat-val">${s.interactive}</div><div class="stat-lbl">تفاعلي</div></div>
+                    </div>
+                    <div class="posts">
+                        ${r.posts.slice(0, 5).map(p => `
+                        <div class="post">
+                            <div class="post-title">${p.title}</div>
+                            <div class="post-stats">by u/${p.author}</div>
+                            <a class="post-link" href="${p.url}" target="_blank">فتح في Reddit ↗</a>
+                        </div>`).join('')}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+    </script>
+</body>
+</html>
