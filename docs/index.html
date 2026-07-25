@@ -215,18 +215,17 @@
     <div class="modal-box">
       <div id="apiKeyFormView">
         <h2>AI API Keys</h2>
-        <p>Enter your VPS API URL or individual provider keys.</p>
+        <p>Add at least one key. HuggingFace is recommended (free, generous limits).</p>
         <div class="field" style="margin-bottom:10px">
-          <label style="color:var(--green);font-weight:700">VPS API URL (Recommended)</label>
-          <input type="text" class="modal-input" id="vpsApiInput" placeholder="http://your-vps-ip:5000" style="font-family:sans-serif">
+          <label style="color:var(--green);font-weight:700">HuggingFace (Recommended - Free)</label>
+          <input type="password" class="modal-input" id="hfKeyInput" placeholder="hf_...">
         </div>
-        <div style="text-align:center;color:var(--text-dim);font-size:12px;margin:8px 0">— OR use keys directly —</div>
         <div class="field" style="margin-bottom:10px">
-          <label style="color:var(--green);font-weight:700">Groq (Free 14K+/day)</label>
+          <label>Groq (Free 14K+/day)</label>
           <input type="password" class="modal-input" id="groqKeyInput" placeholder="gsk_...">
         </div>
         <div class="field" style="margin-bottom:10px">
-          <label style="color:#8b5cf6">Gemini (Free 100/day)</label>
+          <label>Gemini (Free 100/day)</label>
           <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIza...">
         </div>
         <div class="field">
@@ -366,18 +365,22 @@ const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest
 
 // LLM (optional - app works without it)
 const VPS_API_URL=localStorage.getItem('nf_vps_api')||'';
+const HF_BASE='https://router.huggingface.co/v1/chat/completions';
+const HF_MODEL='deepseek-ai/DeepSeek-R1:fastest';
 const GROQ_BASE='https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL='llama-3.3-70b-versatile';
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL='openrouter/free';
 
+function getHFKey(){return localStorage.getItem('nf_hf_key')||'';}
 function getGroqKey(){return localStorage.getItem('nf_groq_key')||'';}
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
-function hasAnyKey(){return VPS_API_URL||getGroqKey()||getGeminiKey()||getOpenRouterKey();}
+function hasAnyKey(){return VPS_API_URL||getHFKey()||getGroqKey()||getGeminiKey()||getOpenRouterKey();}
 function getActiveProvider(){
   if(VPS_API_URL)return'vps';
+  if(getHFKey())return'huggingface';
   if(getGroqKey())return'groq';
   if(getGeminiKey())return'gemini';
   if(getOpenRouterKey())return'openrouter';
@@ -411,8 +414,23 @@ async function _llmFetch(model,prompt,timeoutMs){
     if(rawText.startsWith('{')||rawText.startsWith('[')){
       const d=JSON.parse(rawText);
       if(d.choices&&d.choices[0]?.message?.content){
-        const realModel=d.model||model;
-        return{content:d.choices[0].message.content.trim(),realModel};
+        return{content:d.choices[0].message.content.trim(),realModel:d.model||model};
+      }
+    }
+    return{status:r.status,body:rawText};
+  }catch(e){return{error:e.constructor.name,msg:e.message};}
+}
+
+async function _hfFetch(prompt,timeoutMs){
+  const key=getHFKey();
+  const body={model:HF_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  try{
+    const r=await fetch(HF_BASE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+    const rawText=await r.text();
+    if(rawText.startsWith('{')){
+      const d=JSON.parse(rawText);
+      if(d.choices&&d.choices[0]?.message?.content){
+        return{content:d.choices[0].message.content.trim(),realModel:d.model||HF_MODEL};
       }
     }
     return{status:r.status,body:rawText};
@@ -478,6 +496,20 @@ async function callLLM(prompt,timeoutMs=30000){
     }catch(e){console.log('[LLM] VPS failed:',e.message);}
   }
 
+  // Try HuggingFace (free, generous limits)
+  if(provider==='huggingface'||provider==='none'){
+    if(getHFKey()){
+      console.log('[LLM] Trying HuggingFace...');
+      const hfResult=await _hfFetch(prompt,timeoutMs);
+      if(hfResult&&hfResult.content){
+        llmStats.ok++;
+        llmStats.lastModel=hfResult.realModel||HF_MODEL;
+        llmStats.provider='HuggingFace';
+        return hfResult.content;
+      }
+    }
+  }
+
   // Try Groq
   if(provider==='groq'||provider==='none'){
     if(getGroqKey()){
@@ -528,20 +560,19 @@ async function callLLM(prompt,timeoutMs=30000){
 async function callOpenRouter(prompt,timeoutMs=30000){return callLLM(prompt,timeoutMs);}
 
 function saveAPIKeys(){
-  const vpsApi=document.getElementById('vpsApiInput').value.trim().replace(/\/$/,'');
+  const hfKey=document.getElementById('hfKeyInput').value.trim();
   const groqKey=document.getElementById('groqKeyInput').value.trim();
   const geminiKey=document.getElementById('geminiKeyInput').value.trim();
   const openrouterKey=document.getElementById('apiKeyInput').value.trim();
-  if(vpsApi)localStorage.setItem('nf_vps_api',vpsApi);
-  else localStorage.removeItem('nf_vps_api');
+  if(hfKey)localStorage.setItem('nf_hf_key',hfKey);
   if(groqKey)localStorage.setItem('nf_groq_key',groqKey);
   if(geminiKey)localStorage.setItem('nf_gemini_key',geminiKey);
   if(openrouterKey)localStorage.setItem('nf_openrouter_key',openrouterKey);
-  if(!vpsApi&&!groqKey&&!geminiKey&&!openrouterKey){alert('Enter at least one option');return;}
+  if(!hfKey&&!groqKey&&!geminiKey&&!openrouterKey){alert('Enter at least one key');return;}
   document.getElementById('apiKeyFormView').style.display='none';
   const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('vpsApiInput').value='';document.getElementById('groqKeyInput').value='';document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('hfKeyInput').value='';document.getElementById('groqKeyInput').value='';document.getElementById('geminiKeyInput').value='';document.getElementById('apiKeyInput').value='';},1500);
 }
 
 function saveAPIKey(){saveAPIKeys();}
@@ -555,7 +586,7 @@ function toggleDropdown(e){
 function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('apiKeyModal').classList.remove('hidden');
-  document.getElementById('vpsApiInput').value=VPS_API_URL;
+  document.getElementById('hfKeyInput').value=getHFKey();
   document.getElementById('groqKeyInput').value=getGroqKey();
   document.getElementById('geminiKeyInput').value=getGeminiKey();
   document.getElementById('apiKeyInput').value=getOpenRouterKey();
@@ -575,7 +606,7 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 function renderLLMStats(){
   const s=llmStats;
   const provider=getActiveProvider();
-  const providerLabel=provider==='vps'?'VPS Server':provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='openrouter'?'OpenRouter':'No API key (Keywords only)';
+  const providerLabel=provider==='vps'?'VPS Server':provider==='huggingface'?'HuggingFace':provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='openrouter'?'OpenRouter':'No API key (Keywords only)';
   const providerColor=provider==='none'?'var(--text-dim)':'var(--green)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Last used: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
