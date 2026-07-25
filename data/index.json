@@ -1,32 +1,17 @@
 [
   {
-    "name": "homegym",
+    "name": "game",
     "posts": 50,
-    "updated": "2026-07-25T00:26:31.312707"
-  },
-  {
-    "name": "gaming",
-    "posts": 0,
-    "updated": "2026-07-25T00:26:33.378414"
-  },
-  {
-    "name": "frugal",
-    "posts": 0,
-    "updated": "2026-07-25T00:26:35.441006"
+    "updated": "2026-07-25T00:28:44.366763"
   },
   {
     "name": "technology",
     "posts": 0,
-    "updated": "2026-07-25T00:26:37.508885"
+    "updated": "2026-07-25T00:28:46.694799"
   },
   {
     "name": "science",
     "posts": 0,
-    "updated": "2026-07-25T00:26:39.571526"
-  },
-  {
-    "name": "askreddit",
-    "posts": 0,
-    "updated": "2026-07-25T00:26:41.631069"
+    "updated": "2026-07-25T00:28:49.116718"
   }
 ]
