@@ -26,51 +26,40 @@ def scrape_reddit_playwright(subreddit, num_posts=50):
             page.wait_for_timeout(5000)
 
             last_height = 0
-            for _ in range(8):
+            for attempt in range(8):
                 html = page.content()
 
-                titles = re.findall(r'<a[^>]*slot="title"[^>]*>([^<]+)</a>', html)
-                if not titles:
-                    titles = re.findall(r'<h2[^>]*><a[^>]*>([^<]+)</a></h2>', html)
-                if not titles:
-                    titles = re.findall(r'class="[^"]*title[^"]*"[^>]*>([^<]{10,})</a>', html)
+                if attempt == 0:
+                    print(f"  HTML length: {len(html)}")
 
-                links = re.findall(r'href="(/r/[^"]*comments/[^"]*)"', html)
+                shreddit_posts = page.query_selector_all("shreddit-post")
+                print(f"  Attempt {attempt}: {len(shreddit_posts)} shreddit-post elements")
 
-                scores = re.findall(r'aria-label="(\d+) votes?"', html)
-                if not scores:
-                    scores = re.findall(r'score">(\d+)<', html)
+                for sp in shreddit_posts[:num_posts]:
+                    try:
+                        title = sp.get_attribute("post-title") or ""
+                        author = sp.get_attribute("author") or "unknown"
+                        score = int(sp.get_attribute("score") or "0")
+                        num_comments = int(sp.get_attribute("comment-count") or "0")
+                        permalink = sp.get_attribute("permalink") or ""
 
-                comments_list = re.findall(r'(\d+) comments?', html)
-
-                print(f"  Found {len(titles)} titles, {len(links)} links")
-
-                for i, title in enumerate(titles):
-                    title = title.strip()
-                    if len(title) < 5:
+                        if title and not any(p["title"] == title for p in posts):
+                            posts.append({
+                                "title": title.strip(),
+                                "author": author.strip(),
+                                "score": score,
+                                "numComments": num_comments,
+                                "url": f"https://reddit.com{permalink}" if permalink else "",
+                                "domain": "",
+                                "created": "",
+                                "subreddit": subreddit,
+                                "selftext": "",
+                                "permalink": f"https://reddit.com{permalink}" if permalink else "",
+                                "flair": "",
+                                "isSelf": True,
+                            })
+                    except Exception:
                         continue
-                    if any(p["title"] == title for p in posts):
-                        continue
-
-                    link = links[i] if i < len(links) else ""
-                    score = int(scores[i]) if i < len(scores) else 0
-                    num_comments = int(comments_list[i]) if i < len(comments_list) else 0
-
-                    post = {
-                        "title": title,
-                        "author": "unknown",
-                        "score": score,
-                        "numComments": num_comments,
-                        "url": f"https://reddit.com{link}" if link else "",
-                        "domain": "",
-                        "created": "",
-                        "subreddit": subreddit,
-                        "selftext": "",
-                        "permalink": f"https://reddit.com{link}" if link else "",
-                        "flair": "",
-                        "isSelf": True,
-                    }
-                    posts.append(post)
 
                 if len(posts) >= num_posts:
                     break
