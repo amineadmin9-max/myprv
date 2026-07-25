@@ -519,6 +519,158 @@
             document.getElementById('autoPanel').classList.toggle('hidden', mode !== 'auto');
         }
 
+        // ===== جلب بيانات Google Trends =====
+        async function fetchGoogleTrends() {
+            try {
+                const url = 'https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
+                const data = await fetchWithProxyJSON(url);
+                if (!data) return [];
+                
+                const trends = data.default?.trendingSearchesDays?.[0]?.trendingSearches || [];
+                const ideas = [];
+                
+                const skipPatterns = ['news','celebrity','movie','song','game release','election','sports','score','win'];
+                
+                for (const trend of trends.slice(0, 20)) {
+                    const query = trend.title.query;
+                    const queryLower = query.toLowerCase();
+                    
+                    if (skipPatterns.some(p => queryLower.includes(p))) continue;
+                    
+                    const traffic = trend.formattedTraffic;
+                    const relatedQueries = (trend.relatedQueries || []).map(q => q.query);
+                    
+                    ideas.push({
+                        title: query,
+                        source: 'Google Trends',
+                        traffic: traffic,
+                        related: relatedQueries.slice(0, 3),
+                        type: 'trend'
+                    });
+                    
+                    for (const related of relatedQueries.slice(0, 2)) {
+                        if (related.length > 3 && related.length < 50) {
+                            ideas.push({
+                                title: related,
+                                source: 'Google Trends',
+                                traffic: traffic,
+                                related: [],
+                                type: 'trend'
+                            });
+                        }
+                    }
+                }
+                
+                return ideas;
+            } catch(e) {
+                console.error('Google Trends error:', e);
+                return [];
+            }
+        }
+
+        // ===== جلب بيانات Reddit Unmet Demand =====
+        async function fetchRedditUnmetDemand() {
+            const searchPatterns = [
+                'does anyone know a product',
+                'looking for a product that',
+                'wish there was a product',
+                'is there a product for',
+                'anyone recommend a product',
+                'need help finding a product',
+                'looking for something that',
+                'does anyone use a product',
+                'frustrated with',
+                'tired of',
+                'would pay for',
+                'alternative to',
+                'better than',
+                'replacement for'
+            ];
+            
+            const allIdeas = [];
+            const seen = new Set();
+            
+            for (const pattern of searchPatterns) {
+                try {
+                    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(pattern)}&sort=relevance&limit=25&t=month`;
+                    const xml = await fetchWithProxy(url);
+                    if (!xml) continue;
+                    
+                    const posts = parseRSS(xml);
+                    for (const post of posts) {
+                        const titleKey = post.title.toLowerCase().slice(0, 50);
+                        if (!seen.has(titleKey)) {
+                            seen.add(titleKey);
+                            const nicheIdea = extractNicheFromPost(post);
+                            if (nicheIdea) {
+                                allIdeas.push({
+                                    title: nicheIdea,
+                                    originalTitle: post.title,
+                                    subreddit: post.subreddit,
+                                    url: post.url,
+                                    source: 'Reddit Unmet Demand',
+                                    type: 'demand',
+                                    demandScore: computeDemandScore(post.title, post.content)
+                                });
+                            }
+                        }
+                    }
+                } catch(e) { continue; }
+            }
+            
+            allIdeas.sort((a, b) => b.demandScore - a.demandScore);
+            return allIdeas.slice(0, 30);
+        }
+
+        // ===== استخراج فكرة النيتش من منشور Reddit =====
+        function extractNicheFromPost(post) {
+            const title = post.title;
+            const content = post.content || '';
+            const text = (title + ' ' + content).toLowerCase();
+            
+            const productKeywords = [
+                'product','tool','app','software','service','device','gadget',
+                'equipment','gear','supply','material','resource','platform'
+            ];
+            
+            const demandPatterns = [
+                /does anyone know (?:a |an )?(.+)/i,
+                /looking for (?:a |an )?(.+)/i,
+                /wish there was (?:a |an )?(.+)/i,
+                /is there (?:a |an )?(.+) for/i,
+                /anyone recommend (?:a |an )?(.+)/i,
+                /need (?:a |an )?(.+)/i,
+                /want (?:a |an )?(.+)/i,
+                /best (.+) for/i,
+                /alternative to (.+)/i,
+                /better than (.+)/i
+            ];
+            
+            for (const pattern of demandPatterns) {
+                const match = title.match(pattern);
+                if (match && match[1]) {
+                    let niche = match[1]
+                        .replace(/[?.!,;:]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    if (niche.length > 3 && niche.length < 60) return niche;
+                }
+            }
+            
+            const hasProductKeyword = productKeywords.some(kw => text.includes(kw));
+            if (hasProductKeyword) {
+                const words = title.split(' ');
+                const productIndex = words.findIndex(w => productKeywords.includes(w.toLowerCase()));
+                if (productIndex > 0) {
+                    const start = Math.max(0, productIndex - 2);
+                    const end = Math.min(words.length, productIndex + 3);
+                    return words.slice(start, end).join(' ');
+                }
+            }
+            
+            return null;
+        }
+
         // ===== الخوارزمية الرئيسية: اكتشاف نيتشات من المصادر معاً =====
         async function runFullDiscovery() {
             const btn = document.getElementById('fetchIdeasBtn');
