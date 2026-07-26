@@ -1217,7 +1217,7 @@ function closeYTKeyModal(){document.getElementById('ytKeyModal').classList.add('
 
 // ===================== AI FILTER AND SUMMARIZE =====================
 async function aiFilterAndSummarize(items){
-  const results=[];const batchSize=10;
+  const results=[];const batchSize=25;
   const totalBatches=Math.ceil(items.length/batchSize);
   for(let i=0;i<items.length;i+=batchSize){
     const batch=items.slice(i,i+batchSize);
@@ -1429,26 +1429,42 @@ async function runDualDiscovery(){
 
     // ════════ TRAFFIC LIGHT: EVERGREEN ════════
     const evergreenResults=[];
+    const evergreenAllPosts=[];
     for(let i=0;i<evergreenFiltered.length;i++){
-      setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] Traffic Light: ${evergreenFiltered[i].title}`);
+      setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] Fetching posts: ${evergreenFiltered[i].title}`);
       showProgress(72+(i/evergreenFiltered.length)*10);
       try{
         const posts=await searchReddit(evergreenFiltered[i].title);
-        const scoring=await computeTrafficLight(posts);
-        evergreenResults.push({keyword:evergreenFiltered[i].title,original:evergreenFiltered[i].original,scoring,posts,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
+        evergreenAllPosts.push(...posts);
+        evergreenResults.push({keyword:evergreenFiltered[i].title,original:evergreenFiltered[i].original,scoring:null,posts,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
       }catch(e){continue;}
     }
 
     // ════════ TRAFFIC LIGHT: TRENDING ════════
     const trendingResults=[];
+    const trendingAllPosts=[];
     for(let i=0;i<trendingFiltered.length;i++){
-      setStatus(`[Trending ${i+1}/${trendingFiltered.length}] Traffic Light: ${trendingFiltered[i].title}`);
+      setStatus(`[Trending ${i+1}/${trendingFiltered.length}] Fetching posts: ${trendingFiltered[i].title}`);
       showProgress(82+(i/trendingFiltered.length)*15);
       try{
         const posts=await searchReddit(trendingFiltered[i].title);
-        const scoring=await computeTrafficLight(posts);
-        trendingResults.push({keyword:trendingFiltered[i].title,original:trendingFiltered[i].original,scoring,posts,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
+        trendingAllPosts.push(...posts);
+        trendingResults.push({keyword:trendingFiltered[i].title,original:trendingFiltered[i].original,scoring:null,posts,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
       }catch(e){continue;}
+    }
+
+    // ════════ SINGLE BATCH CLASSIFY (all posts) ════════
+    const allPosts=[...evergreenAllPosts,...trendingAllPosts];
+    if(allPosts.length){
+      setStatus(`AI batch classifying ${allPosts.length} posts...`);
+      showProgress(90);
+      const allClass=await batchClassify(allPosts.slice(0,25));
+      for(const r of evergreenResults){
+        r.scoring=computeScoringFromPosts(r.posts,allClass,evergreenAllPosts);
+      }
+      for(const r of trendingResults){
+        r.scoring=computeScoringFromPosts(r.posts,allClass,trendingAllPosts);
+      }
     }
 
     showProgress(100);setStatus(`Done! ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches found.`);
@@ -1456,6 +1472,34 @@ async function runDualDiscovery(){
 
   }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
   hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
+}
+
+function computeScoringFromPosts(posts,allClass,allPostsPool){
+  if(!posts||!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
+  const total=posts.length;
+  const classResults=posts.map(p=>{
+    const idx=allPostsPool.findIndex(ap=>ap.title===p.title);
+    return idx>=0&&allClass[idx]?allClass[idx]:classify(p.title,p.content||p.selftext||'');
+  });
+  const promo=classResults.filter(cr=>cr.promoScore>=40).length;
+  const ratio=promo/total;
+  const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
+  const avgScore=posts.reduce((s,p)=>s+(p.score||0),0)/total;
+  const hasEngData=avgComments>0||avgScore>0;
+  const highEng=hasEngData?(avgComments+avgScore)/2>10:true;
+  const avgDemand=posts.reduce((s,p)=>s+computeDemandScore(p.title,p.content||p.selftext||''),0)/total;
+  const avgTrend=posts.reduce((s,p)=>s+computeTrendScore(p.title,p.content||p.selftext||''),0)/total;
+  const opportunityScore=Math.round((avgDemand*0.4)+(avgTrend*0.3)+((100-ratio*100)*0.3));
+  let color,label;
+  if(ratio<=0.01&&highEng){color='green';label='Clean opportunity - strong signal';}
+  else if(ratio<=0.15&&highEng){color='green';label='Open and clean market';}
+  else if(ratio<=0.4){color='yellow';label='Moderate market - deeper analysis needed';}
+  else{color='red';label='Saturated with promotions';}
+  const edu=classResults.filter(cr=>cr.eduScore>=30).length;
+  const stories=classResults.filter(cr=>cr.storyScore>=30).length;
+  const eduRatio=Math.round((edu/total)*100);
+  const storyRatio=Math.round((stories/total)*100);
+  return{color,label,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore,promoRatio:Math.round(ratio*100),eduRatio,storyRatio};
 }
 
 function renderDualResults(evergreenResults,trendingResults,stats){
