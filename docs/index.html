@@ -440,8 +440,11 @@ async function _openrouterFetch(prompt,timeoutMs){
   if(!key)return{error:'NoKey',msg:'No OpenRouter key'};
   const body={model:OPENROUTER_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
   const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
   try{
-    const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+    const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timer);
     const rawText=await r.text();
     if(rawText.startsWith('{')){
       const d=JSON.parse(rawText);
@@ -449,11 +452,11 @@ async function _openrouterFetch(prompt,timeoutMs){
         return{content:d.choices[0].message.content.trim(),realModel:d.model||OPENROUTER_MODEL};
       }
     }
-    return{status:r.status,body:rawText};
-  }catch(e){return{error:e.constructor.name,msg:e.message};}
+    return{status:r.status,body:rawText.substring(0,300)};
+  }catch(e){clearTimeout(timer);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
 }
 
-async function callLLM(prompt,timeoutMs=30000){
+async function callLLM(prompt,timeoutMs=60000){
   llmStats.total++;
 
   // Try HuggingFace first
@@ -487,9 +490,9 @@ async function callLLM(prompt,timeoutMs=30000){
       return orResult.content;
     }
     const orErr=orResult.status||0;
-    const orRaw=orResult.body||orResult.error||orResult.msg||'unknown';
+    const orRaw=orResult.body||orResult.msg||orResult.error||'unknown';
     const orMsg=`OR: STATUS ${orErr} | ${orRaw}`;
-    console.error(`[LLM] OpenRouter FAILED — ${orMsg}`);
+    console.error(`[LLM] OpenRouter FAILED — ${orMsg}`,orResult);
     llmStats.lastError=orMsg;
     if(!llmStats.firstError)llmStats.firstError=orMsg;
   }
@@ -498,7 +501,7 @@ async function callLLM(prompt,timeoutMs=30000){
   return null;
 }
 
-async function callOpenRouter(prompt,timeoutMs=30000){return callLLM(prompt,timeoutMs);}
+async function callOpenRouter(prompt,timeoutMs=60000){return callLLM(prompt,timeoutMs);}
 
 function saveAPIKeys(){
   const hfKey=document.getElementById('hfKeyInput').value.trim();
