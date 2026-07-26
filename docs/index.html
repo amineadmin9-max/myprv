@@ -207,6 +207,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
         YouTube API
       </div>
+      <div class="dropdown-item" onclick="openServerModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        Backend Server
+      </div>
       <div class="dropdown-item" onclick="openAboutModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         About
@@ -261,11 +265,40 @@
     </div>
   </div>
 
+  <!-- Modal: Server URL -->
+  <div class="modal-overlay hidden" id="serverModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <div id="serverFormView">
+        <h2>Backend Server</h2>
+        <p>Enter your Flask server URL to enable Reddit comment analysis (traffic light scoring).</p>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Server URL</label>
+          <input type="url" class="modal-input" id="serverURLInput" placeholder="https://your-app.onrender.com">
+        </div>
+        <p style="font-size:11px;color:var(--text-dim);margin-top:8px">Leave empty to skip comment analysis. Deploy free on Render.com — see About for instructions.</p>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="closeServerModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveServerURL()">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="serverSaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Server URL saved
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: About -->
   <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <h2>Niche Finder</h2>
-      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.7</span> — Gemini 2.5 Flash Lite + OpenRouter + YouTube Trending | AI-powered classification</p>
+      <p style="line-height:2;font-size:13px">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.8</span> — Comment-based traffic light scoring | Gemini + OpenRouter + YouTube<br><br>
+      <span style="color:var(--text);font-weight:600">Deploy Backend (for comment analysis):</span><br>
+      <span style="color:var(--text-dim);font-size:12px">1. Go to <a href="https://render.com" target="_blank" style="color:var(--green)">render.com</a> (free)<br>
+      2. New Web Service → Connect GitHub repo<br>
+      3. Build: <code>pip install -r server/requirements.txt</code><br>
+      4. Start: <code>python server/app.py</code><br>
+      5. Copy the URL → Settings → Backend Server</span></p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
@@ -379,7 +412,6 @@
 <script>
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
-const JSON_PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
 // Gemini (primary AI)
 const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
@@ -389,6 +421,7 @@ const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL='openrouter/free';
 function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
+function getServerURL(){return localStorage.getItem('nf_server_url')||'';}
 function hasAnyKey(){return getGeminiKey()||getOpenRouterKey();}
 function getActiveProvider(){
   if(getGeminiKey())return'gemini';
@@ -802,35 +835,15 @@ async function fetchWithProxyJSON(url){
 }
 
 async function fetchRedditComments(permalink){
-  const urls=[
-    'https://www.reddit.com'+permalink+'.json',
-    'https://old.reddit.com'+permalink+'.json'
-  ];
-  for(const jsonUrl of urls){
-    for(const proxy of JSON_PROXIES){
-      try{
-        const fullUrl=proxy+encodeURIComponent(jsonUrl);
-        const r=await fetch(fullUrl,{signal:AbortSignal.timeout(15000)});
-        const text=await r.text();
-        if(text.startsWith('[')){
-          const data=JSON.parse(text);
-          if(data.length>=2&&data[1]?.data?.children){
-            const comments=[];
-            const extract=(children)=>{
-              for(const c of children){
-                if(c.kind==='t1'&&c.data){
-                  comments.push({body:c.data.body||'',score:c.data.score||0});
-                  if(c.data.replies?.data?.children)extract(c.data.replies.data.children);
-                }
-              }
-            };
-            extract(data[1].data.children);
-            const postData=data[0]?.data?.children?.[0]?.data||{};
-            return{score:postData.score||0,ups:postData.ups||0,upvote_ratio:postData.upvote_ratio||0,num_comments:postData.num_comments||0,comments};
-          }
-        }
-      }catch(e){continue;}
-    }
+  const serverURL=getServerURL();
+  if(serverURL){
+    try{
+      const r=await fetch(serverURL+'/api/reddit-comments?permalink='+encodeURIComponent(permalink),{signal:AbortSignal.timeout(20000)});
+      const data=await r.json();
+      if(data&&!data.error&&data.comments){
+        return{score:data.score||0,ups:data.ups||0,upvote_ratio:data.upvote_ratio||0,num_comments:data.num_comments||0,comments:data.comments};
+      }
+    }catch(e){console.warn('[Comments] Server failed:',e.message);}
   }
   return null;
 }
@@ -1252,6 +1265,21 @@ function openYTKeyModal(){
 
 function closeYTKeyModal(){document.getElementById('ytKeyModal').classList.add('hidden');}
 
+function openServerModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('serverModal').classList.remove('hidden');
+  document.getElementById('serverURLInput').value=getServerURL();
+}
+function closeServerModal(){document.getElementById('serverModal').classList.add('hidden');}
+function saveServerURL(){
+  const url=document.getElementById('serverURLInput').value.trim().replace(/\/+$/,'');
+  localStorage.setItem('nf_server_url',url);
+  document.getElementById('serverFormView').style.display='none';
+  const saved=document.getElementById('serverSaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('serverFormView').style.display='';document.getElementById('serverModal').classList.add('hidden');document.getElementById('serverURLInput').value='';},1500);
+}
+
 // ===================== AI FILTER AND SUMMARIZE =====================
 async function aiFilterAndSummarize(items){
   const results=[];const batchSize=25;
@@ -1642,7 +1670,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     html+=`<div class="section-title">🌳 نيتشات متجدرة <span class="dash">— Evergreen Niches (past year)</span></div>`;
     for(const r of evergreenResults){
       const c=r.scoring.color;
-      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:'⚠️ Fallback: post content only';
+      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:(getServerURL()?'⚠️ Server unavailable — using post content':'⚠️ Add server URL for comment analysis');
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
@@ -1659,7 +1687,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     html+=`<div class="section-title">🔥 نيتشات ترند <span class="dash">— Trending Niches (past week)</span></div>`;
     for(const r of trendingResults){
       const c=r.scoring.color;
-      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:'⚠️ Fallback: post content only';
+      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:(getServerURL()?'⚠️ Server unavailable — using post content':'⚠️ Add server URL for comment analysis');
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>

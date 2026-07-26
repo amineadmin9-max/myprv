@@ -124,6 +124,61 @@ def search():
     return jsonify(results)
 
 
+@app.route("/api/reddit-comments", methods=["GET"])
+def reddit_comments():
+    permalink = request.args.get("permalink", "")
+    if not permalink or not permalink.startswith("/r/"):
+        return jsonify({"error": "Invalid permalink"}), 400
+
+    urls_to_try = [
+        f"https://www.reddit.com{permalink}.json",
+        f"https://old.reddit.com{permalink}.json",
+    ]
+
+    for url in urls_to_try:
+        try:
+            resp = requests.get(
+                url,
+                headers={"User-Agent": "NicheFinder/2.8 (Educational research tool)"},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and len(data) >= 2:
+                    post_data = {}
+                    if data[0].get("data", {}).get("children"):
+                        pd = data[0]["data"]["children"][0].get("data", {})
+                        post_data = {
+                            "score": pd.get("score", 0),
+                            "ups": pd.get("ups", 0),
+                            "upvote_ratio": pd.get("upvote_ratio", 0),
+                            "num_comments": pd.get("num_comments", 0),
+                        }
+
+                    comments = []
+                    def extract(children):
+                        for c in children:
+                            if c.get("kind") == "t1" and c.get("data"):
+                                cd = c["data"]
+                                comments.append({
+                                    "body": cd.get("body", ""),
+                                    "score": cd.get("score", 0),
+                                })
+                                if cd.get("replies") and isinstance(cd["replies"], dict):
+                                    extract(cd["replies"].get("data", {}).get("children", []))
+
+                    extract(data[1].get("data", {}).get("children", []))
+
+                    print(f"[REDDIT] OK: {len(comments)} comments from {permalink}")
+                    return jsonify({**post_data, "comments": comments})
+        except Exception as e:
+            print(f"[REDDIT] Error fetching {url}: {e}")
+            continue
+
+    print(f"[REDDIT] All URLs failed for: {permalink}")
+    return jsonify({"error": "Could not fetch comments"}), 502
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "providers": {
