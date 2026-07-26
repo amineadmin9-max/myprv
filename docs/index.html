@@ -273,7 +273,7 @@
         <p>Enter your Flask server URL to enable Reddit comment analysis (traffic light scoring).</p>
         <div class="field" style="margin-top:12px">
           <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Server URL</label>
-          <input type="url" class="modal-input" id="serverURLInput" placeholder="https://your-app.onrender.com">
+          <input type="url" class="modal-input" id="serverURLInput" placeholder="https://your-space.hf.space">
         </div>
         <p style="font-size:11px;color:var(--text-dim);margin-top:8px">Leave empty to skip comment analysis. Deploy free on Render.com — see About for instructions.</p>
         <div class="modal-actions">
@@ -294,11 +294,11 @@
       <h2>Niche Finder</h2>
       <p style="line-height:2;font-size:13px">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.8</span> — Comment-based traffic light scoring | Gemini + OpenRouter + YouTube<br><br>
       <span style="color:var(--text);font-weight:600">Deploy Backend (for comment analysis):</span><br>
-      <span style="color:var(--text-dim);font-size:12px">1. Go to <a href="https://render.com" target="_blank" style="color:var(--green)">render.com</a> (free)<br>
-      2. New Web Service → Connect GitHub repo<br>
-      3. Build: <code>pip install -r server/requirements.txt</code><br>
-      4. Start: <code>python server/app.py</code><br>
-      5. Copy the URL → Settings → Backend Server</span></p>
+      <span style="color:var(--text-dim);font-size:12px">1. Go to <a href="https://huggingface.co/new-space" target="_blank" style="color:var(--green)">huggingface.co/new-space</a> (free, no card)<br>
+      2. Name it → SDK: Docker → Create<br>
+      3. Upload server/ folder files (Dockerfile, app.py, requirements.txt, README.md)<br>
+      4. Wait for build → copy the URL<br>
+      5. Settings → Backend Server → paste URL</span></p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
