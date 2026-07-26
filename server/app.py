@@ -1,10 +1,8 @@
 import json
 import requests
 import gradio as gr
-import spaces
 
 
-@spaces.GPU(duration=10)
 def fetch_reddit_comments(permalink):
     """Fetch Reddit comments via JSON API."""
     if not permalink or not permalink.startswith("/r/"):
