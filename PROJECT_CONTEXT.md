@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-26
+## Last updated: 2026-07-26 (2nd update)
 
 ## Quick Start
 In a new conversation, just say:
@@ -42,7 +42,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - Server URL stored in localStorage `nf_server_url`
 - Endpoint: `POST {serverURL}/api/reddit-comments` → `{"data": ["/r/sub/comments/id/title/"]}`
 - Returns: `{"data": ["{score, ups, upvote_ratio, num_comments, comments: [{body, score}]}"]}`
-- **Status: NOT YET DEPLOYED** — user needs to create HF Space and upload server/ files
+- **Status: BUILDING** — user uploaded to HF Space, fixing startup errors
 
 ## Traffic Light System (🟢🟡🔴)
 ### How it works:
@@ -144,9 +144,11 @@ A **Niche Finder** web app that finds profitable niches by combining:
 1. Go to huggingface.co/new-space
 2. Name: `niche-finder-api`, SDK: `gradio`, Visibility: Public
 3. Upload files from server/ (app.py, requirements.txt, README.md)
-4. Wait for build (~1-2 min)
-5. Copy URL: `https://USERNAME-niche-finder-api.hf.space`
-6. Open app → ⚙️ → Backend Server → paste URL → Save
+4. **IMPORTANT**: README.md must have `hardware: cpu-basic` (no GPU needed)
+5. **IMPORTANT**: app.py must have `ssr_mode=False` in launch()
+6. Wait for build (~1-2 min)
+7. Copy URL: `https://USERNAME-niche-finder-api.hf.space`
+8. Open app → ⚙️ → Backend Server → paste URL → Save
 
 ## Version History
 - v2.8 — Comment-based traffic light + Flask server proxy + Gradio HF Spaces
@@ -154,8 +156,9 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - Earlier — HuggingFace (blocked), DeepSeek, keyword-only scoring
 
 ## Known Issues
-- HuggingFace Spaces server NOT YET DEPLOYED — user needs to create and upload
+- HuggingFace Spaces BUILD SUCCESS but startup errors being fixed (ssr_mode, hardware config)
 - CORS proxies don't work for Reddit JSON (only RSS works)
 - Reddit JSON comment fetching requires the Flask/Gradio server
 - Without server, traffic light falls back to post-content-only scoring
 - User runs app from phone browser (no F12/Console access)
+- HF Spaces needs `hardware: cpu-basic` + `ssr_mode=False` to start properly
