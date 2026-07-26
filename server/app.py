@@ -5,7 +5,7 @@ import gradio as gr
 
 
 def fetch_reddit_comments(permalink):
-    """Fetch Reddit comments via JSON API. Returns JSON string."""
+    """Fetch Reddit comments via JSON API."""
     if not permalink or not permalink.startswith("/r/"):
         return json.dumps({"error": "Invalid permalink"})
 
@@ -63,13 +63,10 @@ def fetch_reddit_comments(permalink):
 
 with gr.Blocks(title="Niche Finder API") as demo:
     gr.Markdown("# Niche Finder API\nBackend for Reddit comment analysis.")
-
-demo.queue()
-
-fetch_reddit_comments_api = demo.api(
-    fn=fetch_reddit_comments,
-    api_name="reddit-comments",
-)
+    permalink_input = gr.Textbox(label="Permalink", placeholder="/r/sub/comments/id/title/")
+    output_json = gr.Textbox(label="JSON Output")
+    btn = gr.Button("Fetch Comments")
+    btn.click(fn=fetch_reddit_comments, inputs=permalink_input, outputs=output_json, api_name="reddit-comments")
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
