@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-26 (2nd update)
+## Last updated: 2026-07-26 (3rd update — Railway migration)
 
 ## Quick Start
 In a new conversation, just say:
@@ -17,7 +17,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 ## Tech Stack
 - Pure HTML/CSS/JS (no frameworks, no build step)
 - Single file: `docs/index.html` (deployed via GitHub Pages)
-- Backend: Gradio app on HuggingFace Spaces (`server/app.py`)
+- Backend: Flask app on Railway (`server/app.py`)
 - AI: Gemini 2.5 Flash Lite (primary) + OpenRouter (fallback)
 - CORS proxies for Reddit RSS + Google Trends
 
@@ -34,20 +34,21 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `callLLM(prompt)` → tries Gemini first, then OpenRouter
 - User rule: LLM is for **analysis only**, max 5-7 calls per run
 
-## Backend Server (Gradio on HuggingFace Spaces)
-- `server/app.py` — Gradio app with `/api/reddit-comments` endpoint
-- `server/requirements.txt` — gradio, requests
-- `server/README.md` — HF Space metadata (SDK: gradio, port: 7860)
+## Backend Server (Flask on Railway)
+- `server/app.py` — Flask app with `/api/reddit-comments` endpoint
+- `server/requirements.txt` — flask, requests, gunicorn
+- `server/Dockerfile` — Python 3.11 + gunicorn on port 8000
 - User sets server URL in: ⚙️ → Backend Server → paste URL
 - Server URL stored in localStorage `nf_server_url`
 - Endpoint: `POST {serverURL}/api/reddit-comments` → `{"data": ["/r/sub/comments/id/title/"]}`
 - Returns: `{"data": ["{score, ups, upvote_ratio, num_comments, comments: [{body, score}]}"]}`
-- **Status: BUILDING** — user uploaded to HF Space, fixing startup errors
+- Health check: `GET {serverURL}/health` → `{"status": "ok"}`
+- **Status: DEPLOYED on Railway**
 
 ## Traffic Light System (🟢🟡🔴)
 ### How it works:
 1. For each niche, get top 5 posts (sorted by numComments desc)
-2. For each post, fetch comments via Flask server (`/api/reddit-comments`)
+2. For each post, fetch comments via server (`/api/reddit-comments`)
 3. Count promo links in comment bodies using `countLinksInText()`
 4. Get Google `site:reddit.com` post count for competition level
 5. Apply scoring rules:
@@ -87,7 +88,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 ### Settings (3-dot menu dropdown)
 1. **Gemini / OpenRouter API** — API keys modal
 2. **YouTube API** — YouTube Data API v3 key
-3. **Backend Server** — Flask/Gradio server URL for Reddit comments
+3. **Backend Server** — Flask server URL for Reddit comments
 4. **About** — version info + deploy instructions
 
 ### Dual Discovery Flow
@@ -136,29 +137,27 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `docs/index.html` — MAIN FILE (all CSS+HTML+JS in one file, ~1820 lines)
 - `docs/sw.js` — service worker (cache v4)
 - `docs/manifest.json` — PWA manifest
-- `server/app.py` — Gradio app for Reddit comments proxy
-- `server/requirements.txt` — gradio, requests
-- `server/README.md` — HF Space metadata
+- `server/app.py` — Flask app for Reddit comments proxy
+- `server/requirements.txt` — flask, requests, gunicorn
+- `server/Dockerfile` — Railway deployment config
 
-## HuggingFace Spaces Deploy Steps
-1. Go to huggingface.co/new-space
-2. Name: `niche-finder-api`, SDK: `gradio`, Visibility: Public
-3. Upload files from server/ (app.py, requirements.txt, README.md)
-4. **IMPORTANT**: README.md must have `hardware: cpu-basic` (no GPU needed)
-5. **IMPORTANT**: app.py must have `ssr_mode=False` in launch()
-6. Wait for build (~1-2 min)
-7. Copy URL: `https://USERNAME-niche-finder-api.hf.space`
-8. Open app → ⚙️ → Backend Server → paste URL → Save
+## Railway Deploy Steps
+1. Push code to GitHub (`server/` folder with Dockerfile)
+2. Go to railway.app → New Project → Deploy from GitHub Repo
+3. Select repo `amineadmin9-max/myprv`
+4. Railway auto-detects Dockerfile → starts build
+5. Wait for build (~1-2 min)
+6. Copy URL: `https://YOUR-APP.up.railway.app`
+7. Open app → ⚙️ → Backend Server → paste URL → Save
 
 ## Version History
+- v2.9 — Migrated backend from Gradio/HuggingFace to Flask/Railway
 - v2.8 — Comment-based traffic light + Flask server proxy + Gradio HF Spaces
 - v2.7 — Gemini 2.5 Flash Lite primary + OpenRouter fallback
 - Earlier — HuggingFace (blocked), DeepSeek, keyword-only scoring
 
 ## Known Issues
-- HuggingFace Spaces BUILD SUCCESS but startup errors being fixed (ssr_mode, hardware config)
 - CORS proxies don't work for Reddit JSON (only RSS works)
-- Reddit JSON comment fetching requires the Flask/Gradio server
+- Reddit JSON comment fetching requires the Flask server
 - Without server, traffic light falls back to post-content-only scoring
 - User runs app from phone browser (no F12/Console access)
-- HF Spaces needs `hardware: cpu-basic` + `ssr_mode=False` to start properly
