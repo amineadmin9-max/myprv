@@ -1,4 +1,4 @@
-const CACHE = 'niche-finder-v3';
+const CACHE = 'niche-finder-v4';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

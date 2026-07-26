@@ -401,8 +401,8 @@ const DEMAND_KW=['does anyone know','looking for','wish there was','is there a p
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
 
-let llmStats={total:0,ok:0,fail:0,firstError:null,lastModel:null,provider:null};
-function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastModel:null,provider:null};}
+let llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};
+function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};}
 
 // ===================== HELPERS =====================
 function countKW(text,kw){return kw.filter(k=>text.toLowerCase().includes(k)).length;}
@@ -469,8 +469,9 @@ async function callLLM(prompt,timeoutMs=30000){
     }
     const hfErr=hfResult.status||0;
     const hfRaw=hfResult.body||hfResult.error||hfResult.msg||'unknown';
-    console.warn(`[LLM] HuggingFace failed: STATUS ${hfErr} | ${hfRaw} — trying OpenRouter...`);
-    if(!llmStats.firstError)llmStats.firstError=`HF: STATUS ${hfErr} | ${hfRaw}`;
+    const hfMsg=`HF: STATUS ${hfErr} | ${hfRaw}`;
+    console.warn(`[LLM] HuggingFace failed: ${hfMsg}`);
+    llmStats.firstError=hfMsg;
   }
 
   // Fallback to OpenRouter
@@ -481,14 +482,16 @@ async function callLLM(prompt,timeoutMs=30000){
       llmStats.ok++;
       llmStats.lastModel=orResult.realModel||OPENROUTER_MODEL;
       llmStats.provider='OpenRouter';
+      llmStats.firstError=null;
       console.log('[LLM] SUCCESS (OpenRouter)');
       return orResult.content;
     }
     const orErr=orResult.status||0;
     const orRaw=orResult.body||orResult.error||orResult.msg||'unknown';
-    const errMsg=`STATUS ${orErr} | ${orRaw}`;
-    console.error(`[LLM] OpenRouter FAILED — ${errMsg}`);
-    if(!llmStats.firstError)llmStats.firstError=`OR: ${errMsg}`;
+    const orMsg=`OR: STATUS ${orErr} | ${orRaw}`;
+    console.error(`[LLM] OpenRouter FAILED — ${orMsg}`);
+    llmStats.lastError=orMsg;
+    if(!llmStats.firstError)llmStats.firstError=orMsg;
   }
 
   llmStats.fail++;
@@ -541,7 +544,7 @@ function renderLLMStats(){
   const provider=llmStats.provider||(getHFKey()?'huggingface':getOpenRouterKey()?'openrouter':'none');
   const providerLabel=provider==='huggingface'?'HuggingFace Qwen 7B':provider==='openrouter'?'OpenRouter (Free)':'No API key (Keywords only)';
   const providerColor=hasKey?'var(--green)':'var(--text-dim)';
-  const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'';
+  const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}${s.lastError?'\n'+s.lastError:''}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Model: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
   return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
     <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">AI Stats</div>
