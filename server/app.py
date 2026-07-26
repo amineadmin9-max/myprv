@@ -1,4 +1,3 @@
-import os
 import json
 import requests
 import gradio as gr
@@ -69,4 +68,4 @@ with gr.Blocks(title="Niche Finder API") as demo:
     btn.click(fn=fetch_reddit_comments, inputs=permalink_input, outputs=output_json, api_name="reddit-comments")
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860, ssr_mode=False)
