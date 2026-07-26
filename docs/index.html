@@ -838,10 +838,19 @@ async function fetchRedditComments(permalink){
   const serverURL=getServerURL();
   if(serverURL){
     try{
-      const r=await fetch(serverURL+'/api/reddit-comments?permalink='+encodeURIComponent(permalink),{signal:AbortSignal.timeout(20000)});
-      const data=await r.json();
-      if(data&&!data.error&&data.comments){
-        return{score:data.score||0,ups:data.ups||0,upvote_ratio:data.upvote_ratio||0,num_comments:data.num_comments||0,comments:data.comments};
+      const r=await fetch(serverURL+'/api/reddit-comments',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({data:[permalink]}),
+        signal:AbortSignal.timeout(20000)
+      });
+      const res=await r.json();
+      const raw=res?.data?.[0];
+      if(raw){
+        const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+        if(parsed&&!parsed.error&&parsed.comments){
+          return{score:parsed.score||0,ups:parsed.ups||0,upvote_ratio:parsed.upvote_ratio||0,num_comments:parsed.num_comments||0,comments:parsed.comments};
+        }
       }
     }catch(e){console.warn('[Comments] Server failed:',e.message);}
   }
