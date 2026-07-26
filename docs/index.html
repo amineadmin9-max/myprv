@@ -800,6 +800,34 @@ async function fetchWithProxyJSON(url){
   return null;
 }
 
+async function fetchRedditComments(permalink){
+  const jsonUrl='https://www.reddit.com'+permalink+'.json';
+  for(const proxy of PROXIES){
+    try{
+      const r=await fetch(proxy+encodeURIComponent(jsonUrl),{signal:AbortSignal.timeout(12000)});
+      const text=await r.text();
+      if(text.startsWith('[')){
+        const data=JSON.parse(text);
+        if(data.length>=2&&data[1]?.data?.children){
+          const comments=[];
+          const extract=(children)=>{
+            for(const c of children){
+              if(c.kind==='t1'&&c.data){
+                comments.push({body:c.data.body||'',score:c.data.score||0});
+                if(c.data.replies?.data?.children)extract(c.data.replies.data.children);
+              }
+            }
+          };
+          extract(data[1].data.children);
+          const postData=data[0]?.data?.children?.[0]?.data||{};
+          return{score:postData.score||0,ups:postData.ups||0,upvote_ratio:postData.upvote_ratio||0,num_comments:postData.num_comments||0,comments};
+        }
+      }
+    }catch(e){continue;}
+  }
+  return null;
+}
+
 async function searchReddit(keyword){
   const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=10&t=month`;
   const xml=await fetchWithProxy(url);
@@ -1508,7 +1536,7 @@ function countPromoLinks(posts){
 }
 
 async function computeScoringFromPosts(posts,allClass,allPostsPool,keyword){
-  if(!posts||!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0,postCount:0};
+  if(!posts||!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0,postCount:0,usedComments:false};
   const total=posts.length;
   const classResults=posts.map(p=>{
     const idx=allPostsPool.findIndex(ap=>ap.title===p.title);
@@ -1523,21 +1551,52 @@ async function computeScoringFromPosts(posts,allClass,allPostsPool,keyword){
   const avgDemand=posts.reduce((s,p)=>s+computeDemandScore(p.title,p.content||p.selftext||''),0)/total;
   const avgTrend=posts.reduce((s,p)=>s+computeTrendScore(p.title,p.content||p.selftext||''),0)/total;
   const opportunityScore=Math.round((avgDemand*0.4)+(avgTrend*0.3)+((100-promoRatio*100)*0.3));
-  const promoLinks=countPromoLinks(posts);
   const postCount=await countRedditPostsViaGoogle(keyword||'');
   const actualPostCount=postCount||total*50;
+
+  // ══════ COMMENT-BASED SCORING ══════
+  let commentPromoLinks=0;
+  let usedComments=false;
+  const sortedPosts=[...posts].sort((a,b)=>(b.numComments||0)-(a.numComments||0)).slice(0,5);
+  for(const p of sortedPosts){
+    try{
+      const permalink=p.url?.replace('https://www.reddit.com','')||'';
+      if(!permalink)continue;
+      const cData=await fetchRedditComments(permalink);
+      if(cData&&cData.comments){
+        usedComments=true;
+        for(const c of cData.comments){
+          commentPromoLinks+=countLinksInText(c.body);
+        }
+      }
+      await delay(300);
+    }catch(e){continue;}
+  }
+
   let color,label;
-  if(actualPostCount<1000&&highEng&&promoLinks<=2){color='green';label='🟢 Clean opportunity — low competition, high engagement';}
-  else if(actualPostCount<=30000&&highEng&&promoRatio<=0.2){color='green';label='🟢 Open market — moderate posts, good engagement';}
-  else if(actualPostCount<=30000&&promoRatio>0.2&&promoRatio<=0.5){color='yellow';label='🟡 Growing market — some promotions, needs analysis';}
-  else if(actualPostCount>30000&&promoLinks>5){color='red';label='🔴 Saturated — high post count, many promo links';}
-  else if(actualPostCount>30000){color='yellow';label='🟡 Large market — high volume, analyze competition';}
-  else{color='yellow';label='🟡 Moderate market — deeper analysis needed';}
+  if(usedComments){
+    if(actualPostCount>30000&&commentPromoLinks>5){color='red';label='🔴 Saturated — high volume, many promo links in comments';}
+    else if(actualPostCount<=30000&&commentPromoLinks>5){color='red';label='🔴 Saturated — many promo links detected in comments';}
+    else if(actualPostCount<1000&&highEng&&commentPromoLinks<=2){color='green';label='🟢 Clean opportunity — low competition, high engagement';}
+    else if(actualPostCount<=30000&&highEng&&commentPromoLinks<=2){color='green';label='🟢 Open market — moderate posts, good engagement';}
+    else if(actualPostCount<=30000&&commentPromoLinks<=5){color='yellow';label='🟡 Growing market — some activity, needs deeper analysis';}
+    else if(actualPostCount>30000&&commentPromoLinks<=5){color='yellow';label='🟡 Large market — high volume, moderate promo links';}
+    else{color='yellow';label='🟡 Moderate market — deeper analysis needed';}
+  }else{
+    const postPromoLinks=countPromoLinks(posts);
+    if(actualPostCount<1000&&highEng&&postPromoLinks<=2){color='green';label='🟢 Clean opportunity — low competition, high engagement';}
+    else if(actualPostCount<=30000&&highEng&&promoRatio<=0.2){color='green';label='🟢 Open market — moderate posts, good engagement';}
+    else if(actualPostCount<=30000&&promoRatio>0.2&&promoRatio<=0.5){color='yellow';label='🟡 Growing market — some promotions, needs analysis';}
+    else if(actualPostCount>30000&&postPromoLinks>5){color='red';label='🔴 Saturated — high post count, many promo links';}
+    else if(actualPostCount>30000){color='yellow';label='🟡 Large market — high volume, analyze competition';}
+    else{color='yellow';label='🟡 Moderate market — deeper analysis needed';}
+  }
+
   const edu=classResults.filter(cr=>cr.eduScore>=30).length;
   const stories=classResults.filter(cr=>cr.storyScore>=30).length;
   const eduRatio=Math.round((edu/total)*100);
   const storyRatio=Math.round((stories/total)*100);
-  return{color,label,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore,promoRatio:Math.round(promoRatio*100),eduRatio,storyRatio,postCount:actualPostCount,promoLinks};
+  return{color,label,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore,promoRatio:Math.round(promoRatio*100),eduRatio,storyRatio,postCount:actualPostCount,promoLinks:usedComments?commentPromoLinks:countPromoLinks(posts),usedComments};
 }
 
 function renderDualResults(evergreenResults,trendingResults,stats){
@@ -1574,12 +1633,12 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     html+=`<div class="section-title">🌳 نيتشات متجدرة <span class="dash">— Evergreen Niches (past year)</span></div>`;
     for(const r of evergreenResults){
       const c=r.scoring.color;
-      const postCountTxt=r.scoring.postCount?`~${(r.scoring.postCount/1000).toFixed(1)}k posts`:`${r.posts.length} results`;
-      const promoLinksTxt=r.scoring.promoLinks>0?` · ${r.scoring.promoLinks} promo links`:'';
+      const commentBadge=r.scoring.usedComments?'💬 Comments analyzed ✓':'⚠️ Fallback: post content only';
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
-          <div class="niche-card-meta">🌳 Evergreen · ${postCountTxt}${promoLinksTxt} · ${r.scoring.label}</div>
+          <div class="niche-card-meta">🌳 Evergreen · ${r.scoring.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${commentBadge}</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -1591,12 +1650,12 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     html+=`<div class="section-title">🔥 نيتشات ترند <span class="dash">— Trending Niches (past week)</span></div>`;
     for(const r of trendingResults){
       const c=r.scoring.color;
-      const postCountTxt=r.scoring.postCount?`~${(r.scoring.postCount/1000).toFixed(1)}k posts`:`${r.posts.length} results`;
-      const promoLinksTxt=r.scoring.promoLinks>0?` · ${r.scoring.promoLinks} promo links`:'';
+      const commentBadge=r.scoring.usedComments?'💬 Comments analyzed ✓':'⚠️ Fallback: post content only';
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
-          <div class="niche-card-meta">🔥 Trending · ${postCountTxt}${promoLinksTxt} · ${r.scoring.label}</div>
+          <div class="niche-card-meta">🔥 Trending · ${r.scoring.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${commentBadge}</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
