@@ -563,8 +563,8 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 function renderLLMStats(){
   const s=llmStats;
   const hasKey=getHFKey()||getOpenRouterKey();
-  const provider=llmStats.provider||(getHFKey()?'huggingface':getOpenRouterKey()?'openrouter':'none');
-  const providerLabel=provider==='huggingface'?'HuggingFace Qwen 7B':provider==='openrouter'?'OpenRouter (Free)':'No API key (Keywords only)';
+  const provider=llmStats.provider||(getHFKey()?'huggingface':getOpenRouterKey()?'OpenRouter':'none');
+  const providerLabel=provider==='huggingface'?'HuggingFace Qwen 7B':provider==='OpenRouter'?'OpenRouter (Free)':'No API key (Keywords only)';
   const providerColor=hasKey?'var(--green)':'var(--text-dim)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}${s.lastError?'\n'+s.lastError:''}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Model: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
