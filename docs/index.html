@@ -201,7 +201,7 @@
     <div class="dropdown" id="dropdownMenu">
       <div class="dropdown-item" onclick="openAPIKeyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        HuggingFace API
+        HuggingFace / OpenRouter API
       </div>
       <div class="dropdown-item" onclick="openYTKeyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -218,10 +218,15 @@
   <div class="modal-overlay hidden" id="apiKeyModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <div id="apiKeyFormView">
-        <h2>HuggingFace API Key</h2>
-        <p>Enter your HuggingFace token to enable AI analysis with Qwen 7B model.</p>
-        <div class="field">
+        <h2>API Keys</h2>
+        <p>Enter at least one key to enable AI analysis.</p>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">HuggingFace Token (optional)</label>
           <input type="password" class="modal-input" id="hfKeyInput" placeholder="hf_...">
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">OpenRouter API Key (recommended)</label>
+          <input type="password" class="modal-input" id="orKeyInput" placeholder="sk-or-...">
         </div>
         <div class="modal-actions">
           <button class="modal-btn ghost" onclick="closeAPIKeyModal()">Cancel</button>
@@ -230,7 +235,7 @@
       </div>
       <div class="modal-saved" id="apiKeySaved">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
-        Key saved & active
+        Keys saved & active
       </div>
     </div>
   </div>
@@ -260,7 +265,7 @@
   <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <h2>Niche Finder</h2>
-      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.5</span> — HuggingFace Qwen 7B + YouTube Trending | AI-powered classification</p>
+      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.6</span> — HuggingFace + OpenRouter + YouTube Trending | AI-powered classification</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
@@ -378,9 +383,17 @@ const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest
 // HuggingFace Qwen (primary AI)
 const HF_BASE='https://api-inference.huggingface.co/v1/chat/completions';
 const HF_MODEL='Qwen/Qwen2.5-7B-Instruct';
+// OpenRouter fallback (works from browser - supports CORS)
+const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL='openrouter/free';
+function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
 function getHFKey(){return localStorage.getItem('nf_hf_key')||'';}
-function hasAnyKey(){return getHFKey();}
-function getActiveProvider(){return getHFKey()?'huggingface':'none';}
+function hasAnyKey(){return getHFKey()||getOpenRouterKey();}
+function getActiveProvider(){
+  if(getHFKey())return'huggingface';
+  if(getOpenRouterKey())return'openrouter';
+  return'none';
+}
 const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
 const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
 const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
@@ -401,9 +414,9 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function _hfFetch(prompt,timeoutMs){
   const key=getHFKey();
+  if(!key)return{error:'NoKey',msg:'No HuggingFace key'};
   const body={model:HF_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
   const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
-  // Try direct first, then CORS proxy
   const urls=[HF_BASE,...PROXIES.map(p=>p+encodeURIComponent(HF_BASE))];
   for(const url of urls){
     try{
@@ -415,39 +428,69 @@ async function _hfFetch(prompt,timeoutMs){
           return{content:d.choices[0].message.content.trim(),realModel:d.model||HF_MODEL};
         }
       }
-      // If proxy returned HTML error, try next
       if(rawText.includes('<!')||rawText.includes('error'))continue;
       return{status:r.status,body:rawText};
     }catch(e){continue;}
   }
-  return{error:'FetchError',msg:'All endpoints failed'};
+  return{error:'FetchError',msg:'All HuggingFace endpoints failed'};
+}
+
+async function _openrouterFetch(prompt,timeoutMs){
+  const key=getOpenRouterKey();
+  if(!key)return{error:'NoKey',msg:'No OpenRouter key'};
+  const body={model:OPENROUTER_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
+  try{
+    const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+    const rawText=await r.text();
+    if(rawText.startsWith('{')){
+      const d=JSON.parse(rawText);
+      if(d.choices&&d.choices[0]?.message?.content){
+        return{content:d.choices[0].message.content.trim(),realModel:d.model||OPENROUTER_MODEL};
+      }
+    }
+    return{status:r.status,body:rawText};
+  }catch(e){return{error:e.constructor.name,msg:e.message};}
 }
 
 async function callLLM(prompt,timeoutMs=30000){
   llmStats.total++;
-  
-  if(!getHFKey()){
-    console.log('[LLM] No HuggingFace key - using keyword fallback');
-    llmStats.fail++;
-    return null;
+
+  // Try HuggingFace first
+  if(getHFKey()){
+    console.log('[LLM] Trying HuggingFace...');
+    const hfResult=await _hfFetch(prompt,timeoutMs);
+    if(hfResult&&hfResult.content){
+      llmStats.ok++;
+      llmStats.lastModel=hfResult.realModel||HF_MODEL;
+      llmStats.provider='HuggingFace Qwen';
+      console.log('[LLM] SUCCESS (HuggingFace)');
+      return hfResult.content;
+    }
+    const hfErr=hfResult.status||0;
+    const hfRaw=hfResult.body||hfResult.error||hfResult.msg||'unknown';
+    console.warn(`[LLM] HuggingFace failed: STATUS ${hfErr} | ${hfRaw} — trying OpenRouter...`);
+    if(!llmStats.firstError)llmStats.firstError=`HF: STATUS ${hfErr} | ${hfRaw}`;
   }
 
-  console.log('[LLM] Calling HuggingFace Qwen...');
-  const result=await _hfFetch(prompt,timeoutMs);
-  
-  if(result&&result.content){
-    llmStats.ok++;
-    llmStats.lastModel=result.realModel||HF_MODEL;
-    llmStats.provider='HuggingFace Qwen';
-    console.log('[LLM] SUCCESS');
-    return result.content;
+  // Fallback to OpenRouter
+  if(getOpenRouterKey()){
+    console.log('[LLM] Trying OpenRouter...');
+    const orResult=await _openrouterFetch(prompt,timeoutMs);
+    if(orResult&&orResult.content){
+      llmStats.ok++;
+      llmStats.lastModel=orResult.realModel||OPENROUTER_MODEL;
+      llmStats.provider='OpenRouter';
+      console.log('[LLM] SUCCESS (OpenRouter)');
+      return orResult.content;
+    }
+    const orErr=orResult.status||0;
+    const orRaw=orResult.body||orResult.error||orResult.msg||'unknown';
+    const errMsg=`STATUS ${orErr} | ${orRaw}`;
+    console.error(`[LLM] OpenRouter FAILED — ${errMsg}`);
+    if(!llmStats.firstError)llmStats.firstError=`OR: ${errMsg}`;
   }
-  
-  const status=result.status||0;
-  const rawErr=result.body||result.error||result.msg||'unknown';
-  const errMsg=`STATUS ${status} | ${rawErr}`;
-  console.error(`[LLM] FAILED — ${errMsg}`);
-  if(!llmStats.firstError)llmStats.firstError=errMsg;
+
   llmStats.fail++;
   return null;
 }
@@ -456,12 +499,14 @@ async function callOpenRouter(prompt,timeoutMs=30000){return callLLM(prompt,time
 
 function saveAPIKeys(){
   const hfKey=document.getElementById('hfKeyInput').value.trim();
+  const orKey=document.getElementById('orKeyInput').value.trim();
   if(hfKey)localStorage.setItem('nf_hf_key',hfKey);
-  if(!hfKey){alert('Enter your HuggingFace API key');return;}
+  if(orKey)localStorage.setItem('nf_openrouter_key',orKey);
+  if(!hfKey&&!orKey){alert('Enter at least one API key');return;}
   document.getElementById('apiKeyFormView').style.display='none';
   const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('hfKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('hfKeyInput').value='';document.getElementById('orKeyInput').value='';},1500);
 }
 
 function saveAPIKey(){saveAPIKeys();}
@@ -476,6 +521,7 @@ function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('apiKeyModal').classList.remove('hidden');
   document.getElementById('hfKeyInput').value=getHFKey();
+  document.getElementById('orKeyInput').value=getOpenRouterKey();
 }
 
 function openAboutModal(){
@@ -491,8 +537,9 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 
 function renderLLMStats(){
   const s=llmStats;
-  const hasKey=getHFKey();
-  const providerLabel=hasKey?'HuggingFace Qwen 7B':'No API key (Keywords only)';
+  const hasKey=getHFKey()||getOpenRouterKey();
+  const provider=llmStats.provider||(getHFKey()?'huggingface':getOpenRouterKey()?'openrouter':'none');
+  const providerLabel=provider==='huggingface'?'HuggingFace Qwen 7B':provider==='openrouter'?'OpenRouter (Free)':'No API key (Keywords only)';
   const providerColor=hasKey?'var(--green)':'var(--text-dim)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Model: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
