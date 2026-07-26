@@ -12,16 +12,12 @@ CORS(app)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-HF_API_KEY = os.environ.get("HF_API_KEY", "")
 
 GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
-GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
 OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "openrouter/free"
-
-HF_BASE = "https://api-inference.huggingface.co/v1/chat/completions"
-HF_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = "amineadmin9-max/myprv"
@@ -132,7 +128,6 @@ def search():
 def health():
     return jsonify({"status": "ok", "providers": {
         "groq": bool(GROQ_API_KEY),
-        "huggingface": bool(HF_API_KEY),
         "gemini": bool(GEMINI_API_KEY),
         "openrouter": bool(OPENROUTER_API_KEY)
     }})
@@ -153,17 +148,11 @@ def llm_proxy():
         if result:
             return jsonify({"content": result, "provider": "groq", "model": GROQ_MODEL})
 
-    # Try HuggingFace
-    if HF_API_KEY:
-        result = call_huggingface(prompt, timeout)
-        if result:
-            return jsonify({"content": result, "provider": "huggingface", "model": HF_MODEL})
-
     # Try Gemini
     if GEMINI_API_KEY:
         result = call_gemini(prompt, timeout)
         if result:
-            return jsonify({"content": result, "provider": "gemini", "model": "gemini-2.0-flash"})
+            return jsonify({"content": result, "provider": "gemini", "model": "gemini-2.5-flash-lite"})
 
     # Try OpenRouter
     if OPENROUTER_API_KEY:
@@ -225,28 +214,6 @@ def call_openrouter(prompt, timeout=30):
         print(f"[OpenRouter] Error: {resp.status_code} - {resp.text[:200]}")
     except Exception as e:
         print(f"[OpenRouter] Exception: {e}")
-    return None
-
-
-def call_huggingface(prompt, timeout=60):
-    key = HF_API_KEY or os.environ.get("HF_API_KEY", "")
-    if not key:
-        print("[HuggingFace] No API key configured")
-        return None
-    try:
-        resp = requests.post(
-            HF_BASE,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
-            json={"model": HF_MODEL, "messages": [{"role": "user", "content": prompt}],
-                  "temperature": 0.3, "max_tokens": 1024},
-            timeout=timeout
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            return data["choices"][0]["message"]["content"].strip()
-        print(f"[HuggingFace] Error: {resp.status_code} - {resp.text[:200]}")
-    except Exception as e:
-        print(f"[HuggingFace] Exception: {e}")
     return None
 
 

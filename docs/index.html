@@ -201,7 +201,7 @@
     <div class="dropdown" id="dropdownMenu">
       <div class="dropdown-item" onclick="openAPIKeyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        HuggingFace / OpenRouter API
+        Gemini / OpenRouter API
       </div>
       <div class="dropdown-item" onclick="openYTKeyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -221,11 +221,11 @@
         <h2>API Keys</h2>
         <p>Enter at least one key to enable AI analysis.</p>
         <div class="field" style="margin-top:12px">
-          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">HuggingFace Token (optional)</label>
-          <input type="password" class="modal-input" id="hfKeyInput" placeholder="hf_...">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gemini API Key (recommended)</label>
+          <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIza...">
         </div>
         <div class="field" style="margin-top:12px">
-          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">OpenRouter API Key (recommended)</label>
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">OpenRouter API Key (fallback)</label>
           <input type="password" class="modal-input" id="orKeyInput" placeholder="sk-or-...">
         </div>
         <div class="modal-actions">
@@ -265,7 +265,7 @@
   <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <h2>Niche Finder</h2>
-      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.6</span> — HuggingFace + OpenRouter + YouTube Trending | AI-powered classification</p>
+      <p style="line-height:2">Finds profitable niches by combining Reddit unmet demand, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v2.7</span> — Gemini 2.5 Flash Lite + OpenRouter + YouTube Trending | AI-powered classification</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
@@ -380,17 +380,17 @@
 // ===================== CONFIG =====================
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
-// HuggingFace Qwen (primary AI)
-const HF_BASE='https://api-inference.huggingface.co/v1/chat/completions';
-const HF_MODEL='Qwen/Qwen2.5-7B-Instruct';
+// Gemini (primary AI)
+const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+const GEMINI_MODEL='gemini-2.5-flash-lite';
 // OpenRouter fallback (works from browser - supports CORS)
 const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL='openrouter/free';
+function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
 function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
-function getHFKey(){return localStorage.getItem('nf_hf_key')||'';}
-function hasAnyKey(){return getHFKey()||getOpenRouterKey();}
+function hasAnyKey(){return getGeminiKey()||getOpenRouterKey();}
 function getActiveProvider(){
-  if(getHFKey())return'huggingface';
+  if(getGeminiKey())return'gemini';
   if(getOpenRouterKey())return'openrouter';
   return'none';
 }
@@ -412,27 +412,29 @@ function showProgress(pct){document.getElementById('progressBar').classList.remo
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
-async function _hfFetch(prompt,timeoutMs){
-  const key=getHFKey();
-  if(!key)return{error:'NoKey',msg:'No HuggingFace key'};
-  const body={model:HF_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
-  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
-  const urls=[HF_BASE,...PROXIES.map(p=>p+encodeURIComponent(HF_BASE))];
-  for(const url of urls){
-    try{
-      const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
-      const rawText=await r.text();
-      if(rawText.startsWith('{')){
-        const d=JSON.parse(rawText);
-        if(d.choices&&d.choices[0]?.message?.content){
-          return{content:d.choices[0].message.content.trim(),realModel:d.model||HF_MODEL};
+async function _geminiFetch(prompt,timeoutMs){
+  const key=getGeminiKey();
+  if(!key)return{error:'NoKey',msg:'No Gemini key'};
+  const url=GEMINI_BASE+'?key='+key;
+  const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:1024}};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timer);
+    const rawText=await r.text();
+    const trimmed=rawText.trim();
+    if(trimmed.startsWith('{')){
+      try{
+        const d=JSON.parse(trimmed);
+        if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){
+          return{content:d.candidates[0].content.parts[0].text.trim(),realModel:GEMINI_MODEL};
         }
-      }
-      if(rawText.includes('<!')||rawText.includes('error'))continue;
-      return{status:r.status,body:rawText};
-    }catch(e){continue;}
-  }
-  return{error:'FetchError',msg:'All HuggingFace endpoints failed'};
+        if(d.error){return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};}
+      }catch(parseErr){}
+    }
+    return{status:r.status,body:trimmed.substring(0,300)||'(empty response)'};
+  }catch(e){clearTimeout(timer);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
 }
 
 async function _openrouterFetch(prompt,timeoutMs){
@@ -478,22 +480,22 @@ async function _openrouterFetch(prompt,timeoutMs){
 async function callLLM(prompt,timeoutMs=60000){
   llmStats.total++;
 
-  // Try HuggingFace first
-  if(getHFKey()){
-    console.log('[LLM] Trying HuggingFace...');
-    const hfResult=await _hfFetch(prompt,timeoutMs);
-    if(hfResult&&hfResult.content){
+  // Try Gemini first
+  if(getGeminiKey()){
+    console.log('[LLM] Trying Gemini...');
+    const geminiResult=await _geminiFetch(prompt,timeoutMs);
+    if(geminiResult&&geminiResult.content){
       llmStats.ok++;
-      llmStats.lastModel=hfResult.realModel||HF_MODEL;
-      llmStats.provider='HuggingFace Qwen';
-      console.log('[LLM] SUCCESS (HuggingFace)');
-      return hfResult.content;
+      llmStats.lastModel=geminiResult.realModel||GEMINI_MODEL;
+      llmStats.provider='Gemini';
+      console.log('[LLM] SUCCESS (Gemini)');
+      return geminiResult.content;
     }
-    const hfErr=hfResult.status||0;
-    const hfRaw=hfResult.body||hfResult.error||hfResult.msg||'unknown';
-    const hfMsg=`HF: STATUS ${hfErr} | ${hfRaw}`;
-    console.warn(`[LLM] HuggingFace failed: ${hfMsg}`);
-    llmStats.firstError=hfMsg;
+    const geminiErr=geminiResult.status||0;
+    const geminiRaw=geminiResult.body||geminiResult.error||geminiResult.msg||'unknown';
+    const geminiMsg=`Gemini: STATUS ${geminiErr} | ${geminiRaw}`;
+    console.warn(`[LLM] Gemini failed: ${geminiMsg}`);
+    llmStats.firstError=geminiMsg;
   }
 
   // Fallback to OpenRouter
@@ -523,15 +525,15 @@ async function callLLM(prompt,timeoutMs=60000){
 async function callOpenRouter(prompt,timeoutMs=60000){return callLLM(prompt,timeoutMs);}
 
 function saveAPIKeys(){
-  const hfKey=document.getElementById('hfKeyInput').value.trim();
+  const geminiKey=document.getElementById('geminiKeyInput').value.trim();
   const orKey=document.getElementById('orKeyInput').value.trim();
-  if(hfKey)localStorage.setItem('nf_hf_key',hfKey);
+  if(geminiKey)localStorage.setItem('nf_gemini_key',geminiKey);
   if(orKey)localStorage.setItem('nf_openrouter_key',orKey);
-  if(!hfKey&&!orKey){alert('Enter at least one API key');return;}
+  if(!geminiKey&&!orKey){alert('Enter at least one API key');return;}
   document.getElementById('apiKeyFormView').style.display='none';
   const saved=document.getElementById('apiKeySaved');
   saved.style.display='block';
-  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('hfKeyInput').value='';document.getElementById('orKeyInput').value='';},1500);
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('geminiKeyInput').value='';document.getElementById('orKeyInput').value='';},1500);
 }
 
 function saveAPIKey(){saveAPIKeys();}
@@ -545,7 +547,7 @@ function toggleDropdown(e){
 function openAPIKeyModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('apiKeyModal').classList.remove('hidden');
-  document.getElementById('hfKeyInput').value=getHFKey();
+  document.getElementById('geminiKeyInput').value=getGeminiKey();
   document.getElementById('orKeyInput').value=getOpenRouterKey();
 }
 
@@ -562,9 +564,9 @@ document.addEventListener('click',()=>{const dd=document.getElementById('dropdow
 
 function renderLLMStats(){
   const s=llmStats;
-  const hasKey=getHFKey()||getOpenRouterKey();
-  const provider=llmStats.provider||(getHFKey()?'huggingface':getOpenRouterKey()?'OpenRouter':'none');
-  const providerLabel=provider==='huggingface'?'HuggingFace Qwen 7B':provider==='OpenRouter'?'OpenRouter (Free)':'No API key (Keywords only)';
+  const hasKey=getGeminiKey()||getOpenRouterKey();
+  const provider=llmStats.provider||(getGeminiKey()?'gemini':getOpenRouterKey()?'OpenRouter':'none');
+  const providerLabel=provider==='gemini'?'Gemini 2.5 Flash Lite':provider==='OpenRouter'?'OpenRouter (Free)':'No API key (Keywords only)';
   const providerColor=hasKey?'var(--green)':'var(--text-dim)';
   const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}${s.lastError?'\n'+s.lastError:''}</div>`:'';
   const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Model: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
