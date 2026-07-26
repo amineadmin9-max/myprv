@@ -1154,21 +1154,20 @@ async function fetchRedditBulk(timeframe){
   for(const sub of BULK_SUBS){
     if(allPosts.length>=100)break;
     try{
-      const url=`https://www.reddit.com/r/${sub}/top.json?t=${timeframe}&limit=10`;
-      const data=await fetchWithProxyJSON(url);
-      if(data?.data?.children){
-        for(const child of data.data.children){
+      const url=`https://www.reddit.com/r/${sub}/top/.rss?t=${timeframe}&limit=15`;
+      const xml=await fetchWithProxy(url);
+      if(xml){
+        const posts=parseRSS(xml);
+        for(const p of posts){
           if(allPosts.length>=100)break;
-          const p=child.data;
-          if(p.stickied||p.score<0)continue;
           const key=p.title.toLowerCase().slice(0,60);
           if(seen.has(key))continue;
           seen.add(key);
-          allPosts.push({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink,score:p.score||0,numComments:p.num_comments||0});
+          allPosts.push({title:p.title,content:p.content||'',subreddit:p.subreddit||sub,url:p.url,score:p.score||0,numComments:p.numComments||0});
         }
       }
     }catch(e){console.error('Bulk fetch error r/'+sub+':',e);}
-    await delay(100);
+    await delay(200);
   }
   return allPosts;
 }
