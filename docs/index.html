@@ -438,22 +438,30 @@ async function _hfFetch(prompt,timeoutMs){
 async function _openrouterFetch(prompt,timeoutMs){
   const key=getOpenRouterKey();
   if(!key)return{error:'NoKey',msg:'No OpenRouter key'};
-  const body={model:OPENROUTER_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  const body={model:OPENROUTER_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024,stream:false};
   const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
   try{
+    console.log('[OR] Sending request to OpenRouter...');
     const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
     clearTimeout(timer);
+    console.log('[OR] Response status:',r.status);
     const rawText=await r.text();
-    if(rawText.startsWith('{')){
-      const d=JSON.parse(rawText);
+    console.log('[OR] Raw response (first 500 chars):',rawText.substring(0,500));
+    const trimmed=rawText.trim();
+    if(trimmed.startsWith('{')){
+      const d=JSON.parse(trimmed);
+      console.log('[OR] Parsed response:',d);
       if(d.choices&&d.choices[0]?.message?.content){
         return{content:d.choices[0].message.content.trim(),realModel:d.model||OPENROUTER_MODEL};
       }
+      if(d.error){
+        return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};
+      }
     }
     return{status:r.status,body:rawText.substring(0,300)};
-  }catch(e){clearTimeout(timer);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
+  }catch(e){clearTimeout(timer);console.error('[OR] Fetch error:',e);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
 }
 
 async function callLLM(prompt,timeoutMs=60000){
