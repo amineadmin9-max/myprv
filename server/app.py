@@ -1,12 +1,23 @@
 import json
+import os
+from flask import Flask, request, jsonify
+
 import requests
-import gradio as gr
+
+app = Flask(__name__)
 
 
-def fetch_reddit_comments(permalink):
+@app.route("/api/reddit-comments", methods=["POST"])
+def fetch_reddit_comments():
     """Fetch Reddit comments via JSON API."""
+    try:
+        body = request.get_json(silent=True) or {}
+        permalink = body.get("data", [""])[0] if isinstance(body.get("data"), list) else ""
+    except Exception:
+        return jsonify({"error": "Invalid request body"}), 400
+
     if not permalink or not permalink.startswith("/r/"):
-        return json.dumps({"error": "Invalid permalink"})
+        return jsonify({"error": "Invalid permalink"}), 400
 
     urls_to_try = [
         f"https://www.reddit.com{permalink}.json",
@@ -52,20 +63,19 @@ def fetch_reddit_comments(permalink):
                     extract(data[1].get("data", {}).get("children", []))
 
                     print(f"[REDDIT] OK: {len(comments)} comments from {permalink}")
-                    return json.dumps({**post_data, "comments": comments})
+                    return jsonify({"data": [json.dumps({**post_data, "comments": comments})]})
         except Exception as e:
             print(f"[REDDIT] Error fetching {url}: {e}")
             continue
 
-    return json.dumps({"error": "Could not fetch comments"})
+    return jsonify({"data": [json.dumps({"error": "Could not fetch comments"})]}), 502
 
 
-with gr.Blocks(title="Niche Finder API") as demo:
-    gr.Markdown("# Niche Finder API\nBackend for Reddit comment analysis.")
-    permalink_input = gr.Textbox(label="Permalink", placeholder="/r/sub/comments/id/title/")
-    output_json = gr.Textbox(label="JSON Output")
-    btn = gr.Button("Fetch Comments")
-    btn.click(fn=fetch_reddit_comments, inputs=permalink_input, outputs=output_json, api_name="reddit-comments")
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, ssr_mode=False)
+    port = int(os.environ.get("PORT", 7860))
+    app.run(host="0.0.0.0", port=port, debug=False)
