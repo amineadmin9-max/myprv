@@ -376,7 +376,7 @@
 const PROXIES=['https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
 
 // HuggingFace Qwen (primary AI)
-const HF_BASE='https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct/v1/chat/completions';
+const HF_BASE='https://api-inference.huggingface.co/v1/chat/completions';
 const HF_MODEL='Qwen/Qwen2.5-7B-Instruct';
 function getHFKey(){return localStorage.getItem('nf_hf_key')||'';}
 function hasAnyKey(){return getHFKey();}
