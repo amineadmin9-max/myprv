@@ -1,10 +1,12 @@
 import json
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 import requests
 
 app = Flask(__name__)
+CORS(app)
 
 
 @app.route("/api/reddit-comments", methods=["POST"])
