@@ -43,10 +43,20 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - Endpoint: `POST {serverURL}/api/reddit-comments` → `{"data": ["/r/sub/comments/id/title/"]}`
 - Returns: `{"data": ["{score, ups, upvote_ratio, num_comments, comments: [{body, score}]}"]}`
 - Health check: `GET {serverURL}/health` → `{"status": "ok"}`
-- **Status: DEPLOYED but Reddit BLOCKS server IPs at TCP level**
-- **Reddit blocks ALL datacenter IPs (Railway, HuggingFace, AWS, etc.)**
-- **Tried: browser headers, Playwright — all fail because IP is blocked**
-- **Only solution: Reddit OAuth API (free, 100 req/min)**
+- **Status: DEPLOYED — uses Cloudflare Worker proxy to bypass Reddit IP blocks**
+
+## Cloudflare Worker Proxy (Reddit Bypass)
+- `worker.js` — Cloudflare Worker that proxies Reddit requests
+- Uses Cloudflare's residential IPs to bypass Reddit's datacenter IP blocks
+- Deploy: `wrangler deploy worker.js --name reddit-proxy`
+- Set secret: `wrangler secret put PROXY_SECRET`
+- Set env vars on Railway: `WORKER_URL` + `WORKER_SECRET`
+- Routes:
+  - `POST /api/reddit-comments` — proxy Reddit JSON comments
+  - `POST /api/reddit-search` — proxy Reddit search JSON
+  - `POST /api/reddit-rss` — proxy Reddit RSS feeds
+  - `GET /health` — health check
+- Auth: `X-Proxy-Secret` header with shared secret
 
 ## Traffic Light System (🟢🟡🔴)
 ### How it works:
@@ -140,9 +150,10 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `docs/index.html` — MAIN FILE (all CSS+HTML+JS in one file, ~1820 lines)
 - `docs/sw.js` — service worker (cache v4)
 - `docs/manifest.json` — PWA manifest
-- `server/app.py` — Flask app with browser headers + Playwright fallback
+- `server/app.py` — Flask app with Cloudflare Worker proxy + direct fallback
 - `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
 - `server/Dockerfile` — Python 3.11 + Chromium + gunicorn
+- `worker.js` — Cloudflare Worker for Reddit proxy (deploy separately)
 
 ## Railway Deploy Steps
 1. Push code to GitHub (`server/` folder with Dockerfile)
@@ -154,6 +165,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 7. Open app → ⚙️ → Backend Server → paste URL → Save
 
 ## Version History
+- v3.0 — Added Cloudflare Worker proxy to bypass Reddit IP blocks
 - v2.9 — Migrated backend from Gradio/HuggingFace to Flask/Railway
 - v2.9.1 — Added browser headers + Playwright fallback (still blocked by Reddit)
 - v2.8 — Comment-based traffic light + Flask server proxy + Gradio HF Spaces
@@ -161,8 +173,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - Earlier — HuggingFace (blocked), DeepSeek, keyword-only scoring
 
 ## Known Issues
-- **CRITICAL: Reddit blocks ALL datacenter IPs at TCP level**
-- Tried: browser headers, Playwright, SOCKS5 proxy — all fail
-- Only solution: Reddit OAuth API (free, 100 req/min)
+- Cloudflare Worker proxy should bypass Reddit IP blocks (residential IPs)
+- If worker fails, falls back to direct requests (may fail on datacenter IPs)
 - Without server, traffic light falls back to post-content-only scoring
 - User runs app from phone browser (no F12/Console access)

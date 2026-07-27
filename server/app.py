@@ -29,6 +29,10 @@ BROWSER_HEADERS = {
 SESSION = requests.Session()
 SESSION.headers.update(BROWSER_HEADERS)
 
+# Cloudflare Worker proxy config
+WORKER_URL = os.environ.get("WORKER_URL", "")  # e.g. https://reddit-proxy.YOUR_SUBDOMAIN.workers.dev
+WORKER_SECRET = os.environ.get("WORKER_SECRET", "")
+
 _browser = None
 
 
@@ -97,9 +101,33 @@ def parse_reddit_json(data, permalink):
     return {**post_data, "comments": comments}
 
 
+def fetch_via_worker(permalink):
+    """Fetch Reddit comments via Cloudflare Worker proxy."""
+    if not WORKER_URL or not WORKER_SECRET:
+        return None
+
+    try:
+        resp = requests.post(
+            f"{WORKER_URL}/api/reddit-comments",
+            json={"data": [permalink]},
+            headers={"X-Proxy-Secret": WORKER_SECRET, "Content-Type": "application/json"},
+            timeout=15,
+        )
+        print(f"[WORKER] {WORKER_URL} -> {resp.status_code}")
+
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("data"):
+                return data
+    except Exception as e:
+        print(f"[WORKER] Failed: {e}")
+
+    return None
+
+
 @app.route("/api/reddit-comments", methods=["POST"])
 def fetch_reddit_comments():
-    """Fetch Reddit comments: try requests first, fallback to Playwright."""
+    """Fetch Reddit comments: try worker proxy first, then direct requests, then Playwright."""
     try:
         body = request.get_json(silent=True) or {}
         permalink = body.get("data", [""])[0] if isinstance(body.get("data"), list) else ""
@@ -109,6 +137,12 @@ def fetch_reddit_comments():
     if not permalink or not permalink.startswith("/r/"):
         return jsonify({"error": "Invalid permalink"}), 400
 
+    # 1. Try Cloudflare Worker proxy (best chance — residential IPs)
+    worker_result = fetch_via_worker(permalink)
+    if worker_result:
+        return jsonify(worker_result)
+
+    # 2. Try direct requests
     urls_to_try = [
         f"https://www.reddit.com{permalink}.json",
         f"https://old.reddit.com{permalink}.json",
@@ -128,6 +162,7 @@ def fetch_reddit_comments():
         except Exception as e:
             print(f"[REDDIT] requests failed for {url}: {e}")
 
+    # 3. Try Playwright
     print("[REDDIT] requests failed, trying Playwright...")
     for url in urls_to_try:
         try:
