@@ -214,6 +214,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         Backend Server
       </div>
+      <div class="dropdown-item" onclick="openLogsModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Logs
+      </div>
       <div class="dropdown-item" onclick="openAboutModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         About
@@ -304,6 +308,18 @@
       5. Settings → Backend Server → paste URL</span></p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Logs -->
+  <div class="modal-overlay hidden" id="logsModal" onclick="closeModalBg(event)">
+    <div class="modal-box" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column">
+      <h2>Logs</h2>
+      <div id="logsContainer" style="flex:1;overflow-y:auto;max-height:55vh;margin:10px 0;padding:10px;background:var(--bg);border-radius:12px;font-family:monospace;font-size:11px;line-height:1.8;color:var(--text-dim)"></div>
+      <div class="modal-actions">
+        <button class="modal-btn ghost" onclick="clearLogs()" style="flex:0.5">Clear</button>
+        <button class="modal-btn primary" onclick="document.getElementById('logsModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
     </div>
   </div>
@@ -522,6 +538,7 @@ async function callLLM(prompt,timeoutMs=60000){
       llmStats.lastModel=geminiResult.realModel||GEMINI_MODEL;
       llmStats.provider='Gemini';
       console.log('[LLM] SUCCESS (Gemini)');
+      addLog('success',`LLM: Gemini OK (${geminiResult.realModel||GEMINI_MODEL})`);
       return geminiResult.content;
     }
     const geminiErr=geminiResult.status||0;
@@ -529,6 +546,7 @@ async function callLLM(prompt,timeoutMs=60000){
     const geminiMsg=`Gemini: STATUS ${geminiErr} | ${geminiRaw}`;
     console.warn(`[LLM] Gemini failed: ${geminiMsg}`);
     llmStats.firstError=geminiMsg;
+    addLog('warn',`LLM: Gemini failed — ${geminiMsg}`);
   }
 
   // Fallback to OpenRouter
@@ -541,6 +559,7 @@ async function callLLM(prompt,timeoutMs=60000){
       llmStats.provider='OpenRouter';
       llmStats.firstError=null;
       console.log('[LLM] SUCCESS (OpenRouter)');
+      addLog('success',`LLM: OpenRouter OK (${orResult.realModel||OPENROUTER_MODEL})`);
       return orResult.content;
     }
     const orErr=orResult.status||0;
@@ -549,9 +568,11 @@ async function callLLM(prompt,timeoutMs=60000){
     console.error(`[LLM] OpenRouter FAILED — ${orMsg}`,orResult);
     llmStats.lastError=orMsg;
     if(!llmStats.firstError)llmStats.firstError=orMsg;
+    addLog('error',`LLM: OpenRouter failed — ${orMsg}`);
   }
 
   llmStats.fail++;
+  addLog('error',`LLM: All providers failed (total=${llmStats.total}, ok=${llmStats.ok}, fail=${llmStats.fail})`);
   return null;
 }
 
@@ -588,6 +609,36 @@ function openAboutModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('aboutModal').classList.remove('hidden');
 }
+
+const appLogs=[];
+function addLog(type,msg){
+  const t=new Date().toLocaleTimeString();
+  const colors={info:'var(--text-dim)',success:'var(--green)',error:'#ef4444',warn:'#f59e0b'};
+  const icons={info:'ℹ️',success:'✅',error:'❌',warn:'⚠️'};
+  appLogs.push({t,type,msg});
+  const el=document.getElementById('logsContainer');
+  if(el){
+    el.innerHTML+=`<div style="color:${colors[type]||colors.info}">${icons[type]||''} <span style="color:var(--text-dim);opacity:.5">[${t}]</span> ${msg}</div>`;
+    el.scrollTop=el.scrollHeight;
+  }
+}
+function renderLogs(){
+  const el=document.getElementById('logsContainer');
+  if(!el)return;
+  el.innerHTML='';
+  for(const l of appLogs){
+    const colors={info:'var(--text-dim)',success:'var(--green)',error:'#ef4444',warn:'#f59e0b'};
+    const icons={info:'ℹ️',success:'✅',error:'❌',warn:'⚠️'};
+    el.innerHTML+=`<div style="color:${colors[l.type]||colors.info}">${icons[l.type]||''} <span style="color:var(--text-dim);opacity:.5">[${l.t}]</span> ${l.msg}</div>`;
+  }
+  el.scrollTop=el.scrollHeight;
+}
+function openLogsModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('logsModal').classList.remove('hidden');
+  renderLogs();
+}
+function clearLogs(){appLogs.length=0;document.getElementById('logsContainer').innerHTML='';}
 
 function closeAPIKeyModal(){document.getElementById('apiKeyModal').classList.add('hidden');}
 
@@ -1155,6 +1206,7 @@ async function handleSearch(){
   if(!q)return;
   const key=getYTKey();
   if(!key){
+    addLog('error','No YouTube API key found');
     document.getElementById('results').classList.remove('hidden');
     document.getElementById('results').innerHTML='<div class="error">⚠️ Add YouTube API key from settings</div>';
     return;
@@ -1162,13 +1214,19 @@ async function handleSearch(){
   document.getElementById('searchBtn').disabled=true;
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  addLog('info',`Search: "${q}"`);
   showProgress(20);setStatus('Searching YouTube...');
   try{
     showProgress(40);const{videos,totalResults}=await searchYouTubeVideos(q,90,20);
+    addLog('success',`Search: Found ${totalResults} videos on YouTube`);
     showProgress(70);setStatus(`Found ${totalResults} videos on YouTube - analyzing top 20...`);
     const scoring=computeYouTubeScoring(videos,totalResults);showProgress(100);
+    addLog('info',`Search: Score=${scoring.score} (${scoring.label}), avgViews=${scoring.avgViews}`);
     renderSearchResult(q,scoring,videos,totalResults);
-  }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
+  }catch(e){
+    addLog('error',`Search failed: ${e.message}`);
+    document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
+  }
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
 }
 
@@ -1571,7 +1629,11 @@ async function fetchGoogleTrendsYouTube(timeframe){
       if(i<urls.length-1)await new Promise(r=>setTimeout(r,8000));
     }
     console.log(`Trends done: ${okCount} ok, ${failCount} fail, ${ideas.length} ideas`);
-  }catch(e){console.error('Trends error:',e);}
+    addLog(okCount>failCount?'success':'warn',`Google Trends (${timeframe}): ${okCount}/${urls.length} days OK, ${ideas.length} keywords found`);
+  }catch(e){
+    console.error('Trends error:',e);
+    addLog('error',`Google Trends error: ${e.message}`);
+  }
   return ideas.slice(0,100);
 }
 
@@ -1599,8 +1661,11 @@ async function fetchYouTubeTrendingByCategory(){
 
 async function runDualDiscovery(){
   resetLLMStats();
+  appLogs.length=0;
+  addLog('info','=== Dual Discovery Started ===');
   const key=getYTKey();
   if(!key){
+    addLog('error','No YouTube API key found');
     document.getElementById('results').classList.remove('hidden');
     document.getElementById('results').innerHTML='<div class="error">⚠️ Add YouTube API key from settings</div>';
     return;
@@ -1611,24 +1676,31 @@ async function runDualDiscovery(){
   const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
   try{
 
-    // ════════ STEP 1: EVERGREEN (3 months — Google Trends) ════════
+    // ════════ STEP 1: EVERGREEN (1 month — Google Trends) ════════
+    addLog('info','Step 1: Fetching Google Trends keywords (30 days)...');
     showProgress(3);setStatus('Step 1: Fetching Google Trends keywords (3 months)...');
     const evergreenIdeas=await fetchGoogleTrendsYouTube('month');
     stats.evergreenRaw=evergreenIdeas.length;
+    addLog(evergreenIdeas.length>0?'success':'warn',`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
     showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
 
+    addLog('info',`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
     showProgress(20);setStatus(`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
     const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas,'trends');
     stats.evergreenFiltered=evergreenFiltered.length;
+    addLog(evergreenFiltered.length>0?'success':'warn',`Step 1: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches after AI filtering`);
     showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches`);
 
     // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube Trending) ════════
+    addLog('info','Step 2: Fetching Google Trends keywords (1 week)...');
     showProgress(38);setStatus('Step 2: Fetching Google Trends keywords (1 week)...');
     const trendingIdeas=await fetchGoogleTrendsYouTube('week');
     stats.trendingRaw=trendingIdeas.length;
+    addLog(trendingIdeas.length>0?'success':'warn',`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
     showProgress(42);setStatus(`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
 
     // Add YouTube trending videos as keywords too
+    addLog('info','Step 2: Fetching YouTube Trending videos...');
     showProgress(44);setStatus('Step 2: Fetching YouTube Trending videos...');
     const ytTrending=await fetchYouTubeTrendingByCategory();
     for(const v of ytTrending){
@@ -1638,14 +1710,18 @@ async function runDualDiscovery(){
       }
     }
     stats.trendingRaw=trendingIdeas.length;
+    addLog('info',`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube Trending)`);
     showProgress(48);setStatus(`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube)`);
 
+    addLog('info',`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
     showProgress(50);setStatus(`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
     const trendingFiltered=await aiFilterAndSummarize(trendingIdeas,'trends');
     stats.trendingFiltered=trendingFiltered.length;
+    addLog(trendingFiltered.length>0?'success':'warn',`Step 2: ${stats.trendingRaw} → ${stats.trendingFiltered} trending niches after AI filtering`);
     showProgress(60);setStatus(`Step 2 done: ${stats.trendingRaw} → ${stats.trendingFiltered} trending niches`);
 
     // ════════ STEP 3: YOUTUBE SEARCH + SCORING — EVERGREEN ════════
+    addLog('info',`Step 3: Searching YouTube for ${evergreenFiltered.length} evergreen niches...`);
     const evergreenResults=[];
     for(let i=0;i<evergreenFiltered.length;i++){
       const kw=evergreenFiltered[i].title;
@@ -1655,11 +1731,16 @@ async function runDualDiscovery(){
         const{videos,totalResults}=await searchYouTubeVideos(kw,90,20);
         const scoring=computeYouTubeScoring(videos,totalResults);
         evergreenResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
-      }catch(e){continue;}
+        addLog('success',`[Evergreen ${i+1}] ${kw}: ${totalResults} videos, score=${scoring.score}`);
+      }catch(e){
+        addLog('error',`[Evergreen ${i+1}] ${kw}: ${e.message}`);
+      }
       await new Promise(r=>setTimeout(r,300));
     }
+    addLog('info',`Step 3 done: ${evergreenResults.length} evergreen niches scored`);
 
     // ════════ STEP 4: YOUTUBE SEARCH + SCORING — TRENDING ════════
+    addLog('info',`Step 4: Searching YouTube for ${trendingFiltered.length} trending niches...`);
     const trendingResults=[];
     for(let i=0;i<trendingFiltered.length;i++){
       const kw=trendingFiltered[i].title;
@@ -1669,14 +1750,22 @@ async function runDualDiscovery(){
         const{videos,totalResults}=await searchYouTubeVideos(kw,7,20);
         const scoring=computeYouTubeScoring(videos,totalResults);
         trendingResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
-      }catch(e){continue;}
+        addLog('success',`[Trending ${i+1}] ${kw}: ${totalResults} videos, score=${scoring.score}`);
+      }catch(e){
+        addLog('error',`[Trending ${i+1}] ${kw}: ${e.message}`);
+      }
       await new Promise(r=>setTimeout(r,300));
     }
+    addLog('info',`Step 4 done: ${trendingResults.length} trending niches scored`);
 
     showProgress(100);setStatus(`Done! ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches found.`);
+    addLog('success',`=== Dual Discovery Complete: ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches ===`);
     renderDualResults(evergreenResults,trendingResults,stats);
 
-  }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
+  }catch(e){
+    addLog('error',`Fatal error: ${e.message}`);
+    document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
+  }
   hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
 }
 
@@ -1897,10 +1986,12 @@ async function checkMonitor(id){
   const m=monitors.find(x=>x.id===id);
   if(!m)return;
   const key=getYTKey();
-  if(!key){alert('Add YouTube API key from settings');return;}
+  if(!key){addLog('error','No YouTube API key found');alert('Add YouTube API key from settings');return;}
+  addLog('info',`Monitor check: "${m.name}"`);
   try{
     const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
     const scoring=computeYouTubeScoring(videos,totalResults);
+    addLog('success',`Monitor "${m.name}": ${totalResults} videos, score=${scoring.score}`);
     const now=new Date();
     m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
     m.lastVideos=scoring.videoCount;
@@ -1909,28 +2000,37 @@ async function checkMonitor(id){
     addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
     renderMonitors();
     alert(`✅ ${m.name}\n📊 ${totalResults} total YouTube videos\n👁️ ${scoring.avgViews.toLocaleString()} avg views\n${scoring.label}`);
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){
+    addLog('error',`Monitor "${m.name}" failed: ${e.message}`);
+    alert('Error: '+e.message);
+  }
 }
 
 async function runAllMonitors(){
   const monitors=getMonitors().filter(m=>m.active);
   if(!monitors.length){alert('No active monitors.');return;}
   const key=getYTKey();
-  if(!key){alert('Add YouTube API key from settings');return;}
+  if(!key){addLog('error','No YouTube API key found');alert('Add YouTube API key from settings');return;}
+  addLog('info',`Running all monitors (${monitors.length} active)`);
   addNotification({sub:'System',name:'All Monitors',body:`Running check on ${monitors.length} monitors...`,color:'amber',promo:''});
   for(const m of monitors){
     try{
       const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
       const scoring=computeYouTubeScoring(videos,totalResults);
+      addLog('success',`Monitor "${m.name}": ${totalResults} videos, score=${scoring.score}`);
       const now=new Date();
       m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
       m.lastVideos=totalResults;
       m.lastViews=scoring.avgViews;
       saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
       addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
-    }catch(e){addNotification({sub:'YouTube',name:m.name,body:'Error: '+e.message,color:'red',promo:''});}
+    }catch(e){
+      addLog('error',`Monitor "${m.name}" failed: ${e.message}`);
+      addNotification({sub:'YouTube',name:m.name,body:'Error: '+e.message,color:'red',promo:''});
+    }
     await new Promise(r=>setTimeout(r,500));
   }
+  addLog('info','All monitors completed');
   renderMonitors();
   alert('All monitors checked!');
 }

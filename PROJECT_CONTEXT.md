@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-27 (8th update — Reduced evergreen to 30 days to fix hour-long stall)
+## Last updated: 2026-07-27 (9th update — Added Logs modal for monitoring all operations)
 
 ## Quick Start
 In a new conversation, just say:
@@ -72,7 +72,9 @@ A **Niche Finder** web app that finds profitable niches by combining:
 ### Settings (3-dot menu dropdown)
 1. **Gemini / OpenRouter API** — API keys modal
 2. **YouTube API** — YouTube Data API v3 key
-3. **About** — version info
+3. **Backend Server** — server URL
+4. **Logs** — real-time operation logs (success/error/warn)
+5. **About** — version info
 
 ### Dual Discovery Flow
 1. `fetchGoogleTrendsYouTube('month')` — evergreen keywords (30 days, batch=1, delay=8s, retry=3x)
@@ -109,6 +111,8 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `renderDualResults(evergreen, trending, stats)` — render cards
 - `renderSearchResult(keyword, scoring, videos, totalResults)` — render search
 - `renderLLMStats()` — LLM usage stats panel
+- `addLog(type, msg)` — add entry to Logs modal (info/success/error/warn)
+- `openLogsModal()` — open Logs modal from ⋮ menu
 
 ### Constants
 - `PROXIES` — CORS proxies (for Google Trends if needed)
@@ -140,6 +144,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
+- v3.4 — Added Logs modal: ⋮ → Logs shows all operations, errors, and status in real-time
 - v3.3 — Reduced evergreen from 90 to 30 days (fixes hour-long stall, ~4-12 min)
 - v3.2 — Fixed CORS proxy rate limiting: batch=1, delay=8s, retry=3x with 15s backoff
 - v3.1 — Evergreen now fetches full 90 days from Google Trends
