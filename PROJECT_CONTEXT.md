@@ -54,23 +54,22 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - Any path/query/method gets forwarded to reddit.com
 - Env vars: `PROXY_USER_AGENT` (required by Reddit), `PROXY_SECRET` (optional auth)
 
-## Traffic Light System (🟢🟡🔴)
-### How it works:
-1. For each niche, get top 5 posts (sorted by numComments desc)
-2. For each post, fetch comments via server (`/api/reddit-comments`)
-3. Count promo links in comment bodies using `countLinksInText()`
-4. Get Google `site:reddit.com` post count for competition level
+## Traffic Light System (YouTube) — 6 colors
+### How it works (scraper.py):
+1. Get keywords from Google Trends (YouTube filter)
+2. Search YouTube videos per keyword (20 videos)
+3. Count promo links in video descriptions
+4. Check avg views for engagement level
 5. Apply scoring rules:
 
 | Condition | Color | Label |
 |-----------|-------|-------|
-| postCount>30k AND commentLinks>5 | 🔴 | Saturated — high volume, many promo links in comments |
-| postCount≤30k AND commentLinks>5 | 🔴 | Saturated — many promo links detected in comments |
-| postCount<1000 AND highEng AND links≤2 | 🟢 | Clean opportunity — low competition, high engagement |
-| postCount≤30k AND highEng AND links≤2 | 🟢 | Open market — moderate posts, good engagement |
-| postCount≤30k AND links≤5 | 🟡 | Growing market — some activity, needs deeper analysis |
-| postCount>30k AND links≤5 | 🟡 | Large market — high volume, moderate promo links |
-| default | 🟡 | Moderate market — deeper analysis needed |
+| videoCount<5K AND highEng AND links≤3 | 🔵 | فرصة نظيفة — منافسة ضعيفة جداً |
+| videoCount≤25K AND highEng AND links≤3 | 🟢 | سوق مفتوح — منافسة معقولة + تفاعل جيد |
+| videoCount≤25K AND links≤8 | 🟡 | سوق نامي — بعض النشاط |
+| videoCount>25K AND links≤8 | 🟠 | سوق كبير — منافسة متوسطة |
+| videoCount>25K AND links>8 | 🔴 | مُشبع — حجم كبير + روابط كثيرة |
+| videoCount≤25K AND links>8 | 🟣 | مُشبع — روابط كثيرة مع حجم أقل |
 
 ### Card display:
 - **Only shows:** `🌳 Evergreen · {label}` + colored dot
@@ -151,6 +150,8 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `server/Dockerfile` — Python 3.11 + Chromium + gunicorn
 - `worker.js` — Cloudflare Worker general-purpose Reddit proxy
 - `wrangler.toml` — Worker deployment config
+- `scraper.py` — YouTube + Google Trends niche scraper (Termux)
+- `requirements.txt` — Python deps for scraper (pytrends, requests)
 
 ## Railway Deploy Steps
 1. Push code to GitHub (`server/` folder with Dockerfile)
