@@ -1360,31 +1360,23 @@ function saveServerURL(){
 }
 
 // ===================== AI FILTER AND SUMMARIZE =====================
-async function aiFilterAndSummarize(items){
+async function aiFilterAndSummarize(items,sourceType){
   const results=[];const batchSize=50;
   const totalBatches=Math.ceil(items.length/batchSize);
   for(let i=0;i<items.length;i+=batchSize){
     const batch=items.slice(i,i+batchSize);
     const batchNum=Math.floor(i/batchSize)+1;
     setStatus(`AI filtering batch ${batchNum}/${totalBatches} (${batch.length} items)...`);
+    const isTrends=sourceType==='trends';
     const prompt=`Analyze these ${batch.length} items and filter + summarize each one.
 
 FILTERING RULES — REMOVE items that match ANY of these:
-- Political news, celebrity/entertainment gossip, drama
-- Memes, jokes, humor, shitposts, satire
-- General discussion, opinions, or stories without product context
-- Questions about subreddits, communities, or channels
-- Sports scores, game releases, event announcements
-- Items that do NOT relate to a product, tool, app, or purchasable solution
+${isTrends?'- Pure celebrity gossip, drama, or personal life stories\n- Sports scores, game results, match outcomes\n- One-word or meaningless generic terms with no niche potential':'- Political news, celebrity/entertainment gossip, drama\n- Memes, jokes, humor, shitposts, satire\n- General discussion, opinions, or stories without product context\n- Questions about subreddits, communities, or channels\n- Sports scores, game releases, event announcements\n- Items that do NOT relate to a product, tool, app, or purchasable solution'}
 
 KEEP items that:
-- Ask for a specific product, tool, app, or service recommendation
-- Request alternatives to existing products
-- Describe a problem solvable with a product/tool/app
-- Ask "best X for Y" where X is a purchasable category
-- Request budget, quality, or comparison advice for products
+${isTrends?'- Topics with commercial/market potential (people search → can sell products/services)\n- Technology, gadgets, tools, software, AI, health, fitness, home, finance topics\n- "Best X", "how to", comparison, review, or recommendation topics\n- Product categories, hobby niches, lifestyle topics\n- Any trending topic where products/services can be marketed':'- Ask for a specific product, tool, app, or service recommendation\n- Request alternatives to existing products\n- Describe a problem solvable with a product/tool/app\n- Ask "best X for Y" where X is a purchasable category\n- Request budget, quality, or comparison advice for products'}
 
-For each KEPT item, create a clean niche name (2-4 words) that describes the product category. Remove all filler words, question prefixes, and subreddits from the name.
+For each KEPT item, create a clean niche name (2-4 words) that describes the product category or market. Remove filler words, news prefixes.
 
 Items:
 ${batch.map((item,idx)=>`${idx+1}. "${item.title}"${item.content?' — '+item.content.slice(0,120):''}`).join('\n')}
@@ -1532,23 +1524,45 @@ async function fetchGoogleTrendsYouTube(timeframe){
   const seen=new Set();
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
   try{
-    // YouTube category = 0 (All) from Google Trends explore API
-    const url=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${timeframe==='week'?'20240101':''}`;
-    const data=await fetchWithProxyJSON(url);
-    if(!data)return[];
-    const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
-    for(const t of trends){
-      const q=t.title.query;const ql=q.toLowerCase();
-      if(skip.some(s=>ql.includes(s)))continue;
-      if(seen.has(ql))continue;seen.add(ql);
-      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
-      for(const r of(t.relatedQueries||[]).slice(0,3)){
-        const rq=r.query.toLowerCase();
-        if(r.query.length>3&&r.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
+    const today=new Date();
+    let urls=[];
+    if(timeframe==='week'){
+      // Trending: fetch last 7 days of daily trends
+      for(let d=0;d<7;d++){
+        const ed=new Date(today);ed.setDate(today.getDate()-d);
+        const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
+        urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
+      }
+    }else{
+      // Evergreen: fetch last 30 days of daily trends (broad pool for evergreen discovery)
+      for(let d=0;d<30;d++){
+        const ed=new Date(today);ed.setDate(today.getDate()-d);
+        const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
+        urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
       }
     }
+    // Fetch in batches of 5 to avoid overwhelming proxies
+    for(let i=0;i<urls.length;i+=5){
+      const batch=urls.slice(i,i+5);
+      const results=await Promise.allSettled(batch.map(u=>fetchWithProxyJSON(u)));
+      for(const r of results){
+        if(r.status!=='fulfilled'||!r.value)continue;
+        const trends=r.value.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+        for(const t of trends){
+          const q=t.title.query;const ql=q.toLowerCase();
+          if(skip.some(s=>ql.includes(s)))continue;
+          if(seen.has(ql))continue;seen.add(ql);
+          ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+          for(const r2 of(t.relatedQueries||[]).slice(0,3)){
+            const rq=r2.query.toLowerCase();
+            if(r2.query.length>3&&r2.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r2.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
+          }
+        }
+      }
+      if(i+5<urls.length)await new Promise(r=>setTimeout(r,300));
+    }
   }catch(e){console.error('Trends error:',e);}
-  return ideas.slice(0,100);
+  return ideas.slice(0,200);
 }
 
 // Get YouTube trending directly via API (more reliable than Google Trends for YouTube)
@@ -1594,7 +1608,7 @@ async function runDualDiscovery(){
     showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} keywords from Google Trends`);
 
     showProgress(20);setStatus(`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
-    const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas);
+    const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas,'trends');
     stats.evergreenFiltered=evergreenFiltered.length;
     showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches`);
 
@@ -1617,7 +1631,7 @@ async function runDualDiscovery(){
     showProgress(48);setStatus(`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube)`);
 
     showProgress(50);setStatus(`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
-    const trendingFiltered=await aiFilterAndSummarize(trendingIdeas);
+    const trendingFiltered=await aiFilterAndSummarize(trendingIdeas,'trends');
     stats.trendingFiltered=trendingFiltered.length;
     showProgress(60);setStatus(`Step 2 done: ${stats.trendingRaw} → ${stats.trendingFiltered} trending niches`);
 
