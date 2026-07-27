@@ -1,79 +1,69 @@
-import asyncio
 import json
 import sys
+import requests
 from datetime import datetime
-from playwright.async_api import async_playwright
+
+WORKER_URL = ""  # Set your worker URL here, e.g. https://reddit-proxy.YOUR.workers.dev
+
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 
-async def scrape_reddit(subreddit: str, num_posts: int = 25):
-    url = f"https://old.reddit.com/r/{subreddit}/"
+def scrape_reddit(subreddit, num_posts=25):
     posts = []
+    url = f"https://www.reddit.com/r/{subreddit}/.json?limit={num_posts}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        page.set_default_timeout(30000)
-
-        print(f"[*] Opening r/{subreddit} ...")
-        await page.goto(url, wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
-
-        last_height = 0
-        while len(posts) < num_posts:
-            articles = await page.query_selector_all("div.thing.link")
-            for article in articles:
-                try:
-                    title_el = await article.query_selector("a.title")
-                    title = await title_el.inner_text() if title_el else ""
-                    href = await title_el.get_attribute("href") if title_el else ""
-
-                    author_el = await article.query_selector("a.author")
-                    author = await author_el.inner_text() if author_el else "unknown"
-
-                    time_el = await article.query_selector("time")
-                    created = await time_el.get_attribute("title") if time_el else ""
-
-                    score_el = await article.query_selector("div.score.unvoted")
-                    score = await score_el.inner_text() if score_el else "0"
-
-                    comments_el = await article.query_selector("a.comments")
-                    comments = await comments_el.inner_text() if comments_el else "0"
-
-                    domain_el = await article.query_selector("span.domain > a")
-                    domain = await domain_el.inner_text() if domain_el else ""
-
+    # Try worker proxy first
+    if WORKER_URL:
+        try:
+            resp = requests.get(f"{WORKER_URL}/r/{subreddit}/.json?limit={num_posts}", headers=BROWSER_HEADERS, timeout=20)
+            if resp.status_code == 200:
+                data = resp.json()
+                children = data.get("data", {}).get("children", [])
+                for child in children:
+                    d = child.get("data", {})
                     post = {
-                        "title": title.strip(),
-                        "author": author.strip(),
-                        "score": score.strip(),
-                        "comments": comments.strip(),
-                        "url": href.strip(),
-                        "domain": domain.strip(),
-                        "created": created.strip(),
+                        "title": d.get("title", ""),
+                        "author": d.get("author", ""),
+                        "score": str(d.get("score", 0)),
+                        "comments": str(d.get("num_comments", 0)),
+                        "url": f"https://www.reddit.com{d.get('permalink', '')}",
+                        "domain": d.get("domain", ""),
+                        "created": datetime.fromtimestamp(d.get("created_utc", 0)).isoformat(),
                     }
-
-                    if post["title"] and not any(p["title"] == post["title"] for p in posts):
+                    if post["title"]:
                         posts.append(post)
                         print(f"  [{len(posts)}] {post['title'][:80]}")
+                if posts:
+                    return posts[:num_posts]
+        except Exception as e:
+            print(f"[!] Worker failed: {e}")
 
-                except Exception:
-                    continue
-
-                if len(posts) >= num_posts:
-                    break
-
-            if len(posts) >= num_posts:
-                break
-
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(2000)
-            new_height = await page.evaluate("document.body.scrollHeight")
-            if new_height == last_height:
-                print("[!] No more posts to load.")
-                break
-            last_height = new_height
-
-        await browser.close()
+    # Fallback to direct
+    try:
+        resp = requests.get(url, headers=BROWSER_HEADERS, timeout=20)
+        if resp.status_code == 200:
+            data = resp.json()
+            children = data.get("data", {}).get("children", [])
+            for child in children:
+                d = child.get("data", {})
+                post = {
+                    "title": d.get("title", ""),
+                    "author": d.get("author", ""),
+                    "score": str(d.get("score", 0)),
+                    "comments": str(d.get("num_comments", 0)),
+                    "url": f"https://www.reddit.com{d.get('permalink', '')}",
+                    "domain": d.get("domain", ""),
+                    "created": datetime.fromtimestamp(d.get("created_utc", 0)).isoformat(),
+                }
+                if post["title"]:
+                    posts.append(post)
+                    print(f"  [{len(posts)}] {post['title'][:80]}")
+    except Exception as e:
+        print(f"[!] Direct request failed: {e}")
 
     return posts[:num_posts]
 
@@ -81,15 +71,13 @@ async def scrape_reddit(subreddit: str, num_posts: int = 25):
 def save_posts(posts, subreddit):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"r_{subreddit}_{timestamp}.json"
-
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(posts, f, ensure_ascii=False, indent=2)
-
     print(f"\n[+] Saved {len(posts)} posts to {filename}")
     return filename
 
 
-async def main():
+def main():
     subreddit = sys.argv[1] if len(sys.argv) > 1 else "game"
     num_posts = int(sys.argv[2]) if len(sys.argv) > 2 else 25
 
@@ -97,7 +85,7 @@ async def main():
     print(f"[*] Subreddit: r/{subreddit}")
     print(f"[*] Target posts: {num_posts}\n")
 
-    posts = await scrape_reddit(subreddit, num_posts)
+    posts = scrape_reddit(subreddit, num_posts)
     if posts:
         save_posts(posts, subreddit)
     else:
@@ -105,4 +93,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
