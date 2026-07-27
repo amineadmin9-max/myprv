@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-27 (7th update — Fixed CORS proxy rate limiting for 90-day Google Trends fetch)
+## Last updated: 2026-07-27 (8th update — Reduced evergreen to 30 days to fix hour-long stall)
 
 ## Quick Start
 In a new conversation, just say:
@@ -75,7 +75,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 3. **About** — version info
 
 ### Dual Discovery Flow
-1. `fetchGoogleTrendsYouTube('month')` — evergreen keywords (90 days, batch=1, delay=8s, retry=3x)
+1. `fetchGoogleTrendsYouTube('month')` — evergreen keywords (30 days, batch=1, delay=8s, retry=3x)
 2. `aiFilterAndSummarize()` — LLM filters into niche keywords (batch 50)
 3. `fetchGoogleTrendsKeywords('7d')` — trending keywords (1 week)
 4. `aiFilterAndSummarize()` — LLM filters trending (batch 50)
@@ -140,6 +140,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
+- v3.3 — Reduced evergreen from 90 to 30 days (fixes hour-long stall, ~4-12 min)
 - v3.2 — Fixed CORS proxy rate limiting: batch=1, delay=8s, retry=3x with 15s backoff
 - v3.1 — Evergreen now fetches full 90 days from Google Trends
 - v3.0 — YouTube-only (no Reddit), Google Trends + YouTube + AI traffic light
@@ -150,7 +151,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 ## Known Issues
 - YouTube API quota: ~100 units per search (100 keywords = ~10,000 units)
 - Google Trends may be blocked from datacenter IPs (scraper.py works around this)
-- CORS proxies have rate limits (~10-30 req/min); 90-day fetch takes ~12-45 min with retry
-- Google Trends API may only retain ~30 days of daily data (older dates may return empty)
+- CORS proxies have rate limits (~10-30 req/min); 30-day fetch takes ~4-12 min with retry
+- Google Trends API only retains ~30 days of daily data
 - User runs app from phone browser (no F12/Console access)
 - All UI text is in English (no Arabic)

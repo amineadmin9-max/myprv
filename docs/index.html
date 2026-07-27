@@ -1537,7 +1537,7 @@ async function fetchGoogleTrendsYouTube(timeframe){
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
   try{
     const today=new Date();
-    const days=timeframe==='week'?7:90;
+    const days=timeframe==='week'?7:30;
     let urls=[];
     for(let d=0;d<days;d++){
       const ed=new Date(today);ed.setDate(today.getDate()-d);
