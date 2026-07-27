@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-26 (3rd update — Railway migration)
+## Last updated: 2026-07-26 (4th update — Railway + Reddit block)
 
 ## Quick Start
 In a new conversation, just say:
@@ -36,14 +36,17 @@ A **Niche Finder** web app that finds profitable niches by combining:
 
 ## Backend Server (Flask on Railway)
 - `server/app.py` — Flask app with `/api/reddit-comments` endpoint
-- `server/requirements.txt` — flask, requests, gunicorn
-- `server/Dockerfile` — Python 3.11 + gunicorn on port 8000
+- `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
+- `server/Dockerfile` — Python 3.11 + Chromium + gunicorn on port 8000
 - User sets server URL in: ⚙️ → Backend Server → paste URL
 - Server URL stored in localStorage `nf_server_url`
 - Endpoint: `POST {serverURL}/api/reddit-comments` → `{"data": ["/r/sub/comments/id/title/"]}`
 - Returns: `{"data": ["{score, ups, upvote_ratio, num_comments, comments: [{body, score}]}"]}`
 - Health check: `GET {serverURL}/health` → `{"status": "ok"}`
-- **Status: DEPLOYED on Railway**
+- **Status: DEPLOYED but Reddit BLOCKS server IPs at TCP level**
+- **Reddit blocks ALL datacenter IPs (Railway, HuggingFace, AWS, etc.)**
+- **Tried: browser headers, Playwright — all fail because IP is blocked**
+- **Only solution: Reddit OAuth API (free, 100 req/min)**
 
 ## Traffic Light System (🟢🟡🔴)
 ### How it works:
@@ -137,9 +140,9 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `docs/index.html` — MAIN FILE (all CSS+HTML+JS in one file, ~1820 lines)
 - `docs/sw.js` — service worker (cache v4)
 - `docs/manifest.json` — PWA manifest
-- `server/app.py` — Flask app for Reddit comments proxy
-- `server/requirements.txt` — flask, requests, gunicorn
-- `server/Dockerfile` — Railway deployment config
+- `server/app.py` — Flask app with browser headers + Playwright fallback
+- `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
+- `server/Dockerfile` — Python 3.11 + Chromium + gunicorn
 
 ## Railway Deploy Steps
 1. Push code to GitHub (`server/` folder with Dockerfile)
@@ -152,12 +155,14 @@ A **Niche Finder** web app that finds profitable niches by combining:
 
 ## Version History
 - v2.9 — Migrated backend from Gradio/HuggingFace to Flask/Railway
+- v2.9.1 — Added browser headers + Playwright fallback (still blocked by Reddit)
 - v2.8 — Comment-based traffic light + Flask server proxy + Gradio HF Spaces
 - v2.7 — Gemini 2.5 Flash Lite primary + OpenRouter fallback
 - Earlier — HuggingFace (blocked), DeepSeek, keyword-only scoring
 
 ## Known Issues
-- CORS proxies don't work for Reddit JSON (only RSS works)
-- Reddit JSON comment fetching requires the Flask server
+- **CRITICAL: Reddit blocks ALL datacenter IPs at TCP level**
+- Tried: browser headers, Playwright, SOCKS5 proxy — all fail
+- Only solution: Reddit OAuth API (free, 100 req/min)
 - Without server, traffic light falls back to post-content-only scoring
 - User runs app from phone browser (no F12/Console access)
