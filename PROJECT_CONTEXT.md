@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-26 (4th update — Railway + Reddit block)
+## Last updated: 2026-07-27 (5th update — YouTube-only, no Reddit)
 
 ## Quick Start
 In a new conversation, just say:
@@ -9,17 +9,18 @@ In a new conversation, just say:
 
 ## What is this project?
 A **Niche Finder** web app that finds profitable niches by combining:
-- **Reddit RSS + JSON Comments** — posts asking for products + comment analysis for promo links
-- **YouTube Trending** — trending video topics
+- **Google Trends** — evergreen (3 months) + trending (1 week) keyword discovery
+- **YouTube Data API v3** — video search, stats (views/likes/comments), traffic light scoring
 - **AI (Gemini + OpenRouter)** — classifies niches, filters, and summarizes
-- **Google site:reddit.com** — approximate post count per niche
+
+> **Reddit is completely blocked** from all datacenter IPs at TCP level — only residential IPs work. The app now uses YouTube + Google Trends exclusively.
 
 ## Tech Stack
 - Pure HTML/CSS/JS (no frameworks, no build step)
 - Single file: `docs/index.html` (deployed via GitHub Pages)
-- Backend: Flask app on Railway (`server/app.py`)
 - AI: Gemini 2.5 Flash Lite (primary) + OpenRouter (fallback)
-- CORS proxies for Reddit RSS + Google Trends
+- YouTube Data API v3 for video search + stats
+- Google Trends (via pytrends in scraper.py) for keyword discovery
 
 ## GitHub
 - Repo: `amineadmin9-max/myprv`
@@ -30,148 +31,122 @@ A **Niche Finder** web app that finds profitable niches by combining:
 ## AI Providers
 - **Gemini 2.5 Flash Lite** (primary) — key in localStorage `nf_gemini_key`
 - **OpenRouter** (fallback) — key in localStorage `nf_openrouter_key`
-- **HuggingFace** — BLOCKED by CORS from browser
 - `callLLM(prompt)` → tries Gemini first, then OpenRouter
 - User rule: LLM is for **analysis only**, max 5-7 calls per run
+- AI calls reduced: batch size 50, Google Trends returns up to 100 keywords → ~2 AI calls total
 
-## Backend Server (Flask on Railway)
-- `server/app.py` — Flask app with `/api/reddit-comments` endpoint
-- `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
-- `server/Dockerfile` — Python 3.11 + Chromium + gunicorn on port 8000
-- User sets server URL in: ⚙️ → Backend Server → paste URL
-- Server URL stored in localStorage `nf_server_url`
-- Endpoint: `POST {serverURL}/api/reddit-comments` → `{"data": ["/r/sub/comments/id/title/"]}`
-- Returns: `{"data": ["{score, ups, upvote_ratio, num_comments, comments: [{body, score}]}"]}`
-- Health check: `GET {serverURL}/health` → `{"status": "ok"}`
-- **Status: DEPLOYED — uses Cloudflare Worker proxy to bypass Reddit IP blocks**
-
-## Cloudflare Worker Proxy (Reddit Bypass)
-- `worker.js` — General-purpose Cloudflare Worker that proxies ALL requests to reddit.com
-- `wrangler.toml` — Worker config
-- Uses Cloudflare's edge IPs to bypass Reddit's datacenter IP blocks
-- Deploy: `wrangler deploy`
-- Example: `https://reddit-proxy.YOUR.workers.dev/r/programming/hot.json` → `https://www.reddit.com/r/programming/hot.json`
-- Any path/query/method gets forwarded to reddit.com
-- Env vars: `PROXY_USER_AGENT` (required by Reddit), `PROXY_SECRET` (optional auth)
+## YouTube API
+- **YouTube Data API v3** — key in localStorage `nf_yt_key`
+- `searchYouTubeVideos(keyword, daysBack, maxResults)` — searches YouTube, returns `{videos, totalResults}`
+- `getYouTubeVideoStats(videoIds)` — fetches views/likes/comments for video IDs
+- `fetchYouTubeTrendingByCategory()` — fetches trending videos (currently disabled)
+- API quota: ~100 units per search (100 keywords = ~10,000 units)
 
 ## Traffic Light System (YouTube) — 6 colors
-### How it works (scraper.py):
-1. Get keywords from Google Trends (YouTube filter)
-2. Search YouTube videos per keyword (20 videos)
+### How it works:
+1. Get keywords from Google Trends (3 months evergreen + 1 week trending)
+2. Search YouTube videos per keyword (top 20, but totalResults from API)
 3. Count promo links in video descriptions
-4. Check avg views for engagement level
-5. Apply scoring rules:
+4. Check avg views for engagement level (highEng = avgViews > 10,000)
+5. Apply scoring rules using **totalResults** (not just 20 fetched):
 
 | Condition | Color | Label |
 |-----------|-------|-------|
-| videoCount<5K AND highEng AND links≤3 | 🔵 | فرصة نظيفة — منافسة ضعيفة جداً |
-| videoCount≤25K AND highEng AND links≤3 | 🟢 | سوق مفتوح — منافسة معقولة + تفاعل جيد |
-| videoCount≤25K AND links≤8 | 🟡 | سوق نامي — بعض النشاط |
-| videoCount>25K AND links≤8 | 🟠 | سوق كبير — منافسة متوسطة |
-| videoCount>25K AND links>8 | 🔴 | مُشبع — حجم كبير + روابط كثيرة |
-| videoCount≤25K AND links>8 | 🟣 | مُشبع — روابط كثيرة مع حجم أقل |
-
-### Card display:
-- **Only shows:** `🌳 Evergreen · {label}` + colored dot
-- **No numbers** (no post count, no promo link count)
-- Badge below label: `💬 247 comments · 3 links` (if server works) or `⚠️ Add server URL for comment analysis` (if not)
+| videoCount<5K AND highEng AND links≤3 | 🔵 | Clean opportunity — very low competition |
+| videoCount≤25K AND highEng AND links≤3 | 🟢 | Open market — moderate competition + good engagement |
+| videoCount≤25K AND links≤8 | 🟡 | Growing market — some activity |
+| videoCount>25K AND links≤8 | 🟠 | Large market — moderate competition |
+| videoCount>25K AND links>8 | 🔴 | Saturated — high volume + many promo links |
+| videoCount≤25K AND links>8 | 🟣 | Saturated — many promo links with lower volume |
 
 ### Key functions:
-- `fetchRedditComments(permalink)` — calls Flask server, returns `{score, comments}`
-- `computeScoringFromPosts(posts, allClass, allPostsPool, keyword)` — main scoring
+- `computeYouTubeScoring(videos, totalResults)` — main scoring, uses totalResults for thresholds
 - `countLinksInText(text)` — counts URLs in text
-- `countPromoLinks(posts)` — counts links in post content/title (fallback)
-- `countRedditPostsViaGoogle(keyword)` — Google site: search
-
-### IMPORTANT BUG FIXED:
-- `computeScoringFromPosts` calls were missing `await` → caused dots to disappear
-- Line ~1500 in `runDualDiscovery`: must use `await computeScoringFromPosts(...)`
 
 ## Architecture (docs/index.html)
 ### Pages (bottom nav: 2 tabs)
-1. **Search** — manual search + dual discovery (evergreen + trending)
-2. **Schedule/Monitors** — create/toggle/delete monitoring channels
+1. **Search** — manual search (YouTube) + dual discovery (evergreen + trending)
+2. **Schedule/Monitors** — create/toggle/delete YouTube keyword monitors
 3. **Notifications** — alert history
 
 ### Settings (3-dot menu dropdown)
 1. **Gemini / OpenRouter API** — API keys modal
 2. **YouTube API** — YouTube Data API v3 key
-3. **Backend Server** — Flask server URL for Reddit comments
-4. **About** — version info + deploy instructions
+3. **About** — version info
 
 ### Dual Discovery Flow
-1. `fetchRedditBulk('year')` — RSS from bulk subreddits (evergreen)
-2. `aiFilterAndSummarize()` — LLM filters raw posts into niche keywords (batch 25)
-3. `fetchRedditBulk('week')` + `fetchYouTubeTrending()` — trending sources
-4. `aiFilterAndSummarize()` — LLM filters trending (batch 25)
-5. For each niche: `searchReddit(keyword)` → RSS posts
-6. `batchClassify(allPosts)` — single LLM call for all posts (max 25)
-7. `computeScoringFromPosts()` — traffic light scoring with comments
-8. `renderDualResults()` — display cards
+1. `fetchGoogleTrendsKeywords('3m')` — evergreen keywords (3 months)
+2. `aiFilterAndSummarize()` — LLM filters into niche keywords (batch 50)
+3. `fetchGoogleTrendsKeywords('7d')` — trending keywords (1 week)
+4. `aiFilterAndSummarize()` — LLM filters trending (batch 50)
+5. For each niche: `searchYouTubeVideos(keyword, daysBack, 20)` → videos + totalResults
+6. `computeYouTubeScoring(videos, totalResults)` — traffic light scoring
+7. `renderDualResults()` — display cards with total video count
+
+### Search Flow
+1. `handleSearch()` — takes keyword from search box
+2. `searchYouTubeVideos(keyword, 90, 20)` — searches YouTube
+3. `computeYouTubeScoring(videos, totalResults)` — scoring
+4. `renderSearchResult()` — shows total video count + stats + top 8 videos
+
+### Monitor System
+- `saveMonitor()` — creates YouTube keyword monitor
+- `renderMonitors()` — shows active monitors with Check button
+- `checkMonitor(id)` — searches YouTube for keyword, shows scoring
+- `runAllMonitors()` — checks all active monitors
+- Monitor data: `{id, name, freq, active, lastCheck, lastVideos, lastViews}`
 
 ### Key Functions
 - `callLLM(prompt)` — tries Gemini → OpenRouter
-- `callOpenRouter(prompt)` — alias for callLLM
 - `_geminiFetch(prompt, timeoutMs)` — Gemini API call
 - `_openrouterFetch(prompt, timeoutMs)` — OpenRouter SSE stream
-- `fetchRedditBulk(timeframe)` — RSS fetch from bulk subreddits
-- `searchReddit(keyword)` — RSS search for specific keyword
-- `parseRSS(xml)` — parse Reddit RSS to posts array
-- `fetchWithProxy(url)` — fetch RSS through CORS proxy
-- `fetchWithProxyJSON(url)` — fetch JSON through CORS proxy
-- `fetchRedditComments(permalink)` — calls Flask server for comments
-- `aiFilterAndSummarize(items)` — LLM batch filter (25 per batch)
-- `batchClassify(posts)` — LLM classify posts (max 25)
-- `computeScoringFromPosts(posts, allClass, allPostsPool, keyword)` — traffic light
-- `countRedditPostsViaGoogle(keyword)` — Google site: count
+- `fetchGoogleTrendsKeywords(timeframe)` — Google Trends keywords
+- `searchYouTubeVideos(keyword, daysBack, maxResults)` — YouTube search → `{videos, totalResults}`
+- `getYouTubeVideoStats(videoIds)` — YouTube video stats
+- `aiFilterAndSummarize(items)` — LLM batch filter (50 per batch)
+- `computeYouTubeScoring(videos, totalResults)` — traffic light
 - `countLinksInText(text)` — count URLs in text
-- `countPromoLinks(posts)` — count links in posts (fallback)
 - `renderDualResults(evergreen, trending, stats)` — render cards
+- `renderSearchResult(keyword, scoring, videos, totalResults)` — render search
 - `renderLLMStats()` — LLM usage stats panel
 
 ### Constants
-- `PROXIES` — CORS proxies for RSS (corsproxy.io, codetabs)
-- `BULK_SUBS` — ['findareddit','AskReddit','DoesAnybodyElse','whatisthisthing']
+- `PROXIES` — CORS proxies (for Google Trends if needed)
 - `DEMAND_KW`, `COMMERCIAL_KW`, `TREND_KW` — keyword arrays
 - `llmStats` — tracks Total/OK/Fail/provider for stats panel
 
 ### Data helpers:
 - `getGeminiKey()` — localStorage `nf_gemini_key`
 - `getOpenRouterKey()` — localStorage `nf_openrouter_key`
-- `getServerURL()` — localStorage `nf_server_url`
 - `getYTKey()` — localStorage `nf_yt_key`
 
 ## Files
-- `docs/index.html` — MAIN FILE (all CSS+HTML+JS in one file, ~1820 lines)
+- `docs/index.html` — MAIN FILE (all CSS+HTML+JS in one file, ~1960 lines)
 - `docs/sw.js` — service worker (cache v4)
 - `docs/manifest.json` — PWA manifest
-- `server/app.py` — Flask app with Cloudflare Worker proxy + direct fallback
-- `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
-- `server/Dockerfile` — Python 3.11 + Chromium + gunicorn
-- `worker.js` — Cloudflare Worker general-purpose Reddit proxy
-- `wrangler.toml` — Worker deployment config
-- `scraper.py` — YouTube + Google Trends niche scraper (Termux)
-- `requirements.txt` — Python deps for scraper (pytrends, requests)
+- `server/app.py` — Flask app (playwright optional, for Termux compatibility)
+- `server/requirements.txt` — flask, flask-cors, requests, gunicorn, pytrends
+- `scraper.py` — Standalone YouTube + Google Trends scraper (for GitHub Actions)
+- `.github/workflows/scraper.yml` — GitHub Actions workflow
+- `worker.js` — Cloudflare Worker general-purpose Reddit proxy (legacy)
+- `wrangler.toml` — Worker deployment config (legacy)
+- `requirements.txt` — Python deps for scraper
 
-## Railway Deploy Steps
-1. Push code to GitHub (`server/` folder with Dockerfile)
-2. Go to railway.app → New Project → Deploy from GitHub Repo
-3. Select repo `amineadmin9-max/myprv`
-4. Railway auto-detects Dockerfile → starts build
-5. Wait for build (~1-2 min)
-6. Copy URL: `https://YOUR-APP.up.railway.app`
-7. Open app → ⚙️ → Backend Server → paste URL → Save
+## Deploy Steps (GitHub Pages)
+1. Push code to GitHub (`docs/` folder)
+2. GitHub Pages auto-deploys from `docs/` folder
+3. Open app: `https://amineadmin9-max.github.io/myprv/`
+4. Set YouTube API key: ⚙️ → YouTube API → paste key → Save
+5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
-- v3.0 — Added Cloudflare Worker proxy to bypass Reddit IP blocks
-- v2.9 — Migrated backend from Gradio/HuggingFace to Flask/Railway
-- v2.9.1 — Added browser headers + Playwright fallback (still blocked by Reddit)
-- v2.8 — Comment-based traffic light + Flask server proxy + Gradio HF Spaces
+- v3.0 — YouTube-only (no Reddit), Google Trends + YouTube + AI traffic light
+- v2.9 — Cloudflare Worker proxy for Reddit (now legacy)
+- v2.8 — Comment-based traffic light + Flask server proxy
 - v2.7 — Gemini 2.5 Flash Lite primary + OpenRouter fallback
-- Earlier — HuggingFace (blocked), DeepSeek, keyword-only scoring
 
 ## Known Issues
-- Cloudflare Worker proxy should bypass Reddit IP blocks (residential IPs)
-- If worker fails, falls back to direct requests (may fail on datacenter IPs)
-- Without server, traffic light falls back to post-content-only scoring
+- YouTube API quota: ~100 units per search (100 keywords = ~10,000 units)
+- Google Trends may be blocked from datacenter IPs (scraper.py works around this)
 - User runs app from phone browser (no F12/Console access)
+- All UI text is in English (no Arabic)
