@@ -1532,22 +1532,25 @@ function renderDiscoveryResults(results){
 // ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
 async function fetchGoogleTrendsYouTube(timeframe){
   const ideas=[];
+  const seen=new Set();
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
   try{
     const url=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${timeframe==='week'?'20240101':''}`;
     const data=await fetchWithProxyJSON(url);
     if(!data)return[];
     const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
-    for(const t of trends.slice(0,15)){
+    for(const t of trends){
       const q=t.title.query;const ql=q.toLowerCase();
       if(skip.some(s=>ql.includes(s)))continue;
-      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,2),type:'trend'});
-      for(const r of(t.relatedQueries||[]).slice(0,1)){
-        if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
+      if(seen.has(ql))continue;seen.add(ql);
+      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+      for(const r of(t.relatedQueries||[]).slice(0,3)){
+        const rq=r.query.toLowerCase();
+        if(r.query.length>3&&r.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
       }
     }
   }catch(e){console.error('Trends error:',e);}
-  return ideas;
+  return ideas.slice(0,100);
 }
 
 async function runDualDiscovery(){
