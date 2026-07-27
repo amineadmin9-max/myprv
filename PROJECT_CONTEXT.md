@@ -46,17 +46,13 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - **Status: DEPLOYED — uses Cloudflare Worker proxy to bypass Reddit IP blocks**
 
 ## Cloudflare Worker Proxy (Reddit Bypass)
-- `worker.js` — Cloudflare Worker that proxies Reddit requests
-- Uses Cloudflare's residential IPs to bypass Reddit's datacenter IP blocks
-- Deploy: `wrangler deploy worker.js --name reddit-proxy`
-- Set secret: `wrangler secret put PROXY_SECRET`
-- Set env vars on Railway: `WORKER_URL` + `WORKER_SECRET`
-- Routes:
-  - `POST /api/reddit-comments` — proxy Reddit JSON comments
-  - `POST /api/reddit-search` — proxy Reddit search JSON
-  - `POST /api/reddit-rss` — proxy Reddit RSS feeds
-  - `GET /health` — health check
-- Auth: `X-Proxy-Secret` header with shared secret
+- `worker.js` — General-purpose Cloudflare Worker that proxies ALL requests to reddit.com
+- `wrangler.toml` — Worker config
+- Uses Cloudflare's edge IPs to bypass Reddit's datacenter IP blocks
+- Deploy: `wrangler deploy`
+- Example: `https://reddit-proxy.YOUR.workers.dev/r/programming/hot.json` → `https://www.reddit.com/r/programming/hot.json`
+- Any path/query/method gets forwarded to reddit.com
+- Env vars: `PROXY_USER_AGENT` (required by Reddit), `PROXY_SECRET` (optional auth)
 
 ## Traffic Light System (🟢🟡🔴)
 ### How it works:
@@ -153,7 +149,8 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `server/app.py` — Flask app with Cloudflare Worker proxy + direct fallback
 - `server/requirements.txt` — flask, flask-cors, requests, gunicorn, playwright
 - `server/Dockerfile` — Python 3.11 + Chromium + gunicorn
-- `worker.js` — Cloudflare Worker for Reddit proxy (deploy separately)
+- `worker.js` — Cloudflare Worker general-purpose Reddit proxy
+- `wrangler.toml` — Worker deployment config
 
 ## Railway Deploy Steps
 1. Push code to GitHub (`server/` folder with Dockerfile)

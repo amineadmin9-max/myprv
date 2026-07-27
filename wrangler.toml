@@ -1,0 +1,6 @@
+name = "reddit-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+PROXY_USER_AGENT = "NicheFinder/1.0 (by /u/nichefinder_bot)"
