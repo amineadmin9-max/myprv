@@ -1164,29 +1164,30 @@ async function handleSearch(){
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   showProgress(20);setStatus('Searching YouTube...');
   try{
-    showProgress(40);const videos=await searchYouTubeVideos(q,90,20);
-    showProgress(70);setStatus(`Found ${videos.length} videos - analyzing...`);
-    const scoring=computeYouTubeScoring(videos);showProgress(100);
-    renderSearchResult(q,scoring,videos);
+    showProgress(40);const{videos,totalResults}=await searchYouTubeVideos(q,90,20);
+    showProgress(70);setStatus(`Found ${totalResults} videos on YouTube - analyzing top 20...`);
+    const scoring=computeYouTubeScoring(videos,totalResults);showProgress(100);
+    renderSearchResult(q,scoring,videos,totalResults);
   }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
 }
 
-function renderSearchResult(keyword,scoring,videos){
+function renderSearchResult(keyword,scoring,videos,totalResults){
   const el=document.getElementById('results');const s=scoring;const c=s.color;
+  const count=totalResults||s.videoCount;
 
   let html=`<div class="section-title">Search Results <span class="dash">— "${keyword}"</span></div>`;
   html+=`<div class="niche-card">
     <div class="niche-card-left">
       <div class="niche-card-title">${keyword}</div>
       <div class="niche-card-meta">YouTube · ${s.label}</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} فيديو · 👁️ ${s.avgViews.toLocaleString()} مشاهدة · 👍 ${s.avgLikes.toLocaleString()} إعجاب · 💬 ${s.avgComments.toLocaleString()} تعليق</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${count} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
     </div>
     <div class="niche-dot ${c}"></div>
   </div>`;
 
   html+=`<div class="result-stats">
-    <div class="result-stat"><div class="val">${s.videoCount}</div><div class="lbl">Videos</div></div>
+    <div class="result-stat"><div class="val">${count.toLocaleString()}</div><div class="lbl">Total Videos</div></div>
     <div class="result-stat"><div class="val">${s.avgViews.toLocaleString()}</div><div class="lbl">Avg Views</div></div>
     <div class="result-stat"><div class="val">${s.avgLikes.toLocaleString()}</div><div class="lbl">Avg Likes</div></div>
     <div class="result-stat"><div class="val">${s.promoLinks}</div><div class="lbl">Promo Links</div></div>
@@ -1262,10 +1263,11 @@ async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
     const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${key}`;
     const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
     const data=await r.json();
-    if(!data.items||!data.items.length)return[];
+    const totalResults=data.pageInfo?.totalResults||0;
+    if(!data.items||!data.items.length)return{videos:[],totalResults:0};
     const videoIds=data.items.map(v=>v.id.videoId).filter(Boolean);
     const stats=await getYouTubeVideoStats(videoIds);
-    return data.items.map(v=>{
+    const videos=data.items.map(v=>{
       const vid=v.id.videoId;
       const s=stats[vid]||{};
       return{
@@ -1279,7 +1281,8 @@ async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
         published:v.snippet.publishedAt||''
       };
     });
-  }catch(e){console.error('[YouTube] Search error:',e);return[];}
+    return{videos,totalResults};
+  }catch(e){console.error('[YouTube] Search error:',e);return{videos:[],totalResults:0};}
 }
 
 async function getYouTubeVideoStats(videoIds){
@@ -1301,15 +1304,15 @@ function countLinksInText(text){
 }
 
 // ===================== YOUTUBE TRAFFIC LIGHT (6 colors) =====================
-function computeYouTubeScoring(videos){
-  if(!videos||!videos.length)return{color:'yellow',label:'🟡 No data available',videoCount:0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
-  const vc=videos.length;
+function computeYouTubeScoring(videos,totalResults){
+  if(!videos||!videos.length)return{color:'yellow',label:'🟡 No data available',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
+  const vc=totalResults||videos.length;
   const totalViews=videos.reduce((s,v)=>s+v.views,0);
   const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
   const totalComments=videos.reduce((s,v)=>s+v.comments,0);
-  const avgViews=Math.round(totalViews/vc);
-  const avgLikes=Math.round(totalLikes/vc);
-  const avgComments=Math.round(totalComments/vc);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(totalLikes/videos.length);
+  const avgComments=Math.round(totalComments/videos.length);
   const highEng=avgViews>10000;
   const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
   let color,label;
@@ -1625,9 +1628,9 @@ async function runDualDiscovery(){
       setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] Searching YouTube: ${kw}`);
       showProgress(60+(i/evergreenFiltered.length)*15);
       try{
-        const videos=await searchYouTubeVideos(kw,90,20);
-        const scoring=computeYouTubeScoring(videos);
-        evergreenResults.push({keyword:kw,scoring,videos,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
+        const{videos,totalResults}=await searchYouTubeVideos(kw,90,20);
+        const scoring=computeYouTubeScoring(videos,totalResults);
+        evergreenResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
       }catch(e){continue;}
       await new Promise(r=>setTimeout(r,300));
     }
@@ -1639,9 +1642,9 @@ async function runDualDiscovery(){
       setStatus(`[Trending ${i+1}/${trendingFiltered.length}] Searching YouTube: ${kw}`);
       showProgress(75+(i/trendingFiltered.length)*20);
       try{
-        const videos=await searchYouTubeVideos(kw,7,20);
-        const scoring=computeYouTubeScoring(videos);
-        trendingResults.push({keyword:kw,scoring,videos,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
+        const{videos,totalResults}=await searchYouTubeVideos(kw,7,20);
+        const scoring=computeYouTubeScoring(videos,totalResults);
+        trendingResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
       }catch(e){continue;}
       await new Promise(r=>setTimeout(r,300));
     }
@@ -1783,7 +1786,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🌳 Evergreen · ${s.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -1800,7 +1803,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🔥 Trending · ${s.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -1872,16 +1875,16 @@ async function checkMonitor(id){
   const key=getYTKey();
   if(!key){alert('Add YouTube API key from settings');return;}
   try{
-    const videos=await searchYouTubeVideos(m.name,7,20);
-    const scoring=computeYouTubeScoring(videos);
+    const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
+    const scoring=computeYouTubeScoring(videos,totalResults);
     const now=new Date();
     m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
     m.lastVideos=scoring.videoCount;
     m.lastViews=scoring.avgViews;
     saveMonitors(monitors.map(x=>x.id===m.id?m:x));
-    addNotification({sub:'YouTube',name:m.name,body:`📊 ${scoring.videoCount} videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+    addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
     renderMonitors();
-    alert(`✅ ${m.name}\n📊 ${scoring.videoCount} videos\n👁️ ${scoring.avgViews.toLocaleString()} views\n${scoring.label}`);
+    alert(`✅ ${m.name}\n📊 ${totalResults} total YouTube videos\n👁️ ${scoring.avgViews.toLocaleString()} avg views\n${scoring.label}`);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -1893,14 +1896,14 @@ async function runAllMonitors(){
   addNotification({sub:'System',name:'All Monitors',body:`Running check on ${monitors.length} monitors...`,color:'amber',promo:''});
   for(const m of monitors){
     try{
-      const videos=await searchYouTubeVideos(m.name,7,20);
-      const scoring=computeYouTubeScoring(videos);
+      const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
+      const scoring=computeYouTubeScoring(videos,totalResults);
       const now=new Date();
       m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
-      m.lastVideos=scoring.videoCount;
+      m.lastVideos=totalResults;
       m.lastViews=scoring.avgViews;
       saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
-      addNotification({sub:'YouTube',name:m.name,body:`📊 ${scoring.videoCount} videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+      addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
     }catch(e){addNotification({sub:'YouTube',name:m.name,body:'Error: '+e.message,color:'red',promo:''});}
     await new Promise(r=>setTimeout(r,500));
   }
