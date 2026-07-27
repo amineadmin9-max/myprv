@@ -1364,7 +1364,7 @@ function saveServerURL(){
 
 // ===================== AI FILTER AND SUMMARIZE =====================
 async function aiFilterAndSummarize(items){
-  const results=[];const batchSize=25;
+  const results=[];const batchSize=50;
   const totalBatches=Math.ceil(items.length/batchSize);
   for(let i=0;i<items.length;i+=batchSize){
     const batch=items.slice(i,i+batchSize);
@@ -1538,11 +1538,11 @@ async function fetchGoogleTrendsYouTube(timeframe){
     const data=await fetchWithProxyJSON(url);
     if(!data)return[];
     const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
-    for(const t of trends.slice(0,25)){
+    for(const t of trends.slice(0,15)){
       const q=t.title.query;const ql=q.toLowerCase();
       if(skip.some(s=>ql.includes(s)))continue;
-      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
-      for(const r of(t.relatedQueries||[]).slice(0,2)){
+      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,2),type:'trend'});
+      for(const r of(t.relatedQueries||[]).slice(0,1)){
         if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
       }
     }
