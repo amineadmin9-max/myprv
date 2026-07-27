@@ -1157,51 +1157,49 @@ function mergeAndScoreIdeas(ideas){
 async function handleSearch(){
   const q=document.getElementById('searchInput').value.trim();
   if(!q)return;
+  const key=getYTKey();
+  if(!key){
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('results').innerHTML='<div class="error">⚠️ أضف مفتاح YouTube API من الإعدادات</div>';
+    return;
+  }
   document.getElementById('searchBtn').disabled=true;
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
-  showProgress(20);setStatus('Searching Reddit...');
+  showProgress(20);setStatus('البحث في YouTube...');
   try{
-    showProgress(50);const posts=await searchReddit(q);
-    showProgress(80);setStatus(`Found ${posts.length} posts - analyzing...`);
-    const scoring=await computeTrafficLight(posts);showProgress(100);
-    renderSearchResult(q,scoring,posts);
+    showProgress(40);const videos=await searchYouTubeVideos(q,90,20);
+    showProgress(70);setStatus(`وجدت ${videos.length} فيديو - جاري التحليل...`);
+    const scoring=computeYouTubeScoring(videos);showProgress(100);
+    renderSearchResult(q,scoring,videos);
   }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
 }
 
-function renderSearchResult(keyword,scoring,posts){
+function renderSearchResult(keyword,scoring,videos){
   const el=document.getElementById('results');const s=scoring;const c=s.color;
-  const nt=classifyNicheType(keyword,'manual');
-  const emoji=nt.type==='trending'?'🔥':nt.type==='hybrid'?'🔥🌳':'🌳';
-  const typeLabel=nt.label||'General';
-  const subs=s.subreddits?s.subreddits.slice(0,3).map(x=>'r/'+x).join(', '):'';
 
-  let html=`<div class="section-title">Search Results <span class="dash">— "${keyword}"</span></div>`;
+  let html=`<div class="section-title">نتائج البحث <span class="dash">— "${keyword}"</span></div>`;
   html+=`<div class="niche-card">
     <div class="niche-card-left">
       <div class="niche-card-title">${keyword}</div>
-      <div class="niche-card-meta">${subs||'Reddit'} &nbsp;·&nbsp; ${emoji} ${typeLabel} &nbsp;·&nbsp; ${s.label}</div>
+      <div class="niche-card-meta">YouTube · ${s.label}</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} فيديو · 👁️ ${s.avgViews.toLocaleString()} مشاهدة · 👍 ${s.avgLikes.toLocaleString()} إعجاب · 💬 ${s.avgComments.toLocaleString()} تعليق</div>
     </div>
     <div class="niche-dot ${c}"></div>
   </div>`;
 
   html+=`<div class="result-stats">
-    <div class="result-stat"><div class="val">${s.total}</div><div class="lbl">Posts</div></div>
-    <div class="result-stat"><div class="val">${s.ratio}%</div><div class="lbl">Promo</div></div>
-    <div class="result-stat"><div class="val">${s.edu}</div><div class="lbl">Educational</div></div>
-    <div class="result-stat"><div class="val">${s.stories}</div><div class="lbl">Stories</div></div>
-  </div>
-  <div class="result-scores">
-    <div class="result-score"><div class="val" style="color:var(--blue)">${s.demandScore}</div><div class="lbl">Demand</div></div>
-    <div class="result-score"><div class="val" style="color:#8b5cf6">${s.trendScore}</div><div class="lbl">Trend</div></div>
-    <div class="result-score highlight"><div class="val" style="color:var(--green)">${s.opportunityScore}</div><div class="lbl">Opportunity</div></div>
-  </div>
-  <div class="result-posts">${posts.slice(0,8).map(p=>`
+    <div class="result-stat"><div class="val">${s.videoCount}</div><div class="lbl">Videos</div></div>
+    <div class="result-stat"><div class="val">${s.avgViews.toLocaleString()}</div><div class="lbl">Avg Views</div></div>
+    <div class="result-stat"><div class="val">${s.avgLikes.toLocaleString()}</div><div class="lbl">Avg Likes</div></div>
+    <div class="result-stat"><div class="val">${s.promoLinks}</div><div class="lbl">Promo Links</div></div>
+  </div>`;
+  html+=`<div class="result-posts">${videos.slice(0,8).map(v=>`
     <div class="result-post">
-      <div class="result-post-title">${p.title}</div>
-      <div class="result-post-meta">r/${p.subreddit} - u/${p.author}</div>
-      <a class="result-post-link" href="${p.url}" target="_blank">Open in Reddit</a>
+      <div class="result-post-title">${v.title}</div>
+      <div class="result-post-meta">${v.channel} · 👁️ ${v.views.toLocaleString()} · 👍 ${v.likes.toLocaleString()}</div>
+      <a class="result-post-link" href="${v.url}" target="_blank">فتح في YouTube</a>
     </div>`).join('')}
   </div>`;
 
@@ -1535,6 +1533,7 @@ async function fetchGoogleTrendsYouTube(timeframe){
   const seen=new Set();
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
   try{
+    // YouTube category = 0 (All) from Google Trends explore API
     const url=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${timeframe==='week'?'20240101':''}`;
     const data=await fetchWithProxyJSON(url);
     if(!data)return[];
@@ -1551,6 +1550,28 @@ async function fetchGoogleTrendsYouTube(timeframe){
     }
   }catch(e){console.error('Trends error:',e);}
   return ideas.slice(0,100);
+}
+
+// Get YouTube trending directly via API (more reliable than Google Trends for YouTube)
+async function fetchYouTubeTrendingByCategory(){
+  const key=getYTKey();
+  if(!key)return[];
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=US&maxResults=50&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    const data=await r.json();
+    if(!data.items||!data.items.length)return[];
+    return data.items.map(v=>({
+      title:v.snippet.title,
+      content:v.snippet.description||'',
+      source:'YouTube Trending',
+      videoId:v.id,
+      channel:v.snippet.channelTitle||'',
+      views:parseInt(v.statistics?.viewCount||0),
+      likes:parseInt(v.statistics?.likeCount||0),
+      comments:parseInt(v.statistics?.commentCount||0),
+    }));
+  }catch(e){return[];}
 }
 
 async function runDualDiscovery(){
@@ -1578,11 +1599,23 @@ async function runDualDiscovery(){
     stats.evergreenFiltered=evergreenFiltered.length;
     showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} نيتش متجذر`);
 
-    // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube) ════════
+    // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube Trending) ════════
     showProgress(38);setStatus('Step 2: جاري جلب كلمات Google Trends (أسبوع)...');
     const trendingIdeas=await fetchGoogleTrendsYouTube('week');
     stats.trendingRaw=trendingIdeas.length;
-    showProgress(45);setStatus(`Step 2: وجدت ${trendingIdeas.length} كلمة ترند`);
+    showProgress(42);setStatus(`Step 2: وجدت ${trendingIdeas.length} كلمة ترند من Google Trends`);
+
+    // Add YouTube trending videos as keywords too
+    showProgress(44);setStatus('Step 2: جاري جلب فيديوهات YouTube Trending...');
+    const ytTrending=await fetchYouTubeTrendingByCategory();
+    for(const v of ytTrending){
+      const title=v.title;
+      if(title&&title.length>3&&title.length<60){
+        trendingIdeas.push({title,content:v.source,source:'YouTube Trending',type:'trend'});
+      }
+    }
+    stats.trendingRaw=trendingIdeas.length;
+    showProgress(48);setStatus(`Step 2: المجموع ${trendingIdeas.length} كلمة (Google Trends + YouTube)`);
 
     showProgress(50);setStatus(`Step 2: AI يصفّي ${trendingIdeas.length} كلمة (Trending)...`);
     const trendingFiltered=await aiFilterAndSummarize(trendingIdeas);
