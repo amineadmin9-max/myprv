@@ -1401,16 +1401,27 @@ Return ONLY a valid JSON array, no other text:
         }
       }catch(e){console.error('AI filter parse error:',e);}
     }else{
-      // If AI fails, keep items with keyword-based heuristic
+      // If AI fails, keyword-based heuristic (trends-aware)
       for(const item of batch){
         const text=item.title.toLowerCase();
-        const hasDemand=DEMAND_KW.some(kw=>text.includes(kw));
-        const hasQuestion=/\?/.test(item.title);
-        const hasProduct=COMMERCIAL_KW.some(kw=>text.includes(kw))||/\b(app|tool|product|software|gadget|device|kit|set|machine|maker)\b/i.test(item.title);
-        if(hasDemand||hasQuestion||hasProduct){
-          const topic=extractCleanTopic(item.title,item.content);
-          if(topic){
-            results.push({title:topic,original:item.title,source:item.source||'unknown',content:item.content||''});
+        if(isTrends){
+          // For Google Trends: keep almost everything (already trending = has demand)
+          // Only skip very short/meaningless or pure sports/score items
+          if(text.length>3&&!/^\d+$/.test(text)&&!/^(score|win|lost|final|vs\.?)$/i.test(text)){
+            const topic=extractCleanTopic(item.title,item.content);
+            if(topic&&topic.length>2){
+              results.push({title:topic,original:item.title,source:item.source||'unknown',content:item.content||''});
+            }
+          }
+        }else{
+          const hasDemand=DEMAND_KW.some(kw=>text.includes(kw));
+          const hasQuestion=/\?/.test(item.title);
+          const hasProduct=COMMERCIAL_KW.some(kw=>text.includes(kw))||/\b(app|tool|product|software|gadget|device|kit|set|machine|maker)\b/i.test(item.title);
+          if(hasDemand||hasQuestion||hasProduct){
+            const topic=extractCleanTopic(item.title,item.content);
+            if(topic){
+              results.push({title:topic,original:item.title,source:item.source||'unknown',content:item.content||''});
+            }
           }
         }
       }
@@ -1518,6 +1529,64 @@ function renderDiscoveryResults(results){
   el.innerHTML=html;
 }
 
+// ===================== EVERGREEN FROM YOUTUBE (bypasses Google Trends block) =====================
+async function fetchEvergreenFromYouTube(){
+  const key=getYTKey();
+  if(!key)return[];
+  const ideas=[];const seen=new Set();
+  // Seed queries that indicate commercial/product niches
+  const seeds=[
+    'best budget gadget','best home tool','best kitchen gadget','best tech under 50',
+    'best productivity app','best fitness equipment','best travel accessories',
+    'best desk setup','best cleaning tool','best pet product','best baby product',
+    'best gaming accessories','best smart home device','best outdoor gear',
+    'best office supplies','best beauty tool','best car accessory','best hobby supplies',
+    'best organizer','best emergency kit','best solar gadget','best portable charger',
+    'best water filter','best air purifier','best sleep gadget','best massage tool',
+    'best cooking gadget','best gardening tool','best art supplies','best music equipment'
+  ];
+  try{
+    // Search each seed keyword on YouTube (last90 days) and collect popular video topics
+    for(let i=0;i<seeds.length;i++){
+      const seed=seeds[i];
+      setStatus(`[Evergreen ${i+1}/${seeds.length}] Searching YouTube: ${seed}`);
+      try{
+        const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(seed)}&type=video&order=viewCount&publishedAfter=${new Date(Date.now()-90*86400000).toISOString()}&maxResults=5&key=${key}`;
+        const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+        const data=await r.json();
+        if(!data.items)continue;
+        for(const v of data.items){
+          const title=v.snippet.title;
+          const titleLower=title.toLowerCase();
+          if(title.length<5||title.length>60)continue;
+          if(seen.has(titleLower))continue;seen.add(titleLower);
+          ideas.push({title,content:v.snippet.description||'',source:'YouTube Evergreen',type:'evergreen'});
+        }
+      }catch(e){continue;}
+      await new Promise(r=>setTimeout(r,250));
+    }
+    // Also search for "best X" and "how to" patterns
+    const patterns=['best 2026','how to choose','buying guide','product review','vs comparison','alternative to'];
+    for(const p of patterns){
+      try{
+        const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(p)}&type=video&order=viewCount&publishedAfter=${new Date(Date.now()-90*86400000).toISOString()}&maxResults=10&key=${key}`;
+        const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+        const data=await r.json();
+        if(!data.items)continue;
+        for(const v of data.items){
+          const title=v.snippet.title;
+          const titleLower=title.toLowerCase();
+          if(title.length<5||title.length>60)continue;
+          if(seen.has(titleLower))continue;seen.add(titleLower);
+          ideas.push({title,content:v.snippet.description||'',source:'YouTube Evergreen',type:'evergreen'});
+        }
+      }catch(e){continue;}
+      await new Promise(r=>setTimeout(r,250));
+    }
+  }catch(e){console.error('Evergreen YouTube error:',e);}
+  return ideas.slice(0,200);
+}
+
 // ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
 async function fetchGoogleTrendsYouTube(timeframe){
   const ideas=[];
@@ -1526,22 +1595,13 @@ async function fetchGoogleTrendsYouTube(timeframe){
   try{
     const today=new Date();
     let urls=[];
-    if(timeframe==='week'){
-      // Trending: fetch last 7 days of daily trends
-      for(let d=0;d<7;d++){
-        const ed=new Date(today);ed.setDate(today.getDate()-d);
-        const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
-        urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
-      }
-    }else{
-      // Evergreen: fetch last 30 days of daily trends (broad pool for evergreen discovery)
-      for(let d=0;d<30;d++){
-        const ed=new Date(today);ed.setDate(today.getDate()-d);
-        const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
-        urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
-      }
+    // Only used for 'week' trending now — evergreen uses YouTube seed search
+    const days=timeframe==='week'?7:7;
+    for(let d=0;d<days;d++){
+      const ed=new Date(today);ed.setDate(today.getDate()-d);
+      const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
+      urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
     }
-    // Fetch in batches of 5 to avoid overwhelming proxies
     for(let i=0;i<urls.length;i+=5){
       const batch=urls.slice(i,i+5);
       const results=await Promise.allSettled(batch.map(u=>fetchWithProxyJSON(u)));
@@ -1562,7 +1622,7 @@ async function fetchGoogleTrendsYouTube(timeframe){
       if(i+5<urls.length)await new Promise(r=>setTimeout(r,300));
     }
   }catch(e){console.error('Trends error:',e);}
-  return ideas.slice(0,200);
+  return ideas.slice(0,100);
 }
 
 // Get YouTube trending directly via API (more reliable than Google Trends for YouTube)
@@ -1601,11 +1661,11 @@ async function runDualDiscovery(){
   const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
   try{
 
-    // ════════ STEP 1: EVERGREEN (3 months — Google Trends + YouTube) ════════
-    showProgress(3);setStatus('Step 1: Fetching Google Trends keywords (3 months)...');
-    const evergreenIdeas=await fetchGoogleTrendsYouTube('month');
+    // ════════ STEP 1: EVERGREEN (3 months — YouTube seed search) ════════
+    showProgress(3);setStatus('Step 1: Fetching evergreen keywords from YouTube...');
+    const evergreenIdeas=await fetchEvergreenFromYouTube();
     stats.evergreenRaw=evergreenIdeas.length;
-    showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} keywords from Google Trends`);
+    showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} evergreen keywords from YouTube`);
 
     showProgress(20);setStatus(`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
     const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas,'trends');
@@ -1772,7 +1832,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
         <div style="color:var(--text-dim);font-size:11px">Evergreen — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Google Trends (3 months)</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: YouTube Seed Search</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
