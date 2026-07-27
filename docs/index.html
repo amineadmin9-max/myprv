@@ -1537,20 +1537,25 @@ async function fetchGoogleTrendsYouTube(timeframe){
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
   try{
     const today=new Date();
-    const days=timeframe==='week'?7:14;
+    const days=timeframe==='week'?7:90;
     let urls=[];
     for(let d=0;d<days;d++){
       const ed=new Date(today);ed.setDate(today.getDate()-d);
       const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
       urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
     }
-    // Fetch in batches of 3 to avoid proxy rate limiting
-    for(let i=0;i<urls.length;i+=3){
-      const batch=urls.slice(i,i+3);
-      const results=await Promise.allSettled(batch.map(u=>fetchWithProxyJSON(u)));
-      for(const r of results){
-        if(r.status!=='fulfilled'||!r.value)continue;
-        const trends=r.value.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+    // Fetch one URL at a time with retry to avoid CORS proxy rate limiting
+    let okCount=0,failCount=0;
+    for(let i=0;i<urls.length;i++){
+      let data=null;
+      for(let attempt=0;attempt<3;attempt++){
+        data=await fetchWithProxyJSON(urls[i]);
+        if(data)break;
+        if(attempt<2)await new Promise(r=>setTimeout(r,15000));
+      }
+      if(data){
+        okCount++;
+        const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
         for(const t of trends){
           const q=t.title.query;const ql=q.toLowerCase();
           if(skip.some(s=>ql.includes(s)))continue;
@@ -1561,9 +1566,11 @@ async function fetchGoogleTrendsYouTube(timeframe){
             if(r2.query.length>3&&r2.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r2.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
           }
         }
-      }
-      if(i+3<urls.length)await new Promise(r=>setTimeout(r,500));
+      }else{failCount++;}
+      console.log(`Trends ${i+1}/${urls.length}: ok=${okCount} fail=${failCount} ideas=${ideas.length}`);
+      if(i<urls.length-1)await new Promise(r=>setTimeout(r,8000));
     }
+    console.log(`Trends done: ${okCount} ok, ${failCount} fail, ${ideas.length} ideas`);
   }catch(e){console.error('Trends error:',e);}
   return ideas.slice(0,100);
 }
