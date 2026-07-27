@@ -1914,17 +1914,21 @@ async function runAllMonitors(){
 // ===================== NOTIFICATIONS =====================
 function getNotifications(){try{return JSON.parse(localStorage.getItem('nf_notifs')||'[]');}catch(e){return[];}}
 function saveNotifications(n){localStorage.setItem('nf_notifs',JSON.stringify(n));}
-function addNotification(n){const notifs=getNotifications();notifs.unshift({id:Date.now(),...n,time:new Date().toLocaleString()});saveNotifications(notifs);updateNotifBadge();}
+function addNotification(n){const notifs=getNotifications();notifs.unshift({id:Date.now(),isRead:false,...n,time:new Date().toLocaleString()});saveNotifications(notifs);updateNotifBadge();}
 function deleteNotification(id){saveNotifications(getNotifications().filter(n=>n.id!==id));renderNotifications();updateNotifBadge();}
 function updateNotifBadge(){
-  const c=getNotifications().length;
-  document.getElementById('notifCount').textContent=c;
-  document.getElementById('notifTotal').textContent=c;
-  document.getElementById('notifCount').style.display=c>0?'flex':'none';
+  const unread=getNotifications().filter(n=>!n.isRead).length;
+  document.getElementById('notifCount').textContent=unread;
+  document.getElementById('notifTotal').textContent=unread;
+  document.getElementById('notifCount').style.display=unread>0?'flex':'none';
 }
 function renderNotifications(){
   const notifs=getNotifications();
-  document.getElementById('notifTotal').textContent=notifs.length;
+  const unread=notifs.filter(n=>!n.isRead).length;
+  document.getElementById('notifTotal').textContent=unread>0?`${unread} unread / ${notifs.length}`:notifs.length;
+  notifs.forEach(n=>n.isRead=true);
+  saveNotifications(notifs);
+  updateNotifBadge();
   const el=document.getElementById('notifList');
   el.innerHTML=notifs.length?notifs.map(n=>`
     <div class="notif-card">
