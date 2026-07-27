@@ -155,9 +155,12 @@
   .niche-card-title{font-weight:700;font-size:16.5px;color:#fbfbff;margin-bottom:6px;}
   .niche-card-meta{font-family:'Consolas','SF Mono',monospace;font-size:12.5px;color:#67719c;letter-spacing:.2px;}
   .niche-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;margin-left:14px;}
+  .niche-dot.skyblue{background:#0ea5e9;box-shadow:0 0 10px rgba(14,165,233,.6);}
   .niche-dot.green{background:var(--green);box-shadow:0 0 10px rgba(34,197,94,.6);}
   .niche-dot.yellow{background:var(--yellow);box-shadow:0 0 10px rgba(234,179,8,.55);}
+  .niche-dot.orange{background:#f97316;box-shadow:0 0 10px rgba(249,115,22,.55);}
   .niche-dot.red{background:var(--red-icon);box-shadow:0 0 10px rgba(255,85,102,.55);}
+  .niche-dot.purple{background:#a855f7;box-shadow:0 0 10px rgba(168,85,247,.55);}
 
   .menu-dots{position:relative;cursor:pointer;padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
   .menu-dots:active{background:var(--border);}
@@ -1256,6 +1259,76 @@ async function fetchYouTubeTrending(){
   }catch(e){console.error('[YouTube] Fetch error:',e);return[];}
 }
 
+// ===================== YOUTUBE SEARCH + STATS =====================
+async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
+  const key=getYTKey();
+  if(!key)return[];
+  const publishedAfter=new Date(Date.now()-daysBack*86400000).toISOString();
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    const data=await r.json();
+    if(!data.items||!data.items.length)return[];
+    const videoIds=data.items.map(v=>v.id.videoId).filter(Boolean);
+    const stats=await getYouTubeVideoStats(videoIds);
+    return data.items.map(v=>{
+      const vid=v.id.videoId;
+      const s=stats[vid]||{};
+      return{
+        title:v.snippet.title,
+        channel:v.snippet.channelTitle||'',
+        views:parseInt(s.viewCount||0),
+        likes:parseInt(s.likeCount||0),
+        comments:parseInt(s.commentCount||0),
+        description:v.snippet.description||'',
+        url:'https://www.youtube.com/watch?v='+vid,
+        published:v.snippet.publishedAt||''
+      };
+    });
+  }catch(e){console.error('[YouTube] Search error:',e);return[];}
+}
+
+async function getYouTubeVideoStats(videoIds){
+  if(!videoIds.length)return{};
+  const key=getYTKey();
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds.join(',')}&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    const data=await r.json();
+    const map={};
+    (data.items||[]).forEach(v=>{map[v.id]=v.statistics||{};});
+    return map;
+  }catch(e){return{};}
+}
+
+function countLinksInText(text){
+  if(!text)return 0;
+  return(text.match(/https?:\/\/[^\s<>"')]+|www\.[^\s<>"')]+/gi)||[]).length;
+}
+
+// ===================== YOUTUBE TRAFFIC LIGHT (6 colors) =====================
+function computeYouTubeScoring(videos){
+  if(!videos||!videos.length)return{color:'yellow',label:'🟡 لا توجد بيانات كافية',videoCount:0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
+  const vc=videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
+  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
+  const avgViews=Math.round(totalViews/vc);
+  const avgLikes=Math.round(totalLikes/vc);
+  const avgComments=Math.round(totalComments/vc);
+  const highEng=avgViews>10000;
+  const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  let color,label;
+  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 فرصة نظيفة — منافسة ضعيفة جداً';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='🟢 سوق مفتوح — منافسة معقولة + تفاعل جيد';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 سوق نامي — بعض النشاط';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 سوق كبير — منافسة متوسطة';}
+  else if(vc>25000&&promoLinks>8){color='red';label='🔴 مُشبع — حجم كبير + روابط كثيرة';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 مُشبع — روابط كثيرة مع حجم أقل';}
+  else{color='yellow';label='🟡 سوق متوسط';}
+  return{color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks,highEng};
+}
+
 function saveYTKey(){
   const key=document.getElementById('ytKeyInput').value.trim();
   if(!key){alert('Enter your YouTube API key');return;}
@@ -1456,92 +1529,92 @@ function renderDiscoveryResults(results){
   el.innerHTML=html;
 }
 
-// ===================== DUAL DISCOVERY (Evergreen + Trending) =====================
+// ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
+async function fetchGoogleTrendsYouTube(timeframe){
+  const ideas=[];
+  const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
+  try{
+    const url=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${timeframe==='week'?'20240101':''}`;
+    const data=await fetchWithProxyJSON(url);
+    if(!data)return[];
+    const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+    for(const t of trends.slice(0,25)){
+      const q=t.title.query;const ql=q.toLowerCase();
+      if(skip.some(s=>ql.includes(s)))continue;
+      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+      for(const r of(t.relatedQueries||[]).slice(0,2)){
+        if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
+      }
+    }
+  }catch(e){console.error('Trends error:',e);}
+  return ideas;
+}
+
 async function runDualDiscovery(){
   resetLLMStats();
+  const key=getYTKey();
+  if(!key){
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('results').innerHTML='<div class="error">⚠️ أضف مفتاح YouTube API من الإعدادات</div>';
+    return;
+  }
   const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
   try{
 
-    // ════════ STEP 1: EVERGREEN (past year — Reddit only) ════════
-    showProgress(3);setStatus('Step 1: Fetching Reddit posts from past year...');
-    const redditYear=await fetchRedditBulk('year');
-    stats.evergreenRaw=redditYear.length;
-    showProgress(12);setStatus(`Step 1: Found ${redditYear.length} Reddit posts (past year)`);
+    // ════════ STEP 1: EVERGREEN (3 months — Google Trends + YouTube) ════════
+    showProgress(3);setStatus('Step 1: جاري جلب كلمات Google Trends (3 أشهر)...');
+    const evergreenIdeas=await fetchGoogleTrendsYouTube('month');
+    stats.evergreenRaw=evergreenIdeas.length;
+    showProgress(15);setStatus(`Step 1: وجدت ${evergreenIdeas.length} كلمة من Google Trends`);
 
-    const allEvergreenRaw=[
-      ...redditYear.map(p=>({title:p.title,content:p.content,source:'Reddit'}))
-    ];
-
-    showProgress(25);setStatus(`Step 1: AI filtering ${allEvergreenRaw.length} raw items (Evergreen)...`);
-    const evergreenFiltered=await aiFilterAndSummarize(allEvergreenRaw);
+    showProgress(20);setStatus(`Step 1: AI يصفّي ${evergreenIdeas.length} كلمة (Evergreen)...`);
+    const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas);
     stats.evergreenFiltered=evergreenFiltered.length;
-    showProgress(40);setStatus(`Step 1 done: ${stats.evergreenRaw} raw → ${stats.evergreenFiltered} evergreen niches after AI filter`);
+    showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} نيتش متجذر`);
 
-    // ════════ STEP 2: TRENDING (past week — Reddit + YouTube) ════════
-    showProgress(43);setStatus('Step 2: Fetching Reddit posts from past week...');
-    const redditWeek=await fetchRedditBulk('week');
-    stats.trendingRaw=redditWeek.length;
-    showProgress(50);setStatus(`Step 2: Found ${redditWeek.length} Reddit posts (past week)`);
+    // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube) ════════
+    showProgress(38);setStatus('Step 2: جاري جلب كلمات Google Trends (أسبوع)...');
+    const trendingIdeas=await fetchGoogleTrendsYouTube('week');
+    stats.trendingRaw=trendingIdeas.length;
+    showProgress(45);setStatus(`Step 2: وجدت ${trendingIdeas.length} كلمة ترند`);
 
-    showProgress(53);setStatus('Step 2: Fetching YouTube trending videos...');
-    const ytVideos=await fetchYouTubeTrending();
-    stats.trendingRaw+=ytVideos.length;
-    showProgress(58);setStatus(`Step 2: Found ${ytVideos.length} YouTube trending videos — total raw: ${stats.trendingRaw}`);
-
-    const allTrendingRaw=[
-      ...redditWeek.map(p=>({title:p.title,content:p.content,source:'Reddit'})),
-      ...ytVideos.map(v=>({title:v.title,content:v.content,source:'YouTube Trending'}))
-    ];
-
-    showProgress(65);setStatus(`Step 2: AI filtering ${allTrendingRaw.length} raw items (Trending)...`);
-    const trendingFiltered=await aiFilterAndSummarize(allTrendingRaw);
+    showProgress(50);setStatus(`Step 2: AI يصفّي ${trendingIdeas.length} كلمة (Trending)...`);
+    const trendingFiltered=await aiFilterAndSummarize(trendingIdeas);
     stats.trendingFiltered=trendingFiltered.length;
-    showProgress(72);setStatus(`Step 2 done: ${stats.trendingRaw} raw → ${stats.trendingFiltered} trending niches after AI filter`);
+    showProgress(60);setStatus(`Step 2 done: ${stats.trendingRaw} → ${stats.trendingFiltered} نيتش ترند`);
 
-    // ════════ TRAFFIC LIGHT: EVERGREEN ════════
+    // ════════ STEP 3: YOUTUBE SEARCH + SCORING — EVERGREEN ════════
     const evergreenResults=[];
-    const evergreenAllPosts=[];
     for(let i=0;i<evergreenFiltered.length;i++){
-      setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] Fetching posts: ${evergreenFiltered[i].title}`);
-      showProgress(72+(i/evergreenFiltered.length)*10);
+      const kw=evergreenFiltered[i].title;
+      setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] يبحث في YouTube: ${kw}`);
+      showProgress(60+(i/evergreenFiltered.length)*15);
       try{
-        const posts=await searchReddit(evergreenFiltered[i].title);
-        evergreenAllPosts.push(...posts);
-        evergreenResults.push({keyword:evergreenFiltered[i].title,original:evergreenFiltered[i].original,scoring:null,posts,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
+        const videos=await searchYouTubeVideos(kw,90,20);
+        const scoring=computeYouTubeScoring(videos);
+        evergreenResults.push({keyword:kw,scoring,videos,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
       }catch(e){continue;}
+      await new Promise(r=>setTimeout(r,300));
     }
 
-    // ════════ TRAFFIC LIGHT: TRENDING ════════
+    // ════════ STEP 4: YOUTUBE SEARCH + SCORING — TRENDING ════════
     const trendingResults=[];
-    const trendingAllPosts=[];
     for(let i=0;i<trendingFiltered.length;i++){
-      setStatus(`[Trending ${i+1}/${trendingFiltered.length}] Fetching posts: ${trendingFiltered[i].title}`);
-      showProgress(82+(i/trendingFiltered.length)*15);
+      const kw=trendingFiltered[i].title;
+      setStatus(`[Trending ${i+1}/${trendingFiltered.length}] يبحث في YouTube: ${kw}`);
+      showProgress(75+(i/trendingFiltered.length)*20);
       try{
-        const posts=await searchReddit(trendingFiltered[i].title);
-        trendingAllPosts.push(...posts);
-        trendingResults.push({keyword:trendingFiltered[i].title,original:trendingFiltered[i].original,scoring:null,posts,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
+        const videos=await searchYouTubeVideos(kw,7,20);
+        const scoring=computeYouTubeScoring(videos);
+        trendingResults.push({keyword:kw,scoring,videos,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
       }catch(e){continue;}
+      await new Promise(r=>setTimeout(r,300));
     }
 
-    // ════════ SINGLE BATCH CLASSIFY (all posts) ════════
-    const allPosts=[...evergreenAllPosts,...trendingAllPosts];
-    if(allPosts.length){
-      setStatus(`AI batch classifying ${allPosts.length} posts...`);
-      showProgress(90);
-      const allClass=await batchClassify(allPosts.slice(0,25));
-      for(const r of evergreenResults){
-        r.scoring=await computeScoringFromPosts(r.posts,allClass,evergreenAllPosts,r.keyword);
-      }
-      for(const r of trendingResults){
-        r.scoring=await computeScoringFromPosts(r.posts,allClass,trendingAllPosts,r.keyword);
-      }
-    }
-
-    showProgress(100);setStatus(`Done! ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches found.`);
+    showProgress(100);setStatus(`تم! ${evergreenResults.length} متجذر + ${trendingResults.length} ترند`);
     renderDualResults(evergreenResults,trendingResults,stats);
 
   }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
@@ -1562,12 +1635,6 @@ async function countRedditPostsViaGoogle(keyword){
     }
     return null;
   }catch(e){return null;}
-}
-
-function countLinksInText(text){
-  if(!text)return 0;
-  const urlPattern=/https?:\/\/[^\s<>"')]+|www\.[^\s<>"')]+/gi;
-  return(text.match(urlPattern)||[]).length;
 }
 
 function countPromoLinks(posts){
@@ -1655,36 +1722,36 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
-        <div style="color:var(--text-dim);font-size:11px">Evergreen — before AI filter</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Reddit (past year)</div>
+        <div style="color:var(--text-dim);font-size:11px">Evergreen — قبل التصفية</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">المصدر: Google Trends (3 أشهر)</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
-        <div style="color:var(--text-dim);font-size:11px">Evergreen — after AI filter</div>
+        <div style="color:var(--text-dim);font-size:11px">Evergreen — بعد التصفية</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingRaw}</div>
-        <div style="color:var(--text-dim);font-size:11px">Trending — before AI filter</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Sources: Reddit + YouTube</div>
+        <div style="color:var(--text-dim);font-size:11px">Trending — قبل التصفية</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">المصدر: Google Trends (أسبوع)</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingFiltered}</div>
-        <div style="color:var(--text-dim);font-size:11px">Trending — after AI filter</div>
+        <div style="color:var(--text-dim);font-size:11px">Trending — بعد التصفية</div>
       </div>
     </div>
   </div>`;
 
   // ════════ Evergreen Section ════════
   if(evergreenResults.length){
-    html+=`<div class="section-title">🌳 نيتشات متجدرة <span class="dash">— Evergreen Niches (past year)</span></div>`;
+    html+=`<div class="section-title">🌳 نيتشات متجدرة <span class="dash">— Evergreen (3 أشهر)</span></div>`;
     for(const r of evergreenResults){
       const c=r.scoring.color;
-      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:(getServerURL()?'⚠️ Server unavailable — using post content':'⚠️ Add server URL for comment analysis');
+      const s=r.scoring;
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
-          <div class="niche-card-meta">🌳 Evergreen · ${r.scoring.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${commentBadge}</div>
+          <div class="niche-card-meta">🌳 Evergreen · ${s.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} فيديو · 👁️ ${s.avgViews.toLocaleString()} مشاهدة · 👍 ${s.avgLikes.toLocaleString()} إعجاب · 💬 ${s.avgComments.toLocaleString()} تعليق</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -1693,15 +1760,15 @@ function renderDualResults(evergreenResults,trendingResults,stats){
 
   // ════════ Trending Section ════════
   if(trendingResults.length){
-    html+=`<div class="section-title">🔥 نيتشات ترند <span class="dash">— Trending Niches (past week)</span></div>`;
+    html+=`<div class="section-title">🔥 نيتشات ترند <span class="dash">— Trending (أسبوع)</span></div>`;
     for(const r of trendingResults){
       const c=r.scoring.color;
-      const commentBadge=r.scoring.usedComments?`💬 ${r.scoring.totalCommentsAnalyzed} comments · ${r.scoring.promoLinks} links`:(getServerURL()?'⚠️ Server unavailable — using post content':'⚠️ Add server URL for comment analysis');
+      const s=r.scoring;
       html+=`<div class="niche-card">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
-          <div class="niche-card-meta">🔥 Trending · ${r.scoring.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${commentBadge}</div>
+          <div class="niche-card-meta">🔥 Trending · ${s.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${s.videoCount} فيديو · 👁️ ${s.avgViews.toLocaleString()} مشاهدة · 👍 ${s.avgLikes.toLocaleString()} إعجاب · 💬 ${s.avgComments.toLocaleString()} تعليق</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -1709,7 +1776,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
   }
 
   if(!evergreenResults.length&&!trendingResults.length){
-    html+='<div class="error">No niches found. Try again.</div>';
+    html+='<div class="error">لم يتم العثور على نيتشات. حاول مرة أخرى.</div>';
   }
 
   el.innerHTML=html;
