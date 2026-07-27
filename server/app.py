@@ -35,11 +35,18 @@ WORKER_SECRET = os.environ.get("WORKER_SECRET", "")
 
 _browser = None
 
+try:
+    from playwright.sync_api import sync_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
+
 
 def get_browser():
     global _browser
+    if not HAS_PLAYWRIGHT:
+        return None
     if _browser is None:
-        from playwright.sync_api import sync_playwright
         pw = sync_playwright().start()
         _browser = pw.chromium.launch(headless=True, args=[
             "--no-sandbox",
@@ -53,6 +60,8 @@ def get_browser():
 def fetch_with_playwright(url):
     """Fetch URL using Playwright Chromium browser."""
     browser = get_browser()
+    if browser is None:
+        return None
     page = browser.new_page()
     try:
         page.goto(url, wait_until="networkidle", timeout=30000)
