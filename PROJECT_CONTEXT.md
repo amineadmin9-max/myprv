@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-27 (11th update — Added /api/trends server endpoint, server-first for Google Trends)
+## Last updated: 2026-07-27 (12th update — YouTube-only discovery, no CORS/proxies needed)
 
 ## Quick Start
 In a new conversation, just say:
@@ -145,6 +145,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
+- v4.0 — YouTube-only: evergreen from YouTube Discovery + trending from YouTube Trending (no CORS/proxies/server needed)
 - v3.6 — Added /api/trends server endpoint; server-first for Google Trends, proxy fallback
 - v3.5 — Terminal-style logging: every request, proxy attempt, retry, response, error with timestamps
 - v3.4 — Added Logs modal: ⋮ → Logs shows all operations, errors, and status in real-time
