@@ -314,12 +314,14 @@
 
   <!-- Modal: Logs -->
   <div class="modal-overlay hidden" id="logsModal" onclick="closeModalBg(event)">
-    <div class="modal-box" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column">
-      <h2>Logs</h2>
-      <div id="logsContainer" style="flex:1;overflow-y:auto;max-height:55vh;margin:10px 0;padding:10px;background:var(--bg);border-radius:12px;font-family:monospace;font-size:11px;line-height:1.8;color:var(--text-dim)"></div>
-      <div class="modal-actions">
-        <button class="modal-btn ghost" onclick="clearLogs()" style="flex:0.5">Clear</button>
-        <button class="modal-btn primary" onclick="document.getElementById('logsModal').classList.add('hidden')" style="flex:1">Close</button>
+    <div class="modal-box" style="max-width:480px;max-height:85vh;display:flex;flex-direction:column">
+      <h2 style="margin-bottom:2px">Activity Log</h2>
+      <p style="font-size:11px;margin-bottom:6px">Real-time operation trace — every request, response & error</p>
+      <div id="logsContainer" style="flex:1;overflow-y:auto;max-height:62vh;margin:0;padding:12px;background:#0d1117;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;line-height:1.9;color:#94a3b8;border:1px solid #21262d"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <span id="logsCount" style="font-size:10px;color:var(--text-dim);flex:1">0 entries</span>
+        <button class="modal-btn ghost" onclick="clearLogs()" style="flex:0;padding:8px 14px;font-size:12px">Clear</button>
+        <button class="modal-btn primary" onclick="document.getElementById('logsModal').classList.add('hidden')" style="flex:0;padding:8px 14px;font-size:12px">Close</button>
       </div>
     </div>
   </div>
@@ -469,21 +471,33 @@ async function _geminiFetch(prompt,timeoutMs){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
   try{
+    addLog('req',`Gemini: POST ${GEMINI_MODEL} (${(prompt.length/1024).toFixed(1)}KB prompt)`);
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
     clearTimeout(timer);
+    addLog('res',`Gemini: HTTP ${r.status}`);
     const rawText=await r.text();
     const trimmed=rawText.trim();
     if(trimmed.startsWith('{')){
       try{
         const d=JSON.parse(trimmed);
         if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){
-          return{content:d.candidates[0].content.parts[0].text.trim(),realModel:GEMINI_MODEL};
+          const txt=d.candidates[0].content.parts[0].text.trim();
+          addLog('success',`Gemini: OK (${(txt.length/1024).toFixed(1)}KB response, ${GEMINI_MODEL})`);
+          return{content:txt,realModel:GEMINI_MODEL};
         }
-        if(d.error){return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};}
+        if(d.error){
+          addLog('error',`Gemini API Error: ${JSON.stringify(d.error).substring(0,200)}`);
+          return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};
+        }
       }catch(parseErr){}
     }
+    addLog('error',`Gemini: Unexpected response (${r.status}): ${trimmed.substring(0,100)}`);
     return{status:r.status,body:trimmed.substring(0,300)||'(empty response)'};
-  }catch(e){clearTimeout(timer);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
+  }catch(e){
+    clearTimeout(timer);
+    addLog('error',`Gemini: Network error — ${e.message}`);
+    return{error:e.name||e.constructor.name,msg:e.message||String(e)};
+  }
 }
 
 async function _openrouterFetch(prompt,timeoutMs){
@@ -494,21 +508,26 @@ async function _openrouterFetch(prompt,timeoutMs){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
   try{
+    addLog('req',`OpenRouter: POST ${OPENROUTER_MODEL} (${(prompt.length/1024).toFixed(1)}KB prompt)`);
     const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
     clearTimeout(timer);
+    addLog('res',`OpenRouter: HTTP ${r.status}`);
     const rawText=await r.text();
     const trimmed=rawText.trim();
-    // Try direct JSON parse
     if(trimmed.startsWith('{')){
       try{
         const d=JSON.parse(trimmed);
         if(d.choices&&d.choices[0]?.message?.content){
-          return{content:d.choices[0].message.content.trim(),realModel:d.model||OPENROUTER_MODEL};
+          const txt=d.choices[0].message.content.trim();
+          addLog('success',`OpenRouter: OK (${(txt.length/1024).toFixed(1)}KB response, ${d.model||OPENROUTER_MODEL})`);
+          return{content:txt,realModel:d.model||OPENROUTER_MODEL};
         }
-        if(d.error){return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};}
+        if(d.error){
+          addLog('error',`OpenRouter API Error: ${JSON.stringify(d.error).substring(0,200)}`);
+          return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};
+        }
       }catch(parseErr){}
     }
-    // Try SSE format: data: {...}\n\n
     const lines=trimmed.split('\n');
     for(const line of lines){
       if(line.startsWith('data: ')){
@@ -517,13 +536,20 @@ async function _openrouterFetch(prompt,timeoutMs){
         try{
           const d=JSON.parse(jsonStr);
           if(d.choices&&d.choices[0]?.message?.content){
-            return{content:d.choices[0].message.content.trim(),realModel:d.model||OPENROUTER_MODEL};
+            const txt=d.choices[0].message.content.trim();
+            addLog('success',`OpenRouter SSE: OK (${(txt.length/1024).toFixed(1)}KB response)`);
+            return{content:txt,realModel:d.model||OPENROUTER_MODEL};
           }
         }catch(parseErr){}
       }
     }
+    addLog('error',`OpenRouter: Unexpected response (${r.status}): ${trimmed.substring(0,100)}`);
     return{status:r.status,body:trimmed.substring(0,300)||'(empty response)'};
-  }catch(e){clearTimeout(timer);return{error:e.name||e.constructor.name,msg:e.message||String(e)};}
+  }catch(e){
+    clearTimeout(timer);
+    addLog('error',`OpenRouter: Network error — ${e.message}`);
+    return{error:e.name||e.constructor.name,msg:e.message||String(e)};
+  }
 }
 
 async function callLLM(prompt,timeoutMs=60000){
@@ -611,34 +637,41 @@ function openAboutModal(){
 }
 
 const appLogs=[];
+let _logStartTime=Date.now();
 function addLog(type,msg){
-  const t=new Date().toLocaleTimeString();
-  const colors={info:'var(--text-dim)',success:'var(--green)',error:'#ef4444',warn:'#f59e0b'};
-  const icons={info:'ℹ️',success:'✅',error:'❌',warn:'⚠️'};
-  appLogs.push({t,type,msg});
+  const now=Date.now();
+  const elapsed=((now-_logStartTime)/1000).toFixed(1);
+  const ts=new Date().toLocaleTimeString();
+  const colors={info:'#94a3b8',success:'#22c55e',error:'#ef4444',warn:'#f59e0b',req:'#60a5fa',res:'#a78bfa',proxy:'#f472b6'};
+  const icons={info:'▸',success:'✔',error:'✖',warn:'!',req:'→',res:'←',proxy:'◈'};
+  appLogs.push({t:ts,elapsed,type,msg});
   const el=document.getElementById('logsContainer');
   if(el){
-    el.innerHTML+=`<div style="color:${colors[type]||colors.info}">${icons[type]||''} <span style="color:var(--text-dim);opacity:.5">[${t}]</span> ${msg}</div>`;
+    el.innerHTML+=`<div style="color:${colors[type]||colors.info}"><span style="opacity:.4">${elapsed}s</span> <span style="color:${colors[type]};font-weight:bold">${icons[type]||'▸'}</span> ${msg}</div>`;
     el.scrollTop=el.scrollHeight;
   }
+  const cnt=document.getElementById('logsCount');
+  if(cnt)cnt.textContent=`${appLogs.length} entries | errors: ${appLogs.filter(l=>l.type==='error').length}`;
 }
 function renderLogs(){
   const el=document.getElementById('logsContainer');
   if(!el)return;
   el.innerHTML='';
   for(const l of appLogs){
-    const colors={info:'var(--text-dim)',success:'var(--green)',error:'#ef4444',warn:'#f59e0b'};
-    const icons={info:'ℹ️',success:'✅',error:'❌',warn:'⚠️'};
-    el.innerHTML+=`<div style="color:${colors[l.type]||colors.info}">${icons[l.type]||''} <span style="color:var(--text-dim);opacity:.5">[${l.t}]</span> ${l.msg}</div>`;
+    const colors={info:'#94a3b8',success:'#22c55e',error:'#ef4444',warn:'#f59e0b',req:'#60a5fa',res:'#a78bfa',proxy:'#f472b6'};
+    const icons={info:'▸',success:'✔',error:'✖',warn:'!',req:'→',res:'←',proxy:'◈'};
+    el.innerHTML+=`<div style="color:${colors[l.type]||colors.info}"><span style="opacity:.4">${l.elapsed}s</span> <span style="color:${colors[l.type]};font-weight:bold">${icons[l.type]||'▸'}</span> ${l.msg}</div>`;
   }
   el.scrollTop=el.scrollHeight;
+  const cnt=document.getElementById('logsCount');
+  if(cnt)cnt.textContent=`${appLogs.length} entries | errors: ${appLogs.filter(l=>l.type==='error').length}`;
 }
 function openLogsModal(){
   document.getElementById('dropdownMenu').classList.remove('show');
   document.getElementById('logsModal').classList.remove('hidden');
   renderLogs();
 }
-function clearLogs(){appLogs.length=0;document.getElementById('logsContainer').innerHTML='';}
+function clearLogs(){appLogs.length=0;_logStartTime=Date.now();document.getElementById('logsContainer').innerHTML='';addLog('info','Logs cleared');}
 
 function closeAPIKeyModal(){document.getElementById('apiKeyModal').classList.add('hidden');}
 
@@ -878,9 +911,25 @@ async function fetchWithProxy(url){
 }
 
 async function fetchWithProxyJSON(url){
-  for(const proxy of PROXIES){
-    try{const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});const t=await r.text();if(t.startsWith('{')||t.startsWith('['))return JSON.parse(t);}catch(e){continue;}
+  const shortUrl=url.replace('https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=','');
+  for(let pi=0;pi<PROXIES.length;pi++){
+    const proxy=PROXIES[pi];
+    const proxyName=proxy.includes('corsproxy')?'corsproxy':'codetabs';
+    try{
+      addLog('proxy',`[${proxyName}] Fetching ed=${shortUrl}`);
+      const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});
+      addLog('proxy',`[${proxyName}] HTTP ${r.status} for ed=${shortUrl}`);
+      const t=await r.text();
+      if(t.startsWith('{')||t.startsWith('[')){
+        addLog('res',`[${proxyName}] JSON OK ed=${shortUrl} (${(t.length/1024).toFixed(1)}KB)`);
+        return JSON.parse(t);
+      }
+      addLog('warn',`[${proxyName}] Non-JSON response ed=${shortUrl} (starts with: ${t.substring(0,30)})`);
+    }catch(e){
+      addLog('error',`[${proxyName}] Fetch failed ed=${shortUrl}: ${e.message}`);
+    }
   }
+  addLog('error',`All proxies failed for ed=${shortUrl}`);
   return null;
 }
 
@@ -1315,15 +1364,26 @@ async function fetchYouTubeTrending(){
 // ===================== YOUTUBE SEARCH + STATS =====================
 async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
   const key=getYTKey();
-  if(!key)return[];
+  if(!key){
+    addLog('error','YouTube: No API key');
+    return{videos:[],totalResults:0};
+  }
   const publishedAfter=new Date(Date.now()-daysBack*86400000).toISOString();
   try{
+    addLog('req',`YouTube Search: "${keyword}" (last ${daysBack}d, max ${maxResults})`);
     const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${key}`;
     const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    addLog('res',`YouTube Search: HTTP ${r.status}`);
     const data=await r.json();
+    if(data.error){
+      addLog('error',`YouTube API Error: ${data.error.message} (code ${data.error.code})`);
+      return{videos:[],totalResults:0};
+    }
     const totalResults=data.pageInfo?.totalResults||0;
+    addLog('info',`YouTube Search: ${totalResults} total results, ${data.items?.length||0} fetched`);
     if(!data.items||!data.items.length)return{videos:[],totalResults:0};
     const videoIds=data.items.map(v=>v.id.videoId).filter(Boolean);
+    addLog('req',`YouTube Stats: fetching stats for ${videoIds.length} videos`);
     const stats=await getYouTubeVideoStats(videoIds);
     const videos=data.items.map(v=>{
       const vid=v.id.videoId;
@@ -1339,8 +1399,12 @@ async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
         published:v.snippet.publishedAt||''
       };
     });
+    addLog('success',`YouTube Search OK: "${keyword}" → ${videos.length} videos, ${totalResults} total`);
     return{videos,totalResults};
-  }catch(e){console.error('[YouTube] Search error:',e);return{videos:[],totalResults:0};}
+  }catch(e){
+    addLog('error',`YouTube Search FAILED: "${keyword}" — ${e.message}`);
+    return{videos:[],totalResults:0};
+  }
 }
 
 async function getYouTubeVideoStats(videoIds){
@@ -1349,11 +1413,20 @@ async function getYouTubeVideoStats(videoIds){
   try{
     const url=`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds.join(',')}&key=${key}`;
     const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    addLog('res',`YouTube Stats: HTTP ${r.status} for ${videoIds.length} IDs`);
     const data=await r.json();
+    if(data.error){
+      addLog('error',`YouTube Stats Error: ${data.error.message}`);
+      return{};
+    }
     const map={};
     (data.items||[]).forEach(v=>{map[v.id]=v.statistics||{};});
+    addLog('success',`YouTube Stats OK: ${Object.keys(map).length} videos stats fetched`);
     return map;
-  }catch(e){return{};}
+  }catch(e){
+    addLog('error',`YouTube Stats FAILED: ${e.message}`);
+    return{};
+  }
 }
 
 function countLinksInText(text){
@@ -1596,17 +1669,20 @@ async function fetchGoogleTrendsYouTube(timeframe){
   try{
     const today=new Date();
     const days=timeframe==='week'?7:30;
+    addLog('req',`Google Trends: ${timeframe} mode → generating ${days} date URLs`);
     let urls=[];
     for(let d=0;d<days;d++){
       const ed=new Date(today);ed.setDate(today.getDate()-d);
       const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
       urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
     }
-    // Fetch one URL at a time with retry to avoid CORS proxy rate limiting
+    addLog('req',`Google Trends: ${urls.length} URLs ready, starting fetch (8s delay between each)`);
     let okCount=0,failCount=0;
     for(let i=0;i<urls.length;i++){
+      const edStr=urls[i].match(/ed=(\d+)/)?.[1]||'?';
       let data=null;
       for(let attempt=0;attempt<3;attempt++){
+        if(attempt>0)addLog('warn',`Retry ${attempt+1}/3 for ed=${edStr} (waiting 15s)`);
         data=await fetchWithProxyJSON(urls[i]);
         if(data)break;
         if(attempt<2)await new Promise(r=>setTimeout(r,15000));
@@ -1614,6 +1690,8 @@ async function fetchGoogleTrendsYouTube(timeframe){
       if(data){
         okCount++;
         const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+        const kwCount=trends.length;
+        addLog('success',`ed=${edStr}: ${kwCount} trending searches`);
         for(const t of trends){
           const q=t.title.query;const ql=q.toLowerCase();
           if(skip.some(s=>ql.includes(s)))continue;
@@ -1624,15 +1702,18 @@ async function fetchGoogleTrendsYouTube(timeframe){
             if(r2.query.length>3&&r2.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r2.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
           }
         }
-      }else{failCount++;}
-      console.log(`Trends ${i+1}/${urls.length}: ok=${okCount} fail=${failCount} ideas=${ideas.length}`);
+        addLog('info',`Progress: ${i+1}/${days} | ok=${okCount} fail=${failCount} | unique keywords=${ideas.length}`);
+      }else{
+        failCount++;
+        addLog('error',`ed=${edStr}: FAILED after 3 attempts`);
+        addLog('info',`Progress: ${i+1}/${days} | ok=${okCount} fail=${failCount} | unique keywords=${ideas.length}`);
+      }
       if(i<urls.length-1)await new Promise(r=>setTimeout(r,8000));
     }
-    console.log(`Trends done: ${okCount} ok, ${failCount} fail, ${ideas.length} ideas`);
-    addLog(okCount>failCount?'success':'warn',`Google Trends (${timeframe}): ${okCount}/${urls.length} days OK, ${ideas.length} keywords found`);
+    addLog('info',`Google Trends done: ${okCount} ok, ${failCount} fail, ${ideas.length} unique keywords`);
   }catch(e){
     console.error('Trends error:',e);
-    addLog('error',`Google Trends error: ${e.message}`);
+    addLog('error',`Google Trends FATAL: ${e.message}`);
   }
   return ideas.slice(0,100);
 }

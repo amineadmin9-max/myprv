@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-27 (9th update — Added Logs modal for monitoring all operations)
+## Last updated: 2026-07-27 (10th update — Terminal-style detailed logging for every operation)
 
 ## Quick Start
 In a new conversation, just say:
@@ -144,6 +144,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
+- v3.5 — Terminal-style logging: every request, proxy attempt, retry, response, error with timestamps
 - v3.4 — Added Logs modal: ⋮ → Logs shows all operations, errors, and status in real-time
 - v3.3 — Reduced evergreen from 90 to 30 days (fixes hour-long stall, ~4-12 min)
 - v3.2 — Fixed CORS proxy rate limiting: batch=1, delay=8s, retry=3x with 15s backoff
