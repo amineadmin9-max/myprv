@@ -28,9 +28,11 @@ jobs:
 
       - name: Copy web files to Android assets
         run: |
+          mkdir -p android/app/src/main/assets
           cp docs/index.html android/app/src/main/assets/
           cp docs/sw.js android/app/src/main/assets/ 2>/dev/null || true
           cp docs/manifest.json android/app/src/main/assets/ 2>/dev/null || true
+          ls -la android/app/src/main/assets/
 
       - name: Build Debug APK
         run: cd android && gradle assembleDebug
