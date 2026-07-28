@@ -452,20 +452,6 @@ const DEMAND_KW=['does anyone know','looking for','wish there was','is there a p
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
 
-// Seed keywords for YouTube-based evergreen discovery (no CORS needed)
-const EVERGREEN_SEEDS=[
-  'how to start','best budget','tutorial for beginners','review 2026',
-  'workout at home','home office setup','productivity tips','side hustle ideas',
-  'passive income','learn coding','cooking recipes','meal prep ideas',
-  'home workout','yoga for beginners','meditation guide','skin care routine',
-  'budget travel','camping tips','DIY projects','home improvement',
-  'pet care tips','plant care','gaming setup','tech gadgets',
-  'online business','freelancing tips','digital marketing','affiliate marketing',
-  'dropshipping guide','stock market basics','crypto explained','personal finance',
-  'car maintenance','phone review','laptop buying guide','headphones under',
-  'best apps','software tutorial','AI tools','productivity apps'
-];
-
 let llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};
 function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};}
 
@@ -1674,60 +1660,8 @@ function renderDiscoveryResults(results){
   el.innerHTML=html;
 }
 
-// ===================== EVERGREEN FROM YOUTUBE (no CORS needed) =====================
-async function fetchEvergreenFromYouTube(){
-  const ideas=[];
-  const seen=new Set();
-  const key=getYTKey();
-  if(!key){addLog('error','YouTube: No API key for evergreen discovery');return[];}
-  addLog('req',`Evergreen: Searching YouTube with ${EVERGREEN_SEEDS.length} seed categories`);
-  const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
-  const shuffled=[...EVERGREEN_SEEDS].sort(()=>Math.random()-0.5);
-  const picked=shuffled.slice(0,10);
-  addLog('info',`Selected 10 random seeds: ${picked.slice(0,5).join(', ')}...`);
-  for(let i=0;i<picked.length;i++){
-    const seed=picked[i];
-    try{
-      addLog('req',`[${i+1}/${picked.length}] YouTube search: "${seed}"`);
-      const publishedAfter=new Date(Date.now()-30*86400000).toISOString();
-      const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(seed)}&type=video&order=viewCount&publishedAfter=${publishedAfter}&maxResults=10&key=${key}`;
-      const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
-      addLog('res',`[${i+1}/${picked.length}] YouTube: HTTP ${r.status}`);
-      const data=await r.json();
-      if(data.error){
-        addLog('error',`[${i+1}/${picked.length}] YouTube API: ${data.error.message}`);
-        continue;
-      }
-      const items=data.items||[];
-      addLog('success',`[${i+1}/${picked.length}] "${seed}": ${items.length} videos`);
-      for(const v of items){
-        const title=v.snippet?.title||'';
-        const desc=v.snippet?.description||'';
-        const words=title.split(/\s+/).filter(w=>w.length>3);
-        for(let w=0;w<words.length-1;w++){
-          const phrase=`${words[w]} ${words[w+1]}`.toLowerCase();
-          if(phrase.length>6&&phrase.length<50&&!seen.has(phrase)&&!skip.some(s=>phrase.includes(s))){
-            seen.add(phrase);
-            ideas.push({title:words[w]+' '+words[w+1],source:'YouTube Discovery',traffic:'High',related:[],type:'evergreen'});
-          }
-        }
-        if(title.length>5&&title.length<60&&!seen.has(title.toLowerCase())&&!skip.some(s=>title.toLowerCase().includes(s))){
-          seen.add(title.toLowerCase());
-          ideas.push({title,content:desc,source:'YouTube Discovery',traffic:'High',related:[],type:'evergreen'});
-        }
-      }
-      addLog('info',`Progress: ${i+1}/${picked.length} | unique keywords=${ideas.length}`);
-    }catch(e){
-      addLog('error',`[${i+1}/${picked.length}] Failed: ${e.message}`);
-    }
-    await new Promise(r=>setTimeout(r,500));
-  }
-  addLog(ideas.length>0?'success':'warn',`Evergreen done: ${ideas.length} unique keywords from YouTube`);
-  return ideas.slice(0,100);
-}
-
-// ===================== DUAL DISCOVERY (YouTube-only, no CORS) =====================
-// ===================== DUAL DISCOVERY (YouTube-only, no CORS) =====================
+// ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
+// ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
 async function fetchTrendsFromServer(edStr){
   const server=getServerURL();
   if(!server)return null;
@@ -1840,7 +1774,7 @@ async function fetchYouTubeTrendingByCategory(){
 async function runDualDiscovery(){
   resetLLMStats();
   appLogs.length=0;
-  addLog('info','=== Dual Discovery Started (YouTube-only, no CORS) ===');
+  addLog('info','=== Dual Discovery Started ===');
   const key=getYTKey();
   if(!key){
     addLog('error','No YouTube API key found');
@@ -1854,13 +1788,13 @@ async function runDualDiscovery(){
   const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
   try{
 
-    // ════════ STEP 1: EVERGREEN (YouTube Discovery — no CORS) ════════
-    addLog('info','Step 1: Discovering evergreen topics from YouTube...');
-    showProgress(3);setStatus('Step 1: Searching YouTube for evergreen topics...');
-    const evergreenIdeas=await fetchEvergreenFromYouTube();
+    // ════════ STEP 1: EVERGREEN (1 month — Google Trends) ════════
+    addLog('info','Step 1: Fetching Google Trends keywords (30 days)...');
+    showProgress(3);setStatus('Step 1: Fetching Google Trends keywords (3 months)...');
+    const evergreenIdeas=await fetchGoogleTrendsYouTube('month');
     stats.evergreenRaw=evergreenIdeas.length;
-    addLog(evergreenIdeas.length>0?'success':'warn',`Step 1: Found ${evergreenIdeas.length} evergreen keywords from YouTube`);
-    showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} evergreen keywords from YouTube`);
+    addLog(evergreenIdeas.length>0?'success':'warn',`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
+    showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
 
     addLog('info',`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
     showProgress(20);setStatus(`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
@@ -1869,10 +1803,17 @@ async function runDualDiscovery(){
     addLog(evergreenFiltered.length>0?'success':'warn',`Step 1: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches after AI filtering`);
     showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches`);
 
-    // ════════ STEP 2: TRENDING (YouTube Trending — no CORS) ════════
+    // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube Trending) ════════
+    addLog('info','Step 2: Fetching Google Trends keywords (1 week)...');
+    showProgress(38);setStatus('Step 2: Fetching Google Trends keywords (1 week)...');
+    const trendingIdeas=await fetchGoogleTrendsYouTube('week');
+    stats.trendingRaw=trendingIdeas.length;
+    addLog(trendingIdeas.length>0?'success':'warn',`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
+    showProgress(42);setStatus(`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
+
+    // Add YouTube trending videos as keywords too
     addLog('info','Step 2: Fetching YouTube Trending videos...');
-    showProgress(38);setStatus('Step 2: Fetching YouTube Trending videos...');
-    const trendingIdeas=[];
+    showProgress(44);setStatus('Step 2: Fetching YouTube Trending videos...');
     const ytTrending=await fetchYouTubeTrendingByCategory();
     for(const v of ytTrending){
       const title=v.title;
@@ -1881,8 +1822,8 @@ async function runDualDiscovery(){
       }
     }
     stats.trendingRaw=trendingIdeas.length;
-    addLog(trendingIdeas.length>0?'success':'warn',`Step 2: Found ${trendingIdeas.length} trending keywords from YouTube`);
-    showProgress(42);setStatus(`Step 2: Found ${trendingIdeas.length} trending keywords from YouTube`);
+    addLog('info',`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube Trending)`);
+    showProgress(48);setStatus(`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube)`);
 
     addLog('info',`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
     showProgress(50);setStatus(`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
@@ -2042,7 +1983,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
         <div style="color:var(--text-dim);font-size:11px">Evergreen — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: YouTube Discovery (30 days)</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Google Trends (3 months)</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
@@ -2051,7 +1992,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingRaw}</div>
         <div style="color:var(--text-dim);font-size:11px">Trending — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: YouTube Trending</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Google Trends (1 week)</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingFiltered}</div>
