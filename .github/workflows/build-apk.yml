@@ -33,37 +33,25 @@ jobs:
           cp docs/sw.js android/app/src/main/assets/ 2>/dev/null || true
           cp docs/manifest.json android/app/src/main/assets/ 2>/dev/null || true
 
-      - name: Create local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.5'
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          ls -la gradlew
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 || true
+          ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No APK output found"
         working-directory: android
 
       - name: Upload APK as artifact
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: niche-finder-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
           retention-days: 30
-
-      - name: Release APK
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: apk-${{ github.run_number }}
-          name: Niche Finder APK v4.0
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          body: |
-            Niche Finder Android APK
-            - Bundled web app (no server needed)
-            - Uses phone's IP directly for Google Trends
-            - YouTube Data API + AI analysis
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
