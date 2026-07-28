@@ -187,7 +187,7 @@ def fetch_reddit_comments():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "version": "3.6-trends"})
 
 
 @app.route("/api/trends", methods=["GET"])
