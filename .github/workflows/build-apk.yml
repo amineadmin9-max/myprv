@@ -29,14 +29,15 @@ jobs:
           cp docs/index.html android/app/src/main/assets/
           cp docs/sw.js android/app/src/main/assets/ 2>/dev/null || true
           cp docs/manifest.json android/app/src/main/assets/ 2>/dev/null || true
-          echo "Files copied:"
+          echo "Assets:"
           ls -la android/app/src/main/assets/
 
-      - name: Build Debug APK
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
-          arguments: assembleDebug
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        working-directory: android
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
