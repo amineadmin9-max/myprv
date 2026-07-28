@@ -1662,30 +1662,61 @@ function renderDiscoveryResults(results){
 
 // ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
 // ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
+async function fetchTrendsFromServer(edStr){
+  const server=getServerURL();
+  if(!server)return null;
+  try{
+    const url=`${server}/api/trends?ed=${edStr}`;
+    addLog('req',`[Server] GET /api/trends?ed=${edStr}`);
+    const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
+    addLog('res',`[Server] HTTP ${r.status}`);
+    if(r.status===200){
+      const data=await r.json();
+      if(data.error){addLog('error',`[Server] ${data.error}`);return null;}
+      addLog('success',`[Server] Trends OK for ed=${edStr}`);
+      return data;
+    }
+    addLog('error',`[Server] Trends returned ${r.status}`);
+    return null;
+  }catch(e){
+    addLog('error',`[Server] Connection failed: ${e.message}`);
+    return null;
+  }
+}
+
 async function fetchGoogleTrendsYouTube(timeframe){
   const ideas=[];
   const seen=new Set();
   const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
+  const server=getServerURL();
+  const mode=server?'Server':'Proxies';
   try{
     const today=new Date();
     const days=timeframe==='week'?7:30;
-    addLog('req',`Google Trends: ${timeframe} mode → generating ${days} date URLs`);
-    let urls=[];
+    addLog('req',`Google Trends: ${timeframe} mode → ${days} days via ${mode}`);
+    let dates=[];
     for(let d=0;d<days;d++){
       const ed=new Date(today);ed.setDate(today.getDate()-d);
-      const edStr=ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0');
-      urls.push(`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`);
+      dates.push(ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0'));
     }
-    addLog('req',`Google Trends: ${urls.length} URLs ready, starting fetch (8s delay between each)`);
+    addLog('info',`Using ${mode} | ${days} dates | ${server?'2s delay':'8s delay'}`);
     let okCount=0,failCount=0;
-    for(let i=0;i<urls.length;i++){
-      const edStr=urls[i].match(/ed=(\d+)/)?.[1]||'?';
+    for(let i=0;i<dates.length;i++){
+      const edStr=dates[i];
       let data=null;
-      for(let attempt=0;attempt<3;attempt++){
-        if(attempt>0)addLog('warn',`Retry ${attempt+1}/3 for ed=${edStr} (waiting 15s)`);
-        data=await fetchWithProxyJSON(urls[i]);
-        if(data)break;
-        if(attempt<2)await new Promise(r=>setTimeout(r,15000));
+      // Try server first
+      if(server){
+        data=await fetchTrendsFromServer(edStr);
+      }
+      // Fallback to proxies
+      if(!data){
+        const trendUrl=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`;
+        for(let attempt=0;attempt<3;attempt++){
+          if(attempt>0)addLog('warn',`Retry ${attempt+1}/3 for ed=${edStr} (waiting 15s)`);
+          data=await fetchWithProxyJSON(trendUrl);
+          if(data)break;
+          if(attempt<2)await new Promise(r=>setTimeout(r,15000));
+        }
       }
       if(data){
         okCount++;
@@ -1702,15 +1733,15 @@ async function fetchGoogleTrendsYouTube(timeframe){
             if(r2.query.length>3&&r2.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r2.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
           }
         }
-        addLog('info',`Progress: ${i+1}/${days} | ok=${okCount} fail=${failCount} | unique keywords=${ideas.length}`);
+        addLog('info',`Progress: ${i+1}/${dates.length} | ok=${okCount} fail=${failCount} | keywords=${ideas.length}`);
       }else{
         failCount++;
-        addLog('error',`ed=${edStr}: FAILED after 3 attempts`);
-        addLog('info',`Progress: ${i+1}/${days} | ok=${okCount} fail=${failCount} | unique keywords=${ideas.length}`);
+        addLog('error',`ed=${edStr}: FAILED (${server?'server + proxies':'all proxies'} failed)`);
+        addLog('info',`Progress: ${i+1}/${dates.length} | ok=${okCount} fail=${failCount} | keywords=${ideas.length}`);
       }
-      if(i<urls.length-1)await new Promise(r=>setTimeout(r,8000));
+      if(i<dates.length-1)await new Promise(r=>setTimeout(r,server?2000:8000));
     }
-    addLog('info',`Google Trends done: ${okCount} ok, ${failCount} fail, ${ideas.length} unique keywords`);
+    addLog(okCount>0?'success':'error',`Google Trends done: ${okCount}/${dates.length} days OK, ${ideas.length} unique keywords`);
   }catch(e){
     console.error('Trends error:',e);
     addLog('error',`Google Trends FATAL: ${e.message}`);

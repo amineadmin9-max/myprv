@@ -1,5 +1,5 @@
 # Niche Finder - Project Context
-## Last updated: 2026-07-27 (10th update — Terminal-style detailed logging for every operation)
+## Last updated: 2026-07-27 (11th update — Added /api/trends server endpoint, server-first for Google Trends)
 
 ## Quick Start
 In a new conversation, just say:
@@ -111,8 +111,9 @@ A **Niche Finder** web app that finds profitable niches by combining:
 - `renderDualResults(evergreen, trending, stats)` — render cards
 - `renderSearchResult(keyword, scoring, videos, totalResults)` — render search
 - `renderLLMStats()` — LLM usage stats panel
-- `addLog(type, msg)` — add entry to Logs modal (info/success/error/warn)
+- `addLog(type, msg)` — add entry to Logs modal (info/success/error/warn/req/res/proxy)
 - `openLogsModal()` — open Logs modal from ⋮ menu
+- `fetchTrendsFromServer(edStr)` — fetch Google Trends via Flask server /api/trends
 
 ### Constants
 - `PROXIES` — CORS proxies (for Google Trends if needed)
@@ -144,6 +145,7 @@ A **Niche Finder** web app that finds profitable niches by combining:
 5. Set AI key: ⚙️ → Gemini / OpenRouter → paste key → Save
 
 ## Version History
+- v3.6 — Added /api/trends server endpoint; server-first for Google Trends, proxy fallback
 - v3.5 — Terminal-style logging: every request, proxy attempt, retry, response, error with timestamps
 - v3.4 — Added Logs modal: ⋮ → Logs shows all operations, errors, and status in real-time
 - v3.3 — Reduced evergreen from 90 to 30 days (fixes hour-long stall, ~4-12 min)

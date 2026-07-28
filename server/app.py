@@ -190,6 +190,39 @@ def health():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/trends", methods=["GET"])
+def fetch_trends():
+    """Fetch Google Trends daily trends for a specific date.
+    Query param: ed=YYYYMMDD (end date)
+    Returns: the raw Google Trends dailytrends JSON response.
+    """
+    ed = request.args.get("ed", "")
+    if not ed or len(ed) != 8 or not ed.isdigit():
+        return jsonify({"error": "Invalid ed param. Use YYYYMMDD format."}), 400
+
+    url = (
+        f"https://trends.google.com/trends/api/dailytrends"
+        f"?hl=en-US&tz=-480&geo=US&ed={ed}"
+    )
+
+    try:
+        resp = SESSION.get(url, timeout=20)
+        print(f"[TRENDS] ed={ed} -> {resp.status_code} ({len(resp.text)} bytes)")
+
+        if resp.status_code == 200:
+            # Google Trends prefixes JSON with ")]}',\n" — strip it
+            text = resp.text
+            if text.startswith(")]}'"):
+                text = text[text.index("\n") + 1 :]
+            return jsonify(json.loads(text))
+        else:
+            return jsonify({"error": f"Google Trends returned {resp.status_code}"}), 502
+
+    except Exception as e:
+        print(f"[TRENDS] Failed for ed={ed}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
