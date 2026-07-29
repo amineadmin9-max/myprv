@@ -1503,7 +1503,7 @@ function renderSearchResults(keyword,results){
     const avgViews=r.videos&&r.videos.length>0?Math.round(r.videos.reduce((s,v)=>s+v.views,0)/r.videos.length):0;
     const es=r.eScoring||computeEvergreenScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
     const ts=r.tScoring||computeTrendingScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
-    html+=`<div class="niche-card">
+    html+=`<div class="niche-card" data-kw="${r.keyword.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" onclick="scheduleNiche(this.dataset.kw)">
       <div class="niche-card-left">
         <div class="niche-card-title">${r.keyword}</div>
         <div class="niche-card-meta" style="display:flex;gap:8px;align-items:center">
@@ -2406,7 +2406,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     for(const r of evergreenResults){
       const c=r.scoring.color;
       const s=r.scoring;
-      html+=`<div class="niche-card">
+      html+=`<div class="niche-card" data-kw="${r.keyword.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" onclick="scheduleNiche(this.dataset.kw)">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🌳 Evergreen · ${s.label}</div>
@@ -2423,7 +2423,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     for(const r of trendingResults){
       const c=r.scoring.color;
       const s=r.scoring;
-      html+=`<div class="niche-card">
+      html+=`<div class="niche-card" data-kw="${r.keyword.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" onclick="scheduleNiche(this.dataset.kw)">
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🔥 Trending · ${s.label}</div>
@@ -2447,6 +2447,26 @@ function setFreq(el,f){monitorFreq=f;el.parentElement.querySelectorAll('.freq-bt
 
 function getMonitors(){try{return JSON.parse(localStorage.getItem('nf_monitors')||'[]');}catch(e){return[];}}
 function saveMonitors(m){localStorage.setItem('nf_monitors',JSON.stringify(m));}
+
+function scheduleNiche(keyword){
+  if(!confirm(`Schedule this niche?\n\n${keyword}\n\nNiche Finder will monitor it regularly.\n\nYes / No`))return;
+  const monitors=getMonitors();
+  if(monitors.some(m=>m.name.toLowerCase()===keyword.toLowerCase())){
+    alert('Already scheduled.');
+    return;
+  }
+  monitors.push({id:Date.now(),name:keyword,freq:'daily',active:true,lastCheck:null,lastVideos:0,lastViews:0});
+  saveMonitors(monitors);
+  renderMonitors();
+  const toast=document.getElementById('page-list');
+  if(toast){
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;z-index:200;animation:fadeIn .3s';
+    t.textContent='✅ Scheduled! Check Monitors tab.';
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(),2500);
+  }
+}
 
 function saveMonitor(){
   const name=document.getElementById('monitorName').value.trim();
