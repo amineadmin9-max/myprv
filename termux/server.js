@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const googleTrends = require('google-trends-api');
+const { spawnSync } = require('child_process');
 const { expandKeywords } = require('./expand');
 const { countKeywords } = require('./count');
 
@@ -80,35 +80,71 @@ app.get('/', (req, res) => {
   });
 });
 
-/* ─── Google Trends ─── */
-app.get('/api/trends', async (req, res) => {
-  const ed = req.query.ed;
-  if (!ed || !/^\d{8}$/.test(ed)) {
-    return res.status(400).json({ error: 'Invalid ed format. Use YYYYMMDD.' });
+/* ─── Pytrends: Related Queries ─── */
+function runPytrends(action, data) {
+  const result = spawnSync('python3', [
+    path.join(__dirname, 'trends.py'),
+    action,
+    JSON.stringify(data)
+  ], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+  if (result.error) throw new Error('Python exec: ' + result.error.message);
+  if (result.status !== 0) {
+    const stderr = result.stderr.toString().trim();
+    throw new Error(stderr || `Python exit code ${result.status}`);
   }
+  const stdout = result.stdout.toString().trim();
+  if (!stdout) return null;
+  return JSON.parse(stdout);
+}
+
+app.post('/api/related', (req, res) => {
+  const { keyword, country } = req.body || {};
+  if (!keyword) return res.status(400).json({ error: 'keyword required' });
   try {
-    const year = parseInt(ed.slice(0, 4));
-    const month = parseInt(ed.slice(4, 6)) - 1;
-    const day = parseInt(ed.slice(6, 8));
-    const date = new Date(year, month, day);
-    if (isNaN(date.getTime())) throw new Error('Invalid date');
-
-    const result = await googleTrends.dailyTrends({
-      trendDate: date,
-      geo: 'US'
-    });
-
-    let parsed;
-    try { parsed = typeof result === 'string' ? JSON.parse(result) : result; }
-    catch { return res.status(502).json({ error: 'Failed to parse Trends response' }); }
-
-    if (!parsed || !parsed.default || !parsed.default.trendingSearchesDays) {
-      return res.status(502).json({ error: 'No trending data returned' });
-    }
-
-    res.json(parsed);
+    const out = runPytrends('related', { keyword, country: country || 'US' });
+    res.json(out || { top: [], rising: [] });
   } catch (err) {
-    res.status(500).json({ error: err.message || 'Trends fetch failed' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/rising', (req, res) => {
+  const { keywords, country } = req.body || {};
+  if (!keywords || !Array.isArray(keywords) || keywords.length === 0)
+    return res.status(400).json({ error: 'keywords array required' });
+  try {
+    const allRising = [];
+    const seen = new Set();
+    for (const kw of keywords) {
+      if (!kw || kw.length < 2) continue;
+      const out = runPytrends('related', { keyword: kw, country: country || 'US' });
+      if (out && out.rising) {
+        for (const item of out.rising) {
+          const q = item.query || item.title || '';
+          if (q && !seen.has(q.toLowerCase())) {
+            seen.add(q.toLowerCase());
+            allRising.push({ keyword: q, parent: kw });
+          }
+        }
+      }
+    }
+    res.json({ keywords: allRising, total: allRising.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ─── Restart: clear data ─── */
+app.post('/api/restart', (req, res) => {
+  try {
+    if (fs.existsSync(EXPANDED_FILE)) fs.unlinkSync(EXPANDED_FILE);
+    if (fs.existsSync(COUNTS_FILE)) fs.unlinkSync(COUNTS_FILE);
+    expandState = { running: false, total: 0, done: 0, failed: 0, startedAt: null, error: null, keywords: [], phase: null, currentKeyword: null, sub: null, l2Done: 0, l2Total: 0 };
+    countState = { running: false, total: 0, done: 0, failed: 0, quotaUsed: 0, quotaExhausted: false, startedAt: null, error: null, keywords: [] };
+    console.log('[restart] Data files cleared');
+    res.json({ status: 'ok', message: 'All data cleared. You can start fresh.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -283,7 +319,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(` ──────────────────────────`);
   console.log(` Running on: http://127.0.0.1:${PORT}`);
   console.log(` Ping:       /ping`);
-  console.log(` Trends:     /api/trends?ed=YYYYMMDD`);
+  console.log(` Related:    POST /api/related`);
+  console.log(` Rising:     POST /api/rising`);
+  console.log(` Restart:    POST /api/restart`);
   console.log(` Expand:     POST /api/expand`);
   console.log(` Status:     /api/expand-status`);
   console.log(` Keywords:   /api/keywords`);

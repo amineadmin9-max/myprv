@@ -218,6 +218,18 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Logs
       </div>
+      <div class="dropdown-item" onclick="openCountryModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Country
+      </div>
+      <div class="dropdown-item" onclick="openKeywordsModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        Keywords
+      </div>
+      <div class="dropdown-item" onclick="restartData()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Restart
+      </div>
       <div class="dropdown-item" onclick="openAboutModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         About
@@ -299,6 +311,60 @@
       <div class="modal-saved" id="serverSaved">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
         Server URL saved
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Country -->
+  <div class="modal-overlay hidden" id="countryModal" onclick="closeModalBg(event)">
+    <div class="modal-box" style="max-height:80vh;display:flex;flex-direction:column">
+      <div id="countryFormView">
+        <h2>Select Country</h2>
+        <p style="font-size:12px">Used for Google Trends (pytrends) to find rising niches + related queries.</p>
+        <div id="countryList" style="flex:1;overflow-y:auto;margin:10px 0;max-height:50vh">
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="closeCountryModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveCountry()">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="countrySaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Country saved
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Keywords -->
+  <div class="modal-overlay hidden" id="keywordsModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <div id="keywordsFormView">
+        <h2>Keywords for Auto-generate</h2>
+        <p style="font-size:12px">These keywords feed pytrends to find <b>rising</b> related queries. One per line.</p>
+        <textarea id="keywordsInput" style="width:100%;min-height:160px;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;margin:10px 0;font-family:inherit" placeholder="health&#10;tech&#10;money&#10;beauty&#10;travel"></textarea>
+        <div class="modal-actions" style="flex-wrap:wrap">
+          <button class="modal-btn ghost" onclick="pasteKeywords()" style="font-size:12px">Paste</button>
+          <button class="modal-btn ghost" onclick="clearKeywords()" style="font-size:12px">Clear</button>
+          <button class="modal-btn ghost" onclick="closeKeywordsModal()" style="font-size:12px">Cancel</button>
+          <button class="modal-btn primary" onclick="saveKeywords()" style="font-size:12px">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="keywordsSaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Keywords saved
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Schedule Niche -->
+  <div class="modal-overlay hidden" id="scheduleModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <h2>Schedule this niche?</h2>
+      <p id="scheduleKeywordDisplay" style="font-size:15px;font-weight:600;color:var(--blue);margin:12px 0;text-align:center;word-break:break-word"></p>
+      <p style="font-size:12px;color:var(--text-dim);text-align:center">Niche Finder will monitor it regularly in the Monitors tab.</p>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="modal-btn ghost" onclick="closeScheduleModal()">Cancel</button>
+        <button class="modal-btn primary" onclick="confirmSchedule()" style="background:var(--green);color:#000;font-weight:700">Yes, Schedule</button>
       </div>
     </div>
   </div>
@@ -458,32 +524,20 @@ const STORY_KW=['my experience','i tried','before and after','journey','story','
 const DEMAND_KW=['does anyone know','looking for','wish there was','is there a product','anyone recommend','need help finding','looking for something','does anyone use','where can i find','how do i get','any suggestions','what do you use','best product for','alternative to','better than','frustrated with','tired of','hate when','annoying that','wish i could','if only there','would pay for','shut up and take my money'];
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
-const SEED_KEYWORDS=[
-  "weight loss","fitness","workout","yoga","meditation","keto diet","vegan recipes","meal prep",
-  "skincare","makeup","beauty tips","hair care","nail art","perfume",
-  "home decor","interior design","gardening","landscaping","declutter",
-  "photography","videography","photo editing","camera gear",
-  "gaming","pc build","streaming","gaming chair","gaming setup",
-  "smart home","home automation","security camera","solar panel",
-  "web development","app development","ai tools","chatgpt","programming",
-  "digital marketing","seo","social media","content creation",
-  "online course","language learning","teaching","tutoring",
-  "investing","crypto","real estate","stock market","credit card",
-  "personal finance","budgeting","side hustle","passive income",
-  "ecommerce","dropshipping","amazon fba","etsy",
-  "pet supplies","dog training","cat food","aquarium","pet grooming",
-  "baby products","pregnancy","parenting","kids education",
-  "camping","hiking","backpacking","survival gear",
-  "cooking","baking","air fryer","instant pot","bbq","kitchen gadgets",
-  "travel","solo travel","travel tips","luggage","hotel",
-  "car maintenance","car detailing","motorcycle","bicycle",
-  "fashion","streetwear","sneakers","watch",
-  "self improvement","productivity","time management","habits",
-  "anxiety relief","sleep better","mental health",
-  "woodworking","diy projects","power tools","3d printing",
-  "fishing","hunting","archery",
-  "podcast","vlogging","microphone","lighting setup",
+const COUNTRIES=[
+  {code:'SA',name:'🇸🇦 Saudi Arabia'},{code:'AE',name:'🇦🇪 UAE'},{code:'EG',name:'🇪🇬 Egypt'},
+  {code:'QA',name:'🇶🇦 Qatar'},{code:'KW',name:'🇰🇼 Kuwait'},{code:'OM',name:'🇴🇲 Oman'},
+  {code:'BH',name:'🇧🇭 Bahrain'},{code:'TR',name:'🇹🇷 Turkey'},{code:'IQ',name:'🇮🇶 Iraq'},
+  {code:'JO',name:'🇯🇴 Jordan'},{code:'LB',name:'🇱🇧 Lebanon'},{code:'MA',name:'🇲🇦 Morocco'},
+  {code:'DZ',name:'🇩🇿 Algeria'},{code:'TN',name:'🇹🇳 Tunisia'},{code:'LY',name:'🇱🇾 Libya'},
+  {code:'US',name:'🇺🇸 United States'},{code:'GB',name:'🇬🇧 UK'},{code:'DE',name:'🇩🇪 Germany'},
+  {code:'FR',name:'🇫🇷 France'},{code:'CA',name:'🇨🇦 Canada'},{code:'AU',name:'🇦🇺 Australia'},
+  {code:'IN',name:'🇮🇳 India'},{code:'JP',name:'🇯🇵 Japan'},{code:'BR',name:'🇧🇷 Brazil'},
+  {code:'MX',name:'🇲🇽 Mexico'},{code:'IT',name:'🇮🇹 Italy'},{code:'ES',name:'🇪🇸 Spain'},
+  {code:'NL',name:'🇳🇱 Netherlands'},{code:'RU',name:'🇷🇺 Russia'}
 ];
+function getCountry(){return localStorage.getItem('nf_country')||'SA';}
+function getKeywords(){try{return JSON.parse(localStorage.getItem('nf_keywords')||'[]');}catch{return[];}}
 
 let llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};
 function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};}
@@ -1433,9 +1487,33 @@ async function handleSearch(){
       return;
     }
 
-    addLog('info',`Termux: expanding "${q}"...`);
-    showProgress(10);setStatus(`Expanding "${q}" on Termux...`);
-    const ok=await startTermuxExpansion(server,[q]);
+    const country=getCountry();
+    addLog('info',`Pytrends: fetching related queries for "${q}" (${country})...`);
+    showProgress(10);setStatus(`Related queries for "${q}" from pytrends...`);
+    let relatedKW=[];
+    try{
+      const rr=await fetch(server+'/api/related',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({keyword:q,country}),
+        signal:AbortSignal.timeout(30000)
+      });
+      if(!rr.ok){const e=await rr.json();throw new Error(e.error||'Related fetch failed');}
+      const rd=await rr.json();
+      const top=rd.top||[];const rising=rd.rising||[];
+      const seen=new Set();const all=[];
+      for(const k of[...top,...rising]){const n=(k.keyword||k).trim().toLowerCase();if(!seen.has(n)&&n!==q.toLowerCase()){seen.add(n);all.push(n);}}
+      relatedKW=all.slice(0,40);
+      addLog('success',`Related: ${relatedKW.length} keywords (top ${top.length} + rising ${rising.length})`);
+    }catch(e){
+      addLog('warn',`Pytrends related failed: ${e.message}. Falling back to direct expansion.`);
+      relatedKW=[q];
+    }
+
+    if(!relatedKW.length)relatedKW=[q];
+
+    addLog('info',`Expanding ${relatedKW.length} keywords via YouTube Suggest...`);
+    showProgress(20);setStatus(`Expanding ${relatedKW.length} keywords...`);
+    const ok=await startTermuxExpansion(server,relatedKW);
     if(!ok)throw new Error('Failed to start expansion');
 
     let expState;
@@ -1445,12 +1523,12 @@ async function handleSearch(){
       if(!expState.running)break;
       const pct=expState.pct||0;
       const detail=expState.currentKeyword?` · ${expState.currentKeyword}${expState.phase==='level2'?` (${expState.l2Done}/${expState.l2Total})`:''}`:'';
-      showProgress(10+pct*0.3);
+      showProgress(20+pct*0.25);
       setStatus(`Expanding: ${expState.done}/${expState.total} keywords${detail} (${pct}%)`);
     }
-    showProgress(40);setStatus('Fetching expanded keywords...');
+    showProgress(45);setStatus('Fetching expanded keywords...');
     const expanded=await fetchTermuxKeywords(server);
-    addLog('success',`Expanded "${q}" → ${expanded.length} keywords`);
+    addLog('success',`Expanded ${relatedKW.length} keywords → ${expanded.length} sub-niches`);
 
     if(!expanded.length){
       document.getElementById('results').innerHTML='<div class="error">⚠️ Expansion returned 0 keywords. Try a different search term.</div>';
@@ -1514,7 +1592,7 @@ function renderSearchResults(keyword,results){
           <span style="color:var(--text-dim);font-size:10px">·</span>
           <span style="color:var(--text-dim);font-size:10px">${es.label}</span>
         </div>
-        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||0).toLocaleString()} videos · 👁️ ${avgViews.toLocaleString()} avg views</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||0).toLocaleString()} videos · 👁️ ${avgViews.toLocaleString()} avg views · 📅 ${avgVideoAge(r.videos||[])}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px">
         <div style="color:#10b981;font-weight:700;font-size:13px">${es.score}</div>
@@ -1523,6 +1601,21 @@ function renderSearchResults(keyword,results){
     </div>`;
   }
   el.innerHTML=html;
+}
+
+function avgVideoAge(videos){
+  if(!videos||!videos.length)return 'N/A';
+  const now=Date.now();
+  let total=0,count=0;
+  for(const v of videos){
+    const t=new Date(v.published).getTime();
+    if(!isNaN(t)){total+=now-t;count++;}
+  }
+  if(!count)return 'N/A';
+  const avgDays=Math.round(total/count/86400000);
+  if(avgDays<1)return 'today';
+  if(avgDays===1)return '1 day ago';
+  return avgDays+' days ago';
 }
 
 function renderSearchResult(keyword,scoring,videos,totalResults){
@@ -1534,7 +1627,7 @@ function renderSearchResult(keyword,scoring,videos,totalResults){
     <div class="niche-card-left">
       <div class="niche-card-title">${keyword}</div>
       <div class="niche-card-meta">YouTube · ${s.label}</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${count} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${count} total videos · 👁️ ${s.avgViews.toLocaleString()} views</div>
     </div>
     <div class="niche-dot ${c}"></div>
   </div>`;
@@ -1542,8 +1635,7 @@ function renderSearchResult(keyword,scoring,videos,totalResults){
   html+=`<div class="result-stats">
     <div class="result-stat"><div class="val">${count.toLocaleString()}</div><div class="lbl">Total Videos</div></div>
     <div class="result-stat"><div class="val">${s.avgViews.toLocaleString()}</div><div class="lbl">Avg Views</div></div>
-    <div class="result-stat"><div class="val">${s.avgLikes.toLocaleString()}</div><div class="lbl">Avg Likes</div></div>
-    <div class="result-stat"><div class="val">${s.promoLinks}</div><div class="lbl">Promo Links</div></div>
+    <div class="result-stat"><div class="val">${s.score}</div><div class="lbl">Score</div></div>
   </div>`;
   html+=`<div class="result-posts">${videos.slice(0,8).map(v=>`
     <div class="result-post">
@@ -1682,87 +1774,78 @@ function countLinksInText(text){
 
 // ===================== YOUTUBE TRAFFIC LIGHT (6 colors) =====================
 function computeYouTubeScoring(videos,totalResults){
-  if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data available',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0,highEng:false};
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data',videoCount:totalResults||0,avgViews:0};
   const vc=totalResults||videos.length;
-  const totalViews=videos.reduce((s,v)=>s+v.views,0);
-  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
-  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
-  const avgViews=Math.round(totalViews/videos.length);
-  const avgLikes=Math.round(totalLikes/videos.length);
-  const avgComments=Math.round(totalComments/videos.length);
-  const highEng=avgViews>10000;
+  const avgViews=Math.round(videos.reduce((s,v)=>s+v.views,0)/videos.length);
+  const avgLikes=Math.round(videos.reduce((s,v)=>s+v.likes,0)/videos.length);
+  const avgComments=Math.round(videos.reduce((s,v)=>s+v.comments,0)/videos.length);
   const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
-  let color,label;
-  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 Clean opportunity — very low competition';}
-  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='🟢 Open market — moderate competition + good engagement';}
-  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 Growing market — some activity';}
-  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 Large market — moderate competition';}
-  else if(vc>25000&&promoLinks>8){color='red';label='🔴 Saturated — high volume + many promo links';}
-  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 Saturated — many promo links with lower volume';}
-  else{color='yellow';label='🟡 Moderate market';}
+  const engRate=avgViews>0?Math.round((avgLikes+avgComments)/avgViews*100):0;
+  const highEng=engRate>5;
   let score=0;
-  if(highEng)score+=30;
-  else if(avgViews>5000)score+=20;
-  else if(avgViews>1000)score+=10;
+  if(highEng)score+=30;else if(engRate>3)score+=20;else if(engRate>1)score+=10;
   if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
-  const engRatio=avgViews>0?(avgLikes+avgComments*5)/avgViews:0;
-  score+=Math.min(20,Math.round(engRatio*100));
+  score+=Math.min(20,engRate);
   if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
   score=Math.min(100,score);
-  return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks,highEng};
+  let color='yellow',label='🟡 No data';
+  if(vc<5000&&highEng&&promoLinks<=3){color='green';label='🟢 فرصة نظيفة';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 سوق مفتوح';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 سوق نامي';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 سوق كبير – منافسة متوسطة';}
+  else if(vc>25000&&promoLinks>8){color='red';label='🔴 مشبع';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 مشبع – روابط كثيرة مع حجم أقل';}
+  return{score,color,label,videoCount:vc,avgViews};
 }
 
 function computeEvergreenScoring(videos,totalResults,recent7dCount){
-  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data',videoCount:totalResults||0,avgViews:0};
   const vc=totalResults||videos.length;
-  const totalViews=videos.reduce((s,v)=>s+v.views,0);
-  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
-  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
-  const avgViews=Math.round(totalViews/videos.length);
-  const avgLikes=Math.round(totalLikes/videos.length);
-  const avgComments=Math.round(totalComments/videos.length);
-  const highEng=avgViews>10000;
+  const avgViews=Math.round(videos.reduce((s,v)=>s+v.views,0)/videos.length);
+  const avgLikes=Math.round(videos.reduce((s,v)=>s+v.likes,0)/videos.length);
+  const avgComments=Math.round(videos.reduce((s,v)=>s+v.comments,0)/videos.length);
   const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  const engRate=avgViews>0?Math.round((avgLikes+avgComments)/avgViews*100):0;
+  const highEng=engRate>5;
   let score=0;
-  if(highEng)score+=30;else if(avgViews>5000)score+=20;else if(avgViews>1000)score+=10;
+  if(highEng)score+=30;else if(engRate>3)score+=20;else if(engRate>1)score+=10;
   if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
-  const engRatio=avgViews>0?(avgLikes+avgComments*5)/avgViews:0;
-  score+=Math.min(20,Math.round(engRatio*100));
+  score+=Math.min(20,engRate);
   if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
   score=Math.min(100,score);
-  let color,label;
-  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='Clean opportunity — low competition';}
-  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='Open market — moderate competition + good engagement';}
-  else if(vc<=25000&&promoLinks<=8){color='yellow';label='Growing market — some activity';}
-  else if(vc>25000&&promoLinks<=8){color='orange';label='Large market — moderate competition';}
-  else if(vc>25000&&promoLinks>8){color='red';label='Saturated — high volume + many promo links';}
-  else if(vc<=25000&&promoLinks>8){color='purple';label='Saturated — many promo links with lower volume';}
-  else{color='yellow';label='Moderate market';}
-  return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks};
+  let color='yellow',label='🟡 No data';
+  if(vc<5000&&highEng&&promoLinks<=3){color='green';label='🟢 فرصة نظيفة';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 سوق مفتوح';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 سوق نامي';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 سوق كبير – منافسة متوسطة';}
+  else if(vc>25000&&promoLinks>8){color='red';label='🔴 مشبع';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 مشبع – روابط كثيرة مع حجم أقل';}
+  return{score,color,label,videoCount:vc,avgViews};
 }
 
 function computeTrendingScoring(videos,totalResults,recent7dCount){
-  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',trendPct:0,videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0};
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data',videoCount:totalResults||0,avgViews:0};
   const vc=totalResults||videos.length;
-  const totalViews=videos.reduce((s,v)=>s+v.views,0);
-  const avgViews=Math.round(totalViews/videos.length);
+  const avgViews=Math.round(videos.reduce((s,v)=>s+v.views,0)/videos.length);
   const avgLikes=Math.round(videos.reduce((s,v)=>s+v.likes,0)/videos.length);
   const avgComments=Math.round(videos.reduce((s,v)=>s+v.comments,0)/videos.length);
-  const highEng=avgViews>10000;
-  const recentRatio=videos.length>0?recent7dCount/videos.length:0;
+  const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  const engRate=avgViews>0?Math.round((avgLikes+avgComments)/avgViews*100):0;
+  const highEng=engRate>5;
   let score=0;
-  if(recentRatio>=0.5)score+=40;else if(recentRatio>=0.3)score+=30;else if(recentRatio>=0.1)score+=15;else if(recentRatio>0)score+=5;
-  if(highEng)score+=40;else if(avgViews>5000)score+=30;else if(avgViews>1000)score+=20;else if(avgViews>500)score+=10;
-  if(vc>=500&&vc<50000)score+=20;else if(vc>=50000&&vc<200000)score+=10;else if(vc>0)score+=5;
+  if(highEng)score+=30;else if(engRate>3)score+=20;else if(engRate>1)score+=10;
+  if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
+  score+=Math.min(20,engRate);
+  if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
   score=Math.min(100,score);
-  let color,label;
-  if(recentRatio>=0.5&&highEng){color='purple';label='🔥 Hot trending — rapid recent activity';}
-  else if(recentRatio>=0.3&&highEng){color='blue';label='📈 Trending up — strong recent engagement';}
-  else if(recentRatio>=0.1&&avgViews>1000){color='skyblue';label='⬆️ Emerging — growing interest';}
-  else if(recentRatio<0.1&&vc>50000){color='orange';label='Established — low recent activity';}
-  else if(recentRatio<0.1){color='gray';label='Stable — no surge';}
-  else{color='yellow';label='Moderate activity';}
-  return{score,color,label,trendPct:Math.round(recentRatio*100),videoCount:vc,avgViews,avgLikes,avgComments};
+  let color='yellow',label='🟡 No data';
+  if(vc<5000&&highEng&&promoLinks<=3){color='green';label='🟢 فرصة نظيفة';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 سوق مفتوح';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 سوق نامي';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 سوق كبير – منافسة متوسطة';}
+  else if(vc>25000&&promoLinks>8){color='red';label='🔴 مشبع';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 مشبع – روابط كثيرة مع حجم أقل';}
+  return{score,color,label,videoCount:vc,avgViews};
 }
 
 function saveYTKey(){
@@ -1796,6 +1879,74 @@ function saveServerURL(){
   const saved=document.getElementById('serverSaved');
   saved.style.display='block';
   setTimeout(()=>{saved.style.display='none';document.getElementById('serverFormView').style.display='';document.getElementById('serverModal').classList.add('hidden');document.getElementById('serverURLInput').value='';},1500);
+}
+
+// ===================== COUNTRY MODAL =====================
+function openCountryModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  const list=document.getElementById('countryList');
+  const current=getCountry();
+  list.innerHTML=COUNTRIES.map(c=>`<div class="country-opt" data-code="${c.code}" style="padding:12px 14px;margin:4px 0;border-radius:10px;cursor:pointer;background:${c.code===current?'var(--blue-light)':'var(--bg)'};border:1px solid ${c.code===current?'var(--blue)':'var(--border)'};display:flex;align-items:center;gap:10px;font-size:14px">${c.name} <span style="flex:1;text-align:right;font-size:11px;color:var(--text-dim)">${c.code}</span></div>`).join('');
+  list.querySelectorAll('.country-opt').forEach(el=>el.onclick=()=>{
+    list.querySelectorAll('.country-opt').forEach(x=>{x.style.background='var(--bg)';x.style.borderColor='var(--border)';});
+    el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';
+    el.dataset.code;  // will be read on save
+    document.querySelectorAll('.country-opt').forEach(x=>x.dataset.selected='');
+    el.dataset.selected='1';
+  });
+  document.getElementById('countryModal').classList.remove('hidden');
+}
+function closeCountryModal(){document.getElementById('countryModal').classList.add('hidden');}
+function saveCountry(){
+  const sel=document.querySelector('#countryList .country-opt[data-selected="1"]');
+  const code=sel?sel.dataset.code:'SA';
+  localStorage.setItem('nf_country',code);
+  document.getElementById('countryFormView').style.display='none';
+  const saved=document.getElementById('countrySaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('countryFormView').style.display='';document.getElementById('countryModal').classList.add('hidden');},1500);
+}
+
+// ===================== KEYWORDS MODAL =====================
+function openKeywordsModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  const kw=getKeywords();
+  document.getElementById('keywordsInput').value=kw.join('\n');
+  document.getElementById('keywordsModal').classList.remove('hidden');
+}
+function closeKeywordsModal(){document.getElementById('keywordsModal').classList.add('hidden');}
+function pasteKeywords(){
+  navigator.clipboard.readText().then(t=>{
+    const ta=document.getElementById('keywordsInput');
+    ta.value+=ta.value?'\n'+t:t;
+  }).catch(()=>alert('Cannot read clipboard. Paste manually.'));
+}
+function clearKeywords(){document.getElementById('keywordsInput').value='';}
+function saveKeywords(){
+  const raw=document.getElementById('keywordsInput').value.trim();
+  const kw=raw.split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+  if(!kw.length){alert('Enter at least one keyword.');return;}
+  localStorage.setItem('nf_keywords',JSON.stringify(kw));
+  document.getElementById('keywordsFormView').style.display='none';
+  const saved=document.getElementById('keywordsSaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('keywordsFormView').style.display='';document.getElementById('keywordsModal').classList.add('hidden');},1500);
+}
+
+// ===================== RESTART =====================
+async function restartData(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  if(!confirm('⚠️ Restart?\n\nThis will delete all expanded + counted data and start fresh from pytrends.\n\nYour keywords and country settings will be kept.'))return;
+  const server=getServerURL();
+  if(server){
+    try{
+      await fetch(server+'/api/restart',{method:'POST',signal:AbortSignal.timeout(5000)});
+      addLog('success','Server data cleared');
+    }catch(e){addLog('error','Restart server call failed: '+e.message);}
+  }
+  if(confirm('Also clear your YouTube quota usage for today?')){localStorage.removeItem('nf_youtube_quota');}
+  addLog('info','Ready. Run Auto-generate to start fresh.');
+  alert('✅ Data cleared. Press Auto-generate to start fresh.');
 }
 
 // ===================== AI FILTER AND SUMMARIZE =====================
@@ -2148,6 +2299,13 @@ async function runDualDiscovery(){
     if(btn)btn.style.pointerEvents='auto';return;
   }
 
+  const savedKW=getKeywords();
+  if(!savedKW.length){
+    resultsEl.innerHTML='<div class="error">⚠️ No keywords saved.<br>Go to ☰ → Keywords → add keywords for Auto-generate</div>';
+    if(btn)btn.style.pointerEvents='auto';return;
+  }
+  const country=getCountry();
+
   try{
     addLog('req','Pinging Termux server...');
     const health=await pingServer(server);
@@ -2157,7 +2315,31 @@ async function runDualDiscovery(){
     }
     addLog('success',`Termux server v${health.version} connected ✓`);
 
-    // ════════ STEP 0: EXPANSION CHECK ════════
+    // ════════ STEP 0: FETCH RISING FROM PYTENDS ════════
+    addLog('info',`Fetching rising keywords for ${savedKW.length} keywords (${country})...`);
+    showProgress(5);setStatus(`Fetching rising keywords from pytrends (${country})...`);
+    let risingKW;
+    try{
+      const r=await fetch(server+'/api/rising',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({keywords:savedKW,country}),
+        signal:AbortSignal.timeout(120000)
+      });
+      if(!r.ok){const e=await r.json();throw new Error(e.error||'Rising fetch failed');}
+      const rd=await r.json();
+      risingKW=rd.keywords||[];
+      addLog('success',`Rising keywords: ${risingKW.length} found`);
+    }catch(e){
+      addLog('error',`Pytrends failed: ${e.message}`);
+      resultsEl.innerHTML=`<div class="error">⚠️ Pytrends error: ${e.message}</div>`;
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+    if(!risingKW.length){
+      resultsEl.innerHTML='<div class="error">⚠️ No rising keywords returned. Try different keywords or country.</div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+
+    // ════════ STEP 1: EXPANSION CHECK ════════
     const expState=await checkTermuxExpansion(server);
     let expandedKeywords=[];
     if(expState.available&&!expState.running&&expState.done>0){
@@ -2177,11 +2359,12 @@ async function runDualDiscovery(){
       expandedKeywords=await fetchTermuxKeywords(server);
       addLog('success',`Loaded ${expandedKeywords.length} keywords after waiting`);
     }else{
-      addLog('info','Starting expansion with SEED_KEYWORDS (background)...');
-      showProgress(5);setStatus('Starting expansion...');
-      const ok=await startTermuxExpansion(server,SEED_KEYWORDS);
+      const risingNames=risingKW.map(k=>k.keyword||k);
+      addLog('info',`Expanding ${risingNames.length} rising keywords...`);
+      showProgress(10);setStatus('Expanding keywords via YouTube Suggest...');
+      const ok=await startTermuxExpansion(server,risingNames);
       if(!ok)throw new Error('Failed to start expansion');
-      addLog('success','Expansion started in background');
+      addLog('success','Expansion started');
 
       resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
       for(let tries=0;tries<120;tries++){
@@ -2189,7 +2372,7 @@ async function runDualDiscovery(){
         const s=await checkTermuxExpansion(server);
         if(s.error){resultsEl.innerHTML=`<div class="error">${s.error}</div>`;break;}
         const detail=s.currentKeyword?` · ${s.currentKeyword}${s.phase==='level2'?` (${s.l2Done}/${s.l2Total})`:''}`:'';
-        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
+        showProgress(10+s.pct*0.3);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
         if(!s.running){
           if(s.done>0){
             expandedKeywords=await fetchTermuxKeywords(server);
@@ -2427,7 +2610,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🌳 Evergreen · ${s.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 📅 ${avgVideoAge(r.videos||[])}</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -2444,7 +2627,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
         <div class="niche-card-left">
           <div class="niche-card-title">${r.keyword}</div>
           <div class="niche-card-meta">🔥 Trending · ${s.label}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 📅 ${avgVideoAge(r.videos||[])}</div>
         </div>
         <div class="niche-dot ${c}"></div>
       </div>`;
@@ -2465,8 +2648,17 @@ function setFreq(el,f){monitorFreq=f;el.parentElement.querySelectorAll('.freq-bt
 function getMonitors(){try{return JSON.parse(localStorage.getItem('nf_monitors')||'[]');}catch(e){return[];}}
 function saveMonitors(m){localStorage.setItem('nf_monitors',JSON.stringify(m));}
 
+let _pendingScheduleKW=null;
 function scheduleNiche(keyword){
-  if(!confirm(`Schedule this niche?\n\n${keyword}\n\nNiche Finder will monitor it regularly.\n\nYes / No`))return;
+  _pendingScheduleKW=keyword;
+  document.getElementById('scheduleKeywordDisplay').textContent=keyword;
+  document.getElementById('scheduleModal').classList.remove('hidden');
+}
+function closeScheduleModal(){document.getElementById('scheduleModal').classList.add('hidden');_pendingScheduleKW=null;}
+function confirmSchedule(){
+  const keyword=_pendingScheduleKW;
+  closeScheduleModal();
+  if(!keyword)return;
   const monitors=getMonitors();
   if(monitors.some(m=>m.name.toLowerCase()===keyword.toLowerCase())){
     alert('Already scheduled.');
@@ -2475,14 +2667,11 @@ function scheduleNiche(keyword){
   monitors.push({id:Date.now(),name:keyword,freq:'daily',active:true,lastCheck:null,lastVideos:0,lastViews:0});
   saveMonitors(monitors);
   renderMonitors();
-  const toast=document.getElementById('page-list');
-  if(toast){
-    const t=document.createElement('div');
-    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;z-index:200;animation:fadeIn .3s';
-    t.textContent='✅ Scheduled! Check Monitors tab.';
-    document.body.appendChild(t);
-    setTimeout(()=>t.remove(),2500);
-  }
+  const toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;z-index:200;animation:fadeIn .3s';
+  toast.textContent='✅ Scheduled! Check Monitors tab.';
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(),2500);
 }
 
 function saveMonitor(){
@@ -2545,7 +2734,7 @@ async function checkMonitor(id){
     m.lastVideos=scoring.videoCount;
     m.lastViews=scoring.avgViews;
     saveMonitors(monitors.map(x=>x.id===m.id?m:x));
-    addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+    addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:''});
     renderMonitors();
     alert(`✅ ${m.name}\n📊 ${totalResults} total YouTube videos\n👁️ ${scoring.avgViews.toLocaleString()} avg views\n${scoring.label}`);
   }catch(e){
@@ -2571,7 +2760,7 @@ async function runAllMonitors(){
       m.lastVideos=totalResults;
       m.lastViews=scoring.avgViews;
       saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
-      addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+      addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:''});
     }catch(e){
       addLog('error',`Monitor "${m.name}" failed: ${e.message}`);
       addNotification({sub:'YouTube',name:m.name,body:'Error: '+e.message,color:'red',promo:''});
