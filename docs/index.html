@@ -1924,7 +1924,7 @@ function pasteKeywords(){
 function clearKeywords(){document.getElementById('keywordsInput').value='';}
 function saveKeywords(){
   const raw=document.getElementById('keywordsInput').value.trim();
-  const kw=raw.split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+  const kw=raw.split(/[\n,]+/).map(s=>s.trim()).filter(s=>s.length>1);
   if(!kw.length){alert('Enter at least one keyword.');return;}
   localStorage.setItem('nf_keywords',JSON.stringify(kw));
   document.getElementById('keywordsFormView').style.display='none';
