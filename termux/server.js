@@ -82,7 +82,8 @@ app.get('/', (req, res) => {
 
 /* ─── Pytrends: Related Queries ─── */
 function runPytrends(action, data) {
-  const result = spawnSync('python3', [
+  const py = spawnSync('python3', ['--version'], { timeout: 5000 }).error ? 'python' : 'python3';
+  const result = spawnSync(py, [
     path.join(__dirname, 'trends.py'),
     action,
     JSON.stringify(data)
