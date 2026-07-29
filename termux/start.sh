@@ -10,10 +10,6 @@ if [ ! -d "node_modules" ]; then
   echo "[setup] Installing npm dependencies..."
   npm install --production
 fi
-if ! python3 -c "import pytrends" 2>/dev/null; then
-  echo "[setup] Installing pytrends..."
-  pip install pytrends
-fi
 
 echo "=============================="
 echo " Niche Finder Server"

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { spawnSync } = require('child_process');
+
 const { expandKeywords } = require('./expand');
 const { countKeywords } = require('./count');
 
@@ -69,7 +69,8 @@ app.get('/', (req, res) => {
     version: '1.1.0',
     endpoints: {
       ping: '/ping',
-      trends: '/api/trends?ed=YYYYMMDD',
+      related: 'POST /api/related',
+      rising: 'POST /api/rising',
       expand: 'POST /api/expand',
       expandStatus: '/api/expand-status',
       keywords: '/api/keywords',
@@ -80,36 +81,31 @@ app.get('/', (req, res) => {
   });
 });
 
-/* ─── Pytrends: Related Queries ─── */
-function runPytrends(action, data) {
-  const py = spawnSync('python3', ['--version'], { timeout: 5000 }).error ? 'python' : 'python3';
-  const result = spawnSync(py, [
-    path.join(__dirname, 'trends.py'),
-    action,
-    JSON.stringify(data)
-  ], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
-  if (result.error) throw new Error('Python exec: ' + result.error.message);
-  if (result.status !== 0) {
-    const stderr = result.stderr.toString().trim();
-    throw new Error(stderr || `Python exit code ${result.status}`);
-  }
-  const stdout = result.stdout.toString().trim();
-  if (!stdout) return null;
-  return JSON.parse(stdout);
+/* ─── Google Trends: Related Queries ─── */
+const googleTrends = require('google-trends-api');
+
+function parseRelated(result) {
+  const data = JSON.parse(result);
+  const ranked = data.default && data.default.rankedList;
+  if (!ranked || ranked.length < 2) return { top: [], rising: [] };
+  const top = (ranked[0].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
+  const rising = (ranked[1].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
+  return { top, rising };
 }
 
-app.post('/api/related', (req, res) => {
+app.post('/api/related', async (req, res) => {
   const { keyword, country } = req.body || {};
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   try {
-    const out = runPytrends('related', { keyword, country: country || 'US' });
-    res.json(out || { top: [], rising: [] });
+    const result = await googleTrends.relatedQueries({ keyword, geo: country || 'US', hl: 'en', time: 'today 1-m' });
+    const out = parseRelated(result);
+    res.json(out);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/rising', (req, res) => {
+app.post('/api/rising', async (req, res) => {
   const { keywords, country } = req.body || {};
   if (!keywords || !Array.isArray(keywords) || keywords.length === 0)
     return res.status(400).json({ error: 'keywords array required' });
@@ -118,15 +114,18 @@ app.post('/api/rising', (req, res) => {
     const seen = new Set();
     for (const kw of keywords) {
       if (!kw || kw.length < 2) continue;
-      const out = runPytrends('related', { keyword: kw, country: country || 'US' });
-      if (out && out.rising) {
+      try {
+        const result = await googleTrends.relatedQueries({ keyword: kw, geo: country || 'US', hl: 'en', time: 'today 1-m' });
+        const out = parseRelated(result);
         for (const item of out.rising) {
-          const q = item.query || item.title || '';
+          const q = item.keyword || '';
           if (q && !seen.has(q.toLowerCase())) {
             seen.add(q.toLowerCase());
             allRising.push({ keyword: q, parent: kw });
           }
         }
+      } catch (e) {
+        console.log(`[rising] Skipped "${kw}": ${e.message}`);
       }
     }
     res.json({ keywords: allRising, total: allRising.length });
