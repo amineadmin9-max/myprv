@@ -2182,14 +2182,29 @@ async function runDualDiscovery(){
       const ok=await startTermuxExpansion(server,SEED_KEYWORDS);
       if(!ok)throw new Error('Failed to start expansion');
       addLog('success','Expansion started in background');
-      resultsEl.innerHTML='<div class="niche-card" style="border:2px solid var(--blue);text-align:center;padding:30px">'
-        +'<div style="font-size:40px;margin-bottom:10px">⏳</div>'
-        +'<div style="font-size:16px;font-weight:600;margin-bottom:6px">Expansion Started!</div>'
-        +'<div style="font-size:13px;color:var(--text-dim)">100 seed keywords being expanded → ~5000 sub-niches<br>'
-        +'⏱ Estimated: 1-2 hours<br><br>'
-        +'Come back later and run Discovery again to see results.</div>'
-        +'<button class="modal-btn primary" style="margin-top:16px" onclick="location.reload()">Check Progress</button></div>';
-      if(btn)btn.style.pointerEvents='auto';return;
+
+      resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+      for(let tries=0;tries<120;tries++){
+        await delay(5000);
+        const s=await checkTermuxExpansion(server);
+        if(s.error){resultsEl.innerHTML=`<div class="error">${s.error}</div>`;break;}
+        const detail=s.currentKeyword?` · ${s.currentKeyword}${s.phase==='level2'?` (${s.l2Done}/${s.l2Total})`:''}`:'';
+        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
+        if(!s.running){
+          if(s.done>0){
+            expandedKeywords=await fetchTermuxKeywords(server);
+            addLog('success',`Expansion complete: ${expandedKeywords.length} keywords`);
+            break;
+          }else{
+            resultsEl.innerHTML='<div class="error">⚠️ Expansion finished with 0 keywords.</div>';
+            if(btn)btn.style.pointerEvents='auto';return;
+          }
+        }
+      }
+      if(!expandedKeywords.length){
+        resultsEl.innerHTML='<div class="error">⚠️ Expansion timed out. Try again.</div>';
+        if(btn)btn.style.pointerEvents='auto';return;
+      }
     }
 
     if(!expandedKeywords.length){
