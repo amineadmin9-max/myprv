@@ -276,14 +276,22 @@
   <div class="modal-overlay hidden" id="serverModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <div id="serverFormView">
-        <h2>Backend Server</h2>
-        <p>Enter your Flask server URL to enable comment analysis (traffic light scoring).</p>
+        <h2>Termux Server</h2>
+        <p style="font-size:12px;line-height:1.6">Connect to local Termux server for Google Trends + Keyword Expansion.</p>
+        <div style="background:#0d1117;border-radius:8px;padding:10px;margin:10px 0;font-size:11px;line-height:1.7;color:var(--text-dim);border:1px solid var(--border)">
+          <b style="color:var(--text)">Setup:</b><br>
+          1. Install Termux from F-Droid<br>
+          2. <code style="color:var(--green)">pkg install nodejs</code><br>
+          3. Copy <code style="color:var(--green)">termux/</code> to phone → <code style="color:var(--green)">cd termux</code><br>
+          4. <code style="color:var(--green)">bash start.sh</code>
+        </div>
         <div class="field" style="margin-top:12px">
           <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Server URL</label>
-          <input type="url" class="modal-input" id="serverURLInput" placeholder="https://your-space.hf.space">
+          <input type="url" class="modal-input" id="serverURLInput" placeholder="http://127.0.0.1:3000">
         </div>
-        <p style="font-size:11px;color:var(--text-dim);margin-top:8px">Leave empty to skip comment analysis.</p>
+        <p style="font-size:11px;color:var(--text-dim);margin-top:8px">Leave empty to use proxies (slower, less reliable).</p>
         <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="testServerConn()" style="font-size:11px">Test</button>
           <button class="modal-btn ghost" onclick="closeServerModal()">Cancel</button>
           <button class="modal-btn primary" onclick="saveServerURL()">Save</button>
         </div>
@@ -299,13 +307,12 @@
   <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
     <div class="modal-box">
       <h2>Niche Finder</h2>
-      <p style="line-height:2;font-size:13px">Finds profitable niches by combining Google Trends, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v3.0</span> — YouTube traffic light scoring | Gemini + OpenRouter + Google Trends<br><br>
-      <span style="color:var(--text);font-weight:600">Deploy Backend (for comment analysis):</span><br>
-      <span style="color:var(--text-dim);font-size:12px">1. Go to <a href="https://huggingface.co/new-space" target="_blank" style="color:var(--green)">huggingface.co/new-space</a> (free, no card)<br>
-      2. Name it → SDK: Docker → Create<br>
-      3. Upload server/ folder files (Dockerfile, app.py, requirements.txt, README.md)<br>
-      4. Wait for build → copy the URL<br>
-      5. Settings → Backend Server → paste URL</span></p>
+      <p style="line-height:2;font-size:13px">Finds profitable niches by combining Google Trends, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v4.0</span> — Termux Server | Keyword Expansion | YouTube Scoring<br><br>
+      <span style="color:var(--text);font-weight:600">Termux Server (recommended):</span><br>
+      <span style="color:var(--text-dim);font-size:12px">1. Install Termux from F-Droid<br>
+      2. Copy <code style="color:var(--green)">termux/</code> folder to phone<br>
+      3. <code style="color:var(--green)">bash start.sh</code> in Termux<br>
+      4. Settings → Termux Server → enter <code style="color:var(--green)">http://127.0.0.1:3000</code></span></p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
       </div>
@@ -451,6 +458,32 @@ const STORY_KW=['my experience','i tried','before and after','journey','story','
 const DEMAND_KW=['does anyone know','looking for','wish there was','is there a product','anyone recommend','need help finding','looking for something','does anyone use','where can i find','how do i get','any suggestions','what do you use','best product for','alternative to','better than','frustrated with','tired of','hate when','annoying that','wish i could','if only there','would pay for','shut up and take my money'];
 const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
 const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
+const SEED_KEYWORDS=[
+  "weight loss","fitness","workout","yoga","meditation","keto diet","vegan recipes","meal prep",
+  "skincare","makeup","beauty tips","hair care","nail art","perfume",
+  "home decor","interior design","gardening","landscaping","declutter",
+  "photography","videography","photo editing","camera gear",
+  "gaming","pc build","streaming","gaming chair","gaming setup",
+  "smart home","home automation","security camera","solar panel",
+  "web development","app development","ai tools","chatgpt","programming",
+  "digital marketing","seo","social media","content creation",
+  "online course","language learning","teaching","tutoring",
+  "investing","crypto","real estate","stock market","credit card",
+  "personal finance","budgeting","side hustle","passive income",
+  "ecommerce","dropshipping","amazon fba","etsy",
+  "pet supplies","dog training","cat food","aquarium","pet grooming",
+  "baby products","pregnancy","parenting","kids education",
+  "camping","hiking","backpacking","survival gear",
+  "cooking","baking","air fryer","instant pot","bbq","kitchen gadgets",
+  "travel","solo travel","travel tips","luggage","hotel",
+  "car maintenance","car detailing","motorcycle","bicycle",
+  "fashion","streetwear","sneakers","watch",
+  "self improvement","productivity","time management","habits",
+  "anxiety relief","sleep better","mental health",
+  "woodworking","diy projects","power tools","3d printing",
+  "fishing","hunting","archery",
+  "podcast","vlogging","microphone","lighting setup",
+];
 
 let llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};
 function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};}
@@ -462,6 +495,92 @@ function setStatus(msg){document.getElementById('status').textContent=msg;}
 function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
 function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+// ===================== TERMUX SERVER =====================
+const TERMUX_DEFAULT='http://127.0.0.1:3000';
+
+async function pingServer(url){
+  try{
+    const r=await fetch(url+'/ping',{signal:AbortSignal.timeout(3000)});
+    if(r.status===200){const d=await r.json();return d;}
+    return null;
+  }catch{return null;}
+}
+
+async function autoDetectTermux(){
+  if(getServerURL())return;
+  if(window.location.protocol!=='file:')return;
+  const ok=await pingServer(TERMUX_DEFAULT);
+  if(ok){
+    localStorage.setItem('nf_server_url',TERMUX_DEFAULT);
+    addLog('success','Auto-detected Termux server at '+TERMUX_DEFAULT);
+  }
+}
+
+async function testServerConn(){
+  const url=document.getElementById('serverURLInput').value.trim().replace(/\/+$/,'');
+  if(!url){alert('Enter a server URL first');return;}
+  const btn=document.querySelector('#serverFormView .modal-actions button:first-child');
+  const orig=btn.textContent;btn.textContent='Testing...';
+  try{
+    const r=await fetch(url+'/ping',{signal:AbortSignal.timeout(5000)});
+    const d=await r.json();
+    if(r.status===200){
+      btn.textContent='✓ OK';btn.style.color='var(--green)';
+      setTimeout(()=>{btn.textContent=orig;btn.style.color='';},2000);
+    }else{
+      btn.textContent='✖ Error';btn.style.color='var(--red-icon)';
+      setTimeout(()=>{btn.textContent=orig;btn.style.color='';},2000);
+    }
+  }catch{
+    btn.textContent='✖ No connection';btn.style.color='var(--red-icon)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.color='';},3000);
+  }
+}
+
+async function fetchTermuxExpand(keywords,onProgress){
+  const server=getServerURL();
+  if(!server)return[];
+  const r1=await fetch(server+'/api/expand',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keywords}),
+    signal:AbortSignal.timeout(10000)
+  });
+  if(!r1.ok){const e=await r1.json();throw new Error(e.error||'Expand start failed');}
+  let done=false;
+  while(!done){
+    await delay(3000);
+    const r2=await fetch(server+'/api/expand-status',{signal:AbortSignal.timeout(5000)});
+    const s=await r2.json();
+    if(onProgress)onProgress(s);
+    if(!s.running)done=true;
+  }
+  const r3=await fetch(server+'/api/keywords?limit=5000',{signal:AbortSignal.timeout(15000)});
+  if(!r3.ok)throw new Error('Failed to fetch expanded keywords');
+  return await r3.json();
+}
+
+async function fetchTermuxCount(keywords,ytKey,onProgress){
+  const server=getServerURL();
+  if(!server)return[];
+  const r1=await fetch(server+'/api/count',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keywords,ytKey}),
+    signal:AbortSignal.timeout(10000)
+  });
+  if(!r1.ok){const e=await r1.json();throw new Error(e.error||'Count start failed');}
+  let done=false;
+  while(!done){
+    await delay(3000);
+    const r2=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(5000)});
+    const s=await r2.json();
+    if(onProgress)onProgress(s);
+    if(!s.running)done=true;
+  }
+  const r3=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+  if(!r3.ok)throw new Error('Failed to fetch results');
+  return await r3.json();
+}
 
 async function _geminiFetch(prompt,timeoutMs){
   const key=getGeminiKey();
@@ -1283,7 +1402,7 @@ function mergeAndScoreIdeas(ideas){
   return Array.from(merged.values()).sort((a,b)=>b.score-a.score).slice(0,20);
 }
 
-// ===================== MANUAL SEARCH =====================
+// ===================== MANUAL SEARCH (Termux Only) =====================
 async function handleSearch(){
   const q=document.getElementById('searchInput').value.trim();
   if(!q)return;
@@ -1298,19 +1417,111 @@ async function handleSearch(){
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   addLog('info',`Search: "${q}"`);
-  showProgress(20);setStatus('Searching YouTube...');
+
+  const server=getServerURL();
+  if(!server){
+    document.getElementById('results').innerHTML='<div class="error">⚠️ Termux server not configured.<br>Go to Settings → Termux Server → enter URL</div>';
+    document.getElementById('searchBtn').disabled=false;
+    return;
+  }
+
   try{
-    showProgress(40);const{videos,totalResults}=await searchYouTubeVideos(q,90,20);
-    addLog('success',`Search: Found ${totalResults} videos on YouTube`);
-    showProgress(70);setStatus(`Found ${totalResults} videos on YouTube - analyzing top 20...`);
-    const scoring=computeYouTubeScoring(videos,totalResults);showProgress(100);
-    addLog('info',`Search: Score=${scoring.score} (${scoring.label}), avgViews=${scoring.avgViews}`);
-    renderSearchResult(q,scoring,videos,totalResults);
+    const health=await pingServer(server);
+    if(!health){
+      document.getElementById('results').innerHTML='<div class="error">⚠️ Termux server not reachable.<br>Make sure Termux is running: bash start.sh</div>';
+      document.getElementById('searchBtn').disabled=false;
+      return;
+    }
+
+    addLog('info',`Termux: expanding "${q}"...`);
+    showProgress(10);setStatus(`Expanding "${q}" on Termux...`);
+    const ok=await startTermuxExpansion(server,[q]);
+    if(!ok)throw new Error('Failed to start expansion');
+
+    let expState;
+    for(let tries=0;tries<120;tries++){
+      await delay(5000);
+      expState=await checkTermuxExpansion(server);
+      if(!expState.running)break;
+      const pct=expState.pct||0;
+      showProgress(10+pct*0.3);
+      setStatus(`Expanding: ${expState.done}/${expState.total} keywords (${pct}%)`);
+    }
+    showProgress(40);setStatus('Fetching expanded keywords...');
+    const expanded=await fetchTermuxKeywords(server);
+    addLog('success',`Expanded "${q}" → ${expanded.length} keywords`);
+
+    if(!expanded.length){
+      document.getElementById('results').innerHTML='<div class="error">⚠️ Expansion returned 0 keywords. Try a different search term.</div>';
+      document.getElementById('searchBtn').disabled=false;
+      return;
+    }
+
+    addLog('info','Counting expanded keywords on Termux...');
+    showProgress(45);setStatus('Counting keywords via YouTube API...');
+    const r1=await fetch(server+'/api/count',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords:expanded.map(k=>({keyword:k.keyword})),ytKey:key,daysBack:90}),
+      signal:AbortSignal.timeout(10000)
+    });
+    if(!r1.ok)throw new Error('Count start failed');
+
+    for(let tries=0;tries<120;tries++){
+      await delay(3000);
+      const r2=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(5000)});
+      const cs=await r2.json();
+      showProgress(45+cs.pct*0.4);
+      setStatus(`Counting: ${cs.done}/${cs.total} keywords (${cs.pct}%)`);
+      if(!cs.running)break;
+    }
+    showProgress(85);setStatus('Loading results...');
+    const rr=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+    const rd=await rr.json();
+    const countData=rd.counts||[];
+
+    const valid=countData.filter(c=>c.keyword&&!c.error&&c.totalResults>0);
+    for(const c of valid){
+      c.eScoring=computeEvergreenScoring(c.videos||[],c.totalResults,c.recent7dCount||0);
+      c.tScoring=computeTrendingScoring(c.videos||[],c.totalResults,c.recent7dCount||0);
+    }
+    valid.sort((a,b)=>b.eScoring.score-a.eScoring.score);
+    const top=valid.slice(0,50);
+    renderSearchResults(q,top);
+    addLog('success',`Search done: ${top.length} niche ideas for "${q}"`);
+
   }catch(e){
     addLog('error',`Search failed: ${e.message}`);
     document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
   }
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
+}
+
+function renderSearchResults(keyword,results){
+  const el=document.getElementById('results');
+  let html=`<div class="section-title">Niche ideas for <span class="dash">"${keyword}"</span> <span style="font-size:11px;color:var(--text-dim);font-weight:400">(${results.length} sub-niches)</span></div>`;
+  for(const r of results){
+    const avgViews=r.videos&&r.videos.length>0?Math.round(r.videos.reduce((s,v)=>s+v.views,0)/r.videos.length):0;
+    const es=r.eScoring||computeEvergreenScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
+    const ts=r.tScoring||computeTrendingScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
+    html+=`<div class="niche-card">
+      <div class="niche-card-left">
+        <div class="niche-card-title">${r.keyword}</div>
+        <div class="niche-card-meta" style="display:flex;gap:8px;align-items:center">
+          <span style="color:#10b981;font-size:11px">🌳 ${es.score}</span>
+          <span style="color:var(--text-dim);font-size:10px">·</span>
+          <span style="color:#8b5cf6;font-size:11px">🔥 ${ts.score}</span>
+          <span style="color:var(--text-dim);font-size:10px">·</span>
+          <span style="color:var(--text-dim);font-size:10px">${es.label}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||0).toLocaleString()} videos · 👁️ ${avgViews.toLocaleString()} avg views</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px">
+        <div style="color:#10b981;font-weight:700;font-size:13px">${es.score}</div>
+        <div style="color:#8b5cf6;font-weight:700;font-size:13px">${ts.score}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML=html;
 }
 
 function renderSearchResult(keyword,scoring,videos,totalResults){
@@ -1498,6 +1709,59 @@ function computeYouTubeScoring(videos,totalResults){
   if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
   score=Math.min(100,score);
   return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks,highEng};
+}
+
+function computeEvergreenScoring(videos,totalResults,recent7dCount){
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
+  const vc=totalResults||videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
+  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(totalLikes/videos.length);
+  const avgComments=Math.round(totalComments/videos.length);
+  const highEng=avgViews>10000;
+  const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  let score=0;
+  if(highEng)score+=30;else if(avgViews>5000)score+=20;else if(avgViews>1000)score+=10;
+  if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
+  const engRatio=avgViews>0?(avgLikes+avgComments*5)/avgViews:0;
+  score+=Math.min(20,Math.round(engRatio*100));
+  if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
+  score=Math.min(100,score);
+  let color,label;
+  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='Clean opportunity — low competition';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='Open market — moderate competition + good engagement';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='Growing market — some activity';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='Large market — moderate competition';}
+  else if(vc>25000&&promoLinks>8){color='red';label='Saturated — high volume + many promo links';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='Saturated — many promo links with lower volume';}
+  else{color='yellow';label='Moderate market';}
+  return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks};
+}
+
+function computeTrendingScoring(videos,totalResults,recent7dCount){
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',trendPct:0,videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0};
+  const vc=totalResults||videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(videos.reduce((s,v)=>s+v.likes,0)/videos.length);
+  const avgComments=Math.round(videos.reduce((s,v)=>s+v.comments,0)/videos.length);
+  const highEng=avgViews>10000;
+  const recentRatio=videos.length>0?recent7dCount/videos.length:0;
+  let score=0;
+  if(recentRatio>=0.5)score+=40;else if(recentRatio>=0.3)score+=30;else if(recentRatio>=0.1)score+=15;else if(recentRatio>0)score+=5;
+  if(highEng)score+=40;else if(avgViews>5000)score+=30;else if(avgViews>1000)score+=20;else if(avgViews>500)score+=10;
+  if(vc>=500&&vc<50000)score+=20;else if(vc>=50000&&vc<200000)score+=10;else if(vc>0)score+=5;
+  score=Math.min(100,score);
+  let color,label;
+  if(recentRatio>=0.5&&highEng){color='purple';label='🔥 Hot trending — rapid recent activity';}
+  else if(recentRatio>=0.3&&highEng){color='blue';label='📈 Trending up — strong recent engagement';}
+  else if(recentRatio>=0.1&&avgViews>1000){color='skyblue';label='⬆️ Emerging — growing interest';}
+  else if(recentRatio<0.1&&vc>50000){color='orange';label='Established — low recent activity';}
+  else if(recentRatio<0.1){color='gray';label='Stable — no surge';}
+  else{color='yellow';label='Moderate activity';}
+  return{score,color,label,trendPct:Math.round(recentRatio*100),videoCount:vc,avgViews,avgLikes,avgComments};
 }
 
 function saveYTKey(){
@@ -1817,10 +2081,53 @@ async function fetchYouTubeTrendingByCategory(){
   }catch(e){return[];}
 }
 
+async function checkTermuxExpansion(server){
+  try{
+    const r=await fetch(server+'/api/expand-status',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return{available:false};
+    const s=await r.json();
+    return{available:true,running:s.running,done:s.done,total:s.total,pct:s.pct,error:s.error};
+  }catch{return{available:false};}
+}
+
+async function startTermuxExpansion(server,keywords){
+  try{
+    const r=await fetch(server+'/api/expand',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords}),
+      signal:AbortSignal.timeout(10000)
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
+async function fetchTermuxKeywords(server){
+  try{
+    const r=await fetch(server+'/api/keywords?limit=5000',{signal:AbortSignal.timeout(30000)});
+    if(!r.ok)return[];
+    return await r.json();
+  }catch{return[];}
+}
+
+function addTermuxProgressRow(container,pct,label,sub){
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px';
+  const barOuter=document.createElement('div');
+  barOuter.style.cssText='flex:1;height:6px;background:var(--card-2);border-radius:3px;overflow:hidden';
+  const barFill=document.createElement('div');
+  barFill.style.cssText=`width:${pct}%;height:100%;background:var(--blue);border-radius:3px;transition:width .5s`;
+  barOuter.appendChild(barFill);
+  row.innerHTML=`<span style="width:50px;color:var(--text-dim);font-size:11px">${pct}%</span>`;
+  row.appendChild(barOuter);
+  row.innerHTML+=`<span style="flex:1;color:var(--text);font-size:11px">${label}</span>`;
+  if(sub)row.innerHTML+=`<span style="color:var(--text-dim);font-size:10px">${sub}</span>`;
+  container.appendChild(row);
+}
+
 async function runDualDiscovery(){
   resetLLMStats();
   appLogs.length=0;
-  addLog('info','=== Dual Discovery Started ===');
+  addLog('info','=== Niche Discovery Started ===');
   const key=getYTKey();
   if(!key){
     addLog('error','No YouTube API key found');
@@ -1830,99 +2137,145 @@ async function runDualDiscovery(){
   }
   const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
   document.getElementById('results').classList.remove('hidden');
-  document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  const resultsEl=document.getElementById('results');
+  resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
   const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
+
+  const server=getServerURL();
+  if(!server){
+    resultsEl.innerHTML='<div class="error">⚠️ Termux server not configured.<br>Go to Settings → Termux Server → enter URL</div>';
+    if(btn)btn.style.pointerEvents='auto';return;
+  }
+
   try{
-
-    // ════════ STEP 1: EVERGREEN (1 month — Google Trends) ════════
-    addLog('info','Step 1: Fetching Google Trends keywords (30 days)...');
-    showProgress(3);setStatus('Step 1: Fetching Google Trends keywords (3 months)...');
-    const evergreenIdeas=await fetchGoogleTrendsYouTube('month');
-    stats.evergreenRaw=evergreenIdeas.length;
-    addLog(evergreenIdeas.length>0?'success':'warn',`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
-    showProgress(15);setStatus(`Step 1: Found ${evergreenIdeas.length} evergreen keywords from Google Trends`);
-
-    addLog('info',`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
-    showProgress(20);setStatus(`Step 1: AI filtering ${evergreenIdeas.length} keywords (Evergreen)...`);
-    const evergreenFiltered=await aiFilterAndSummarize(evergreenIdeas,'trends');
-    stats.evergreenFiltered=evergreenFiltered.length;
-    addLog(evergreenFiltered.length>0?'success':'warn',`Step 1: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches after AI filtering`);
-    showProgress(35);setStatus(`Step 1 done: ${stats.evergreenRaw} → ${stats.evergreenFiltered} evergreen niches`);
-
-    // ════════ STEP 2: TRENDING (1 week — Google Trends + YouTube Trending) ════════
-    addLog('info','Step 2: Fetching Google Trends keywords (1 week)...');
-    showProgress(38);setStatus('Step 2: Fetching Google Trends keywords (1 week)...');
-    const trendingIdeas=await fetchGoogleTrendsYouTube('week');
-    stats.trendingRaw=trendingIdeas.length;
-    addLog(trendingIdeas.length>0?'success':'warn',`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
-    showProgress(42);setStatus(`Step 2: Found ${trendingIdeas.length} trending keywords from Google Trends`);
-
-    // Add YouTube trending videos as keywords too
-    addLog('info','Step 2: Fetching YouTube Trending videos...');
-    showProgress(44);setStatus('Step 2: Fetching YouTube Trending videos...');
-    const ytTrending=await fetchYouTubeTrendingByCategory();
-    for(const v of ytTrending){
-      const title=v.title;
-      if(title&&title.length>3&&title.length<60){
-        trendingIdeas.push({title,content:v.source,source:'YouTube Trending',type:'trend'});
-      }
+    addLog('req','Pinging Termux server...');
+    const health=await pingServer(server);
+    if(!health){
+      resultsEl.innerHTML='<div class="error">⚠️ Termux server not reachable.<br>Start Termux: bash start.sh</div>';
+      if(btn)btn.style.pointerEvents='auto';return;
     }
-    stats.trendingRaw=trendingIdeas.length;
-    addLog('info',`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube Trending)`);
-    showProgress(48);setStatus(`Step 2: Total ${trendingIdeas.length} keywords (Google Trends + YouTube)`);
+    addLog('success',`Termux server v${health.version} connected ✓`);
 
-    addLog('info',`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
-    showProgress(50);setStatus(`Step 2: AI filtering ${trendingIdeas.length} keywords (Trending)...`);
-    const trendingFiltered=await aiFilterAndSummarize(trendingIdeas,'trends');
-    stats.trendingFiltered=trendingFiltered.length;
-    addLog(trendingFiltered.length>0?'success':'warn',`Step 2: ${stats.trendingRaw} → ${stats.trendingFiltered} trending niches after AI filtering`);
-    showProgress(60);setStatus(`Step 2 done: ${stats.trendingRaw} → ${stats.trendingFiltered} trending niches`);
+    // ════════ STEP 0: EXPANSION CHECK ════════
+    const expState=await checkTermuxExpansion(server);
+    let expandedKeywords=[];
+    if(expState.available&&!expState.running&&expState.done>0){
+      addLog('success',`Loading ${expState.done} expanded keywords...`);
+      expandedKeywords=await fetchTermuxKeywords(server);
+      addLog('success',`Loaded ${expandedKeywords.length} keywords`);
+    }else if(expState.running){
+      addLog('info',`Expansion running: ${expState.done}/${expState.total} — waiting...`);
+      resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+      for(let tries=0;tries<120;tries++){
+        await delay(5000);
+        const s=await checkTermuxExpansion(server);
+        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords (${s.pct}%)`);
+        if(!s.running)break;
+      }
+      expandedKeywords=await fetchTermuxKeywords(server);
+      addLog('success',`Loaded ${expandedKeywords.length} keywords after waiting`);
+    }else{
+      addLog('info','Starting expansion with SEED_KEYWORDS (background)...');
+      showProgress(5);setStatus('Starting expansion...');
+      const ok=await startTermuxExpansion(server,SEED_KEYWORDS);
+      if(!ok)throw new Error('Failed to start expansion');
+      addLog('success','Expansion started in background');
+      resultsEl.innerHTML='<div class="niche-card" style="border:2px solid var(--blue);text-align:center;padding:30px">'
+        +'<div style="font-size:40px;margin-bottom:10px">⏳</div>'
+        +'<div style="font-size:16px;font-weight:600;margin-bottom:6px">Expansion Started!</div>'
+        +'<div style="font-size:13px;color:var(--text-dim)">100 seed keywords being expanded → ~5000 sub-niches<br>'
+        +'⏱ Estimated: 1-2 hours<br><br>'
+        +'Come back later and run Discovery again to see results.</div>'
+        +'<button class="modal-btn primary" style="margin-top:16px" onclick="location.reload()">Check Progress</button></div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
 
-    // ════════ STEP 3: YOUTUBE SEARCH + SCORING — EVERGREEN ════════
-    addLog('info',`Step 3: Searching YouTube for ${evergreenFiltered.length} evergreen niches...`);
-    const evergreenResults=[];
-    for(let i=0;i<evergreenFiltered.length;i++){
-      const kw=evergreenFiltered[i].title;
-      setStatus(`[Evergreen ${i+1}/${evergreenFiltered.length}] Searching YouTube: ${kw}`);
-      showProgress(60+(i/evergreenFiltered.length)*15);
+    if(!expandedKeywords.length){
+      resultsEl.innerHTML='<div class="error">⚠️ No expanded keywords found. Try again later.</div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+
+    // ════════ STEP 1: PROCESS KEYWORDS ════════
+    showProgress(10);setStatus(`Processing ${expandedKeywords.length} keywords...`);
+    const allIdeas=expandedKeywords.map(k=>({
+      title:k.keyword,source:'Keyword Expansion',
+      parent:k.parent||'',src:k.src||'',type:'trend'
+    }));
+    stats.evergreenRaw=Math.ceil(allIdeas.length/2);
+    stats.trendingRaw=Math.floor(allIdeas.length/2);
+
+    // ════════ STEP 2: AI FILTER (all keywords, one pass) ════════
+    addLog('info',`AI filtering ${allIdeas.length} keywords...`);
+    showProgress(15);setStatus(`AI filtering ${allIdeas.length} keywords...`);
+    const filteredAll=await aiFilterAndSummarize(allIdeas,'trends');
+    stats.evergreenRaw=allIdeas.length;
+    stats.evergreenFiltered=filteredAll.length;
+    stats.trendingRaw=allIdeas.length;
+    stats.trendingFiltered=filteredAll.length;
+    addLog(filteredAll.length>0?'success':'warn',`Filtered: ${allIdeas.length} → ${filteredAll.length}`);
+
+    // ════════ LOAD TERMUX COUNT DATA ════════
+    let termuxCountsMap=null;
+    try{
+      const r=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(3000)});
+      const cs=await r.json();
+      if(cs.done>0&&!cs.running){
+        const rr=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+        const rd=await rr.json();
+        if(rd.counts&&rd.counts.length>0){
+          termuxCountsMap={};
+          for(const c of rd.counts){
+            if(c.keyword&&c.videos&&c.videos.length>0)
+              termuxCountsMap[c.keyword.toLowerCase()]={videos:c.videos,totalResults:c.totalResults,recent7dCount:c.recent7dCount||0};
+          }
+          addLog('success',`Count data: ${Object.keys(termuxCountsMap).length} keywords with video details`);
+        }else if(rd.counts&&rd.counts.length>0){
+          termuxCountsMap={};
+          for(const c of rd.counts){
+            if(c.keyword&&c.totalResults>0)
+              termuxCountsMap[c.keyword.toLowerCase()]={videos:[],totalResults:c.totalResults,recent7dCount:0};
+          }
+          addLog('info',`Count data: ${Object.keys(termuxCountsMap).length} keywords with totals only`);
+        }
+      }
+    }catch{addLog('warn','Could not load Termux count data');}
+
+    // ════════ STEP 3: COMPUTE BOTH SCORES PER KEYWORD ════════
+    addLog('info',`Scoring ${filteredAll.length} keywords for evergreen + trending...`);
+    const scoredItems=[];
+    for(let i=0;i<filteredAll.length;i++){
+      const kw=filteredAll[i].title||filteredAll[i].keyword||filteredAll[i];
+      setStatus(`Scoring ${i+1}/${filteredAll.length}: ${kw}`);
+      showProgress(30+(i/filteredAll.length)*60);
       try{
-        const{videos,totalResults}=await searchYouTubeVideos(kw,90,20);
-        const scoring=computeYouTubeScoring(videos,totalResults);
-        evergreenResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}});
-        addLog('success',`[Evergreen ${i+1}] ${kw}: ${totalResults} videos, score=${scoring.score}`);
+        const cached=termuxCountsMap&&termuxCountsMap[kw.toLowerCase()];
+        const videos=cached?cached.videos:[];
+        const totalResults=cached?cached.totalResults:0;
+        const recent7dCount=cached?cached.recent7dCount:0;
+        const eScoring=computeEvergreenScoring(videos,totalResults,recent7dCount);
+        const tScoring=computeTrendingScoring(videos,totalResults,recent7dCount);
+        scoredItems.push({keyword:kw,videos,totalResults,eScoring,tScoring});
       }catch(e){
-        addLog('error',`[Evergreen ${i+1}] ${kw}: ${e.message}`);
+        addLog('error',`[${i+1}] ${kw}: ${e.message}`);
       }
-      await new Promise(r=>setTimeout(r,300));
+      await delay(100);
     }
-    addLog('info',`Step 3 done: ${evergreenResults.length} evergreen niches scored`);
+    addLog('info',`Scored: ${scoredItems.length} keywords`);
 
-    // ════════ STEP 4: YOUTUBE SEARCH + SCORING — TRENDING ════════
-    addLog('info',`Step 4: Searching YouTube for ${trendingFiltered.length} trending niches...`);
-    const trendingResults=[];
-    for(let i=0;i<trendingFiltered.length;i++){
-      const kw=trendingFiltered[i].title;
-      setStatus(`[Trending ${i+1}/${trendingFiltered.length}] Searching YouTube: ${kw}`);
-      showProgress(75+(i/trendingFiltered.length)*20);
-      try{
-        const{videos,totalResults}=await searchYouTubeVideos(kw,7,20);
-        const scoring=computeYouTubeScoring(videos,totalResults);
-        trendingResults.push({keyword:kw,scoring,videos,totalResults,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}});
-        addLog('success',`[Trending ${i+1}] ${kw}: ${totalResults} videos, score=${scoring.score}`);
-      }catch(e){
-        addLog('error',`[Trending ${i+1}] ${kw}: ${e.message}`);
-      }
-      await new Promise(r=>setTimeout(r,300));
-    }
-    addLog('info',`Step 4 done: ${trendingResults.length} trending niches scored`);
+    // Sort: top 100 evergreen, top 100 trending
+    const byEvergreen=[...scoredItems].sort((a,b)=>b.eScoring.score-a.eScoring.score).slice(0,100);
+    const byTrending=[...scoredItems].sort((a,b)=>b.tScoring.score-a.tScoring.score).slice(0,100);
+    const evergreenResults=byEvergreen.map(r=>({keyword:r.keyword,scoring:r.eScoring,videos:r.videos,totalResults:r.totalResults,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}}));
+    const trendingResults=byTrending.map(r=>({keyword:r.keyword,scoring:r.tScoring,videos:r.videos,totalResults:r.totalResults,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}}));
+    addLog('success',`Sorted: ${evergreenResults.length} evergreen + ${trendingResults.length} trending`);
 
-    showProgress(100);setStatus(`Done! ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches found.`);
-    addLog('success',`=== Dual Discovery Complete: ${evergreenResults.length} evergreen + ${trendingResults.length} trending niches ===`);
+    showProgress(100);setStatus(`Done: ${evergreenResults.length} evergreen + ${trendingResults.length} trending`);
+    addLog('success',`=== Complete: ${evergreenResults.length} evergreen + ${trendingResults.length} trending ===`);
     renderDualResults(evergreenResults,trendingResults,stats);
 
   }catch(e){
-    addLog('error',`Fatal error: ${e.message}`);
-    document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
+    addLog('error',`Fatal: ${e.message}`);
+    resultsEl.innerHTML=`<div class="error">${e.message}</div>`;
   }
   hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
 }
@@ -2029,7 +2382,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
         <div style="color:var(--text-dim);font-size:11px">Evergreen — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Google Trends (3 months)</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: low competition + sustained demand</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
@@ -2038,7 +2391,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingRaw}</div>
         <div style="color:var(--text-dim);font-size:11px">Trending — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Source: Google Trends (1 week)</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: high recent activity + engagement</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingFiltered}</div>
@@ -2238,6 +2591,7 @@ function renderNotifications(){
 // ===================== INIT =====================
 updateNotifBadge();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+autoDetectTermux();
 </script>
 </body>
 </html>
