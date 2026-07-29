@@ -4,8 +4,8 @@ const path = require('path');
 
 const SUGGEST_HOST = 'suggestqueries.google.com';
 const SUGGEST_PATH = '/complete/search';
-const DELAY_MS = { min: 800, max: 2000 };
-const BATCH_DELAY = { min: 2000, max: 5000 };
+const DELAY_MS = { min: 400, max: 1000 };
+const BATCH_DELAY = { min: 1000, max: 2000 };
 const REQ_TIMEOUT = 8000;
 const MAX_RETRIES = 3;
 const LEVEL2_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
@@ -86,10 +86,11 @@ async function expandKeywords(keywords, outputFile, progress) {
       append({ keyword: sugg, src: 'l1', parent: keyword, ts: Date.now() });
     }
 
-    /* Pause before Level 2 batch to avoid rate limiting */
-    await sleep(2000 + Math.random() * 3000);
-    /* Level 2 */
-    for (const sugg of validL1) {
+    /* Pause before Level 2 batch */
+    await sleep(500 + Math.random() * 1000);
+    /* Level 2 — first 3 suggestions only */
+    const l2Batch = validL1.slice(0, 3);
+    for (const sugg of l2Batch) {
       for (let ci = 0; ci < LEVEL2_LETTERS.length; ci++) {
         const letter = LEVEL2_LETTERS[ci];
         const query = `${sugg} ${letter}`;

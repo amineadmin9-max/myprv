@@ -1,0 +1,2597 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Niche Finder</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --bg:#0a0e1a;--card:#10162a;--card-2:#131a30;--border:#1f2740;
+    --blue:#3b6bf5;--blue-light:#1b2a52;--text:#f4f6fb;--text-dim:#8b93ab;
+    --red:#7a1f2b;--red-icon:#ff5566;--green:#22c55e;--yellow:#eab308;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;height:100%;}
+  body{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;}
+
+  .page{flex:1;display:none;flex-direction:column;padding:calc(20px + env(safe-area-inset-top, 24px)) 20px calc(90px + env(safe-area-inset-bottom, 24px));animation:fadeIn .25s ease;}
+  .page.active{display:flex;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .header-row{display:flex;justify-content:flex-end;align-items:center;margin-bottom:6px;}
+  .add-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .cancel-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .add-btn svg,.cancel-btn svg,.search-box button svg,.sim-btn svg,.del-btn svg{width:18px;height:18px;}
+
+  h1.title{font-size:34px;font-weight:800;margin:10px 0 22px;line-height:1.2;}
+
+  .create-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px 20px;margin-bottom:18px;}
+  .create-card h2{color:var(--blue);font-size:18px;font-weight:700;text-align:center;margin-bottom:20px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;color:var(--text-dim);font-size:13px;margin-bottom:8px;}
+  .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-size:15px;outline:none;}
+  .field input::placeholder{color:var(--text-dim);opacity:.7;}
+  .field input:focus,.field select:focus{border-color:var(--blue);}
+  .field select option{background:var(--bg);color:var(--text);}
+
+  .create-actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
+  .save-btn{background:var(--blue);color:#fff;border:none;border-radius:999px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;}
+  .freq-group{display:flex;gap:8px;}
+  .freq-btn{background:var(--bg);color:var(--text-dim);border:1px solid var(--border);border-radius:999px;padding:11px 18px;font-size:14px;cursor:pointer;}
+  .freq-btn.active{color:var(--blue);border-color:var(--blue);}
+
+  .channel-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:22px 20px;margin-bottom:18px;}
+  .channel-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .channel-name{font-size:20px;font-weight:700;}
+  .badge{background:var(--blue-light);color:#7fa1ff;font-size:13px;padding:7px 14px;border-radius:999px;white-space:nowrap;font-family:monospace;}
+  .meta{color:var(--text-dim);font-size:14px;margin-bottom:18px;}
+  .channel-bottom{display:flex;justify-content:space-between;align-items:center;}
+  .toggle-wrap{display:flex;align-items:center;gap:8px;}
+  .toggle-label{color:var(--text-dim);font-size:14px;}
+  .switch{position:relative;width:52px;height:30px;background:var(--blue);border-radius:999px;cursor:pointer;transition:background .2s;}
+  .switch.off{background:#2a3350;}
+  .switch .knob{position:absolute;top:3px;left:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:transform .2s;}
+  .switch.off .knob{transform:translateX(22px);}
+  .del-btn{background:rgba(122,31,43,.35);border:none;border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red-icon);}
+
+  .sim-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 22px;text-align:center;}
+  .sim-title{color:var(--blue);font-size:19px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .sim-desc{color:var(--text-dim);font-size:14.5px;line-height:1.9;margin-bottom:22px;}
+  .sim-btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:999px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+
+  .search-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;}
+  .bell{position:relative;color:var(--blue);display:flex;cursor:pointer;}
+  .bell svg{width:24px;height:24px;}
+  .bell .dot{position:absolute;top:-4px;left:-6px;background:#ff3b3b;color:#fff;font-size:10px;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .brand{color:var(--text-dim);letter-spacing:3px;font-size:15px;font-weight:700;}
+
+  .search-hero{text-align:left;margin-bottom:30px;}
+  .search-hero h1{font-size:42px;font-weight:800;margin-bottom:16px;}
+  .search-hero p{color:var(--text-dim);font-size:15px;line-height:1.9;}
+
+  .search-box{display:flex;gap:10px;margin-bottom:24px;}
+  .search-box input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;color:var(--text);font-size:14px;outline:none;}
+  .search-box button{background:var(--blue);color:#fff;border:none;border-radius:16px;padding:0 22px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;}
+
+  .idea-card{background:transparent;border:1.5px dashed var(--border);border-radius:16px;padding:22px;text-align:center;cursor:pointer;transition:border-color .2s;}
+  .idea-card:hover{border-color:var(--blue);}
+  .idea-card h3{font-size:16.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .idea-card p{color:var(--text-dim);font-size:13.5px;}
+
+  .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:14px 0 calc(10px + env(safe-area-inset-bottom, 20px));z-index:10;}
+  .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text-dim);font-size:12px;cursor:pointer;}
+  .nav-item.active{color:var(--blue);}
+  .nav-item .icon{width:22px;height:22px;}
+  .nav-item .icon svg{width:100%;height:100%;}
+
+  .notif-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .back-link{color:var(--text-dim);font-size:14px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+  .back-link svg{width:16px;height:16px;}
+  .notif-title{font-size:26px;font-weight:800;}
+  .notif-divider{border:none;border-top:1px solid var(--border);margin:18px 0 20px;}
+  .notif-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:18px;}
+  .notif-top{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+  .notif-top-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .notif-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 0 8px currentColor;}
+  .notif-dot.green{background:#3ddc6f;color:#3ddc6f;}
+  .notif-dot.amber{background:#ffb020;color:#ffb020;}
+  .notif-dot.red{background:#ff5566;color:#ff5566;}
+  .notif-name{font-size:17px;font-weight:700;}
+  .notif-body{color:var(--text);font-size:15px;line-height:1.8;margin-bottom:18px;}
+  .notif-body .inline-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 2px;vertical-align:middle;}
+  .notif-bottom{display:flex;justify-content:space-between;align-items:center;}
+  .notif-time{color:var(--text-dim);font-size:13px;display:flex;align-items:center;gap:6px;}
+  .notif-time svg{width:14px;height:14px;}
+  .promo-pct{color:var(--text-dim);font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:6px 12px;}
+
+  .hidden{display:none!important;}
+  .loading{text-align:center;padding:40px;}
+  .spinner{border:3px solid var(--border);border-top:3px solid var(--blue);border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;margin:0 auto 10px;}
+  @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+  .status{text-align:center;color:var(--text-dim);margin:10px 0;font-size:13px;min-height:20px;}
+  .progress-bar{width:100%;height:4px;background:var(--border);border-radius:2px;margin:10px 0;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .3s;}
+  .error{color:var(--red-icon);text-align:center;padding:20px;}
+
+  .card{background:var(--card);border-radius:20px;padding:20px;margin-bottom:16px;border:2px solid;}
+  .card-green{border-color:var(--green);}
+  .card-yellow{border-color:var(--yellow);}
+  .card-red{border-color:var(--red-icon);}
+  .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .card-title{font-size:18px;font-weight:700;}
+  .card-badge{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;}
+  .card-badge.green{background:rgba(34,197,94,.15);color:#4ade80;}
+  .card-badge.yellow{background:rgba(234,179,8,.15);color:#facc15;}
+  .card-badge.red{background:rgba(255,85,102,.15);color:#ff5566;}
+  .niche-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:6px;}
+
+  .results-area{margin-top:16px;}
+  .result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+  .result-stat{text-align:center;background:var(--bg);border-radius:12px;padding:10px 4px;}
+  .result-stat .val{font-size:18px;font-weight:700;}
+  .result-stat .lbl{font-size:10px;color:var(--text-dim);}
+  .result-scores{display:flex;gap:8px;justify-content:center;margin:12px 0;padding-top:12px;border-top:1px solid var(--border);}
+  .result-score{text-align:center;padding:8px 16px;background:var(--bg);border-radius:8px;}
+  .result-score .val{font-size:20px;font-weight:700;}
+  .result-score .lbl{font-size:10px;color:var(--text-dim);}
+  .result-score.highlight{border:2px solid var(--green);}
+  .result-posts{margin-top:12px;}
+  .result-post{background:var(--bg);border-radius:10px;padding:12px;margin-bottom:8px;}
+  .result-post-title{font-size:13px;margin-bottom:6px;line-height:1.4;}
+  .result-post-meta{font-size:11px;color:var(--text-dim);}
+  .result-post-link{color:var(--blue);font-size:12px;text-decoration:none;}
+
+  .empty-state{text-align:center;padding:30px;color:var(--text-dim);font-size:14px;}
+
+  .section-title{font-weight:800;font-size:17px;margin:26px 0 12px;display:flex;align-items:baseline;gap:8px;color:#f2f4ff;}
+  .section-title .dash{color:#5b6389;font-weight:600;font-size:14px;}
+
+  .niche-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;transition:transform .15s ease,border-color .15s ease;}
+  .niche-card:active{transform:scale(0.985);}
+  .niche-card-left{flex:1;}
+  .niche-card-title{font-weight:700;font-size:16.5px;color:#fbfbff;margin-bottom:6px;}
+  .niche-card-meta{font-family:'Consolas','SF Mono',monospace;font-size:12.5px;color:#67719c;letter-spacing:.2px;}
+  .niche-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;margin-left:14px;}
+  .niche-dot.skyblue{background:#0ea5e9;box-shadow:0 0 10px rgba(14,165,233,.6);}
+  .niche-dot.green{background:var(--green);box-shadow:0 0 10px rgba(34,197,94,.6);}
+  .niche-dot.yellow{background:var(--yellow);box-shadow:0 0 10px rgba(234,179,8,.55);}
+  .niche-dot.orange{background:#f97316;box-shadow:0 0 10px rgba(249,115,22,.55);}
+  .niche-dot.red{background:var(--red-icon);box-shadow:0 0 10px rgba(255,85,102,.55);}
+  .niche-dot.purple{background:#a855f7;box-shadow:0 0 10px rgba(168,85,247,.55);}
+
+  .menu-dots{position:relative;cursor:pointer;padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+  .menu-dots:active{background:var(--border);}
+  .menu-dots svg{width:22px;height:22px;color:var(--text-dim);}
+
+  .dropdown{position:absolute;top:44px;right:0;background:var(--card-2);border:1px solid var(--border);border-radius:14px;min-width:180px;box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:50;display:none;overflow:hidden;}
+  .dropdown.show{display:block;animation:dropIn .15s ease;}
+  @keyframes dropIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+  .dropdown-item{display:flex;align-items:center;gap:10px;padding:14px 18px;font-size:14px;color:var(--text);cursor:pointer;transition:background .15s;}
+  .dropdown-item:active{background:var(--border);}
+  .dropdown-item svg{width:18px;height:18px;color:var(--text-dim);flex-shrink:0;}
+
+  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 22px;width:100%;max-width:380px;position:relative;animation:modalIn .2s ease;}
+  @keyframes modalIn{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
+  .modal-box h2{font-size:18px;font-weight:700;margin-bottom:6px;text-align:center;}
+  .modal-box p{color:var(--text-dim);font-size:13px;text-align:center;margin-bottom:18px;line-height:1.6;}
+  .modal-input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none;font-family:monospace;}
+  .modal-input:focus{border-color:var(--blue);}
+  .modal-actions{display:flex;gap:10px;margin-top:14px;}
+  .modal-btn{flex:1;padding:13px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
+  .modal-btn.primary{background:var(--blue);color:#fff;}
+  .modal-btn.ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  .modal-saved{text-align:center;color:var(--green);font-size:14px;font-weight:700;padding:18px 0;display:none;}
+
+</style>
+</head>
+<body>
+
+<!-- PAGE: Search / Niche Finder -->
+<div class="page active" id="page-search">
+  <div class="search-header">
+    <div class="bell" onclick="showPage('page-notifications')" style="cursor:pointer;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="dot" id="notifCount">0</span>
+    </div>
+    <div class="brand">NICHE FINDER</div>
+    <div class="menu-dots" onclick="toggleDropdown(event)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    </div>
+    <div class="dropdown" id="dropdownMenu">
+      <div class="dropdown-item" onclick="openAPIKeyModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Gemini / OpenRouter API
+      </div>
+      <div class="dropdown-item" onclick="openYTKeyModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        YouTube API
+      </div>
+      <div class="dropdown-item" onclick="openServerModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        Backend Server
+      </div>
+      <div class="dropdown-item" onclick="openLogsModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Logs
+      </div>
+      <div class="dropdown-item" onclick="openAboutModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        About
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: API Key -->
+  <div class="modal-overlay hidden" id="apiKeyModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <div id="apiKeyFormView">
+        <h2>API Keys</h2>
+        <p>Enter at least one key to enable AI analysis.</p>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gemini API Key (recommended)</label>
+          <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIza...">
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">OpenRouter API Key (fallback)</label>
+          <input type="password" class="modal-input" id="orKeyInput" placeholder="sk-or-...">
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="closeAPIKeyModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveAPIKeys()">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="apiKeySaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Keys saved & active
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: YouTube API Key -->
+  <div class="modal-overlay hidden" id="ytKeyModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <div id="ytKeyFormView">
+        <h2>YouTube API Key</h2>
+        <p>Enter your YouTube Data API v3 key to enable trending video analysis for niche discovery.</p>
+        <div class="field">
+          <input type="password" class="modal-input" id="ytKeyInput" placeholder="AIza...">
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="closeYTKeyModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveYTKey()">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="ytKeySaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Key saved & active
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Server URL -->
+  <div class="modal-overlay hidden" id="serverModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <div id="serverFormView">
+        <h2>Termux Server</h2>
+        <p style="font-size:12px;line-height:1.6">Connect to local Termux server for Google Trends + Keyword Expansion.</p>
+        <div style="background:#0d1117;border-radius:8px;padding:10px;margin:10px 0;font-size:11px;line-height:1.7;color:var(--text-dim);border:1px solid var(--border)">
+          <b style="color:var(--text)">Setup:</b><br>
+          1. Install Termux from F-Droid<br>
+          2. <code style="color:var(--green)">pkg install nodejs</code><br>
+          3. Copy <code style="color:var(--green)">termux/</code> to phone → <code style="color:var(--green)">cd termux</code><br>
+          4. <code style="color:var(--green)">bash start.sh</code>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Server URL</label>
+          <input type="url" class="modal-input" id="serverURLInput" placeholder="http://127.0.0.1:3000">
+        </div>
+        <p style="font-size:11px;color:var(--text-dim);margin-top:8px">Leave empty to use proxies (slower, less reliable).</p>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" onclick="testServerConn()" style="font-size:11px">Test</button>
+          <button class="modal-btn ghost" onclick="closeServerModal()">Cancel</button>
+          <button class="modal-btn primary" onclick="saveServerURL()">Save</button>
+        </div>
+      </div>
+      <div class="modal-saved" id="serverSaved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" width="40" height="40" style="margin:0 auto 10px;display:block"><path d="M20 6L9 17l-5-5"/></svg>
+        Server URL saved
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: About -->
+  <div class="modal-overlay hidden" id="aboutModal" onclick="closeModalBg(event)">
+    <div class="modal-box">
+      <h2>Niche Finder</h2>
+      <p style="line-height:2;font-size:13px">Finds profitable niches by combining Google Trends, YouTube trending, and AI analysis.<br><br><span style="color:var(--text);font-weight:600">v4.0</span> — Termux Server | Keyword Expansion | YouTube Scoring<br><br>
+      <span style="color:var(--text);font-weight:600">Termux Server (recommended):</span><br>
+      <span style="color:var(--text-dim);font-size:12px">1. Install Termux from F-Droid<br>
+      2. Copy <code style="color:var(--green)">termux/</code> folder to phone<br>
+      3. <code style="color:var(--green)">bash start.sh</code> in Termux<br>
+      4. Settings → Termux Server → enter <code style="color:var(--green)">http://127.0.0.1:3000</code></span></p>
+      <div class="modal-actions">
+        <button class="modal-btn primary" onclick="document.getElementById('aboutModal').classList.add('hidden')" style="flex:1">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Logs -->
+  <div class="modal-overlay hidden" id="logsModal" onclick="closeModalBg(event)">
+    <div class="modal-box" style="max-width:480px;max-height:85vh;display:flex;flex-direction:column">
+      <h2 style="margin-bottom:2px">Activity Log</h2>
+      <p style="font-size:11px;margin-bottom:6px">Real-time operation trace — every request, response & error</p>
+      <div id="logsContainer" style="flex:1;overflow-y:auto;max-height:62vh;margin:0;padding:12px;background:#0d1117;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;line-height:1.9;color:#94a3b8;border:1px solid #21262d"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <span id="logsCount" style="font-size:10px;color:var(--text-dim);flex:1">0 entries</span>
+        <button class="modal-btn ghost" onclick="clearLogs()" style="flex:0;padding:8px 14px;font-size:12px">Clear</button>
+        <button class="modal-btn primary" onclick="document.getElementById('logsModal').classList.add('hidden')" style="flex:0;padding:8px 14px;font-size:12px">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="search-hero">
+    <h1>Where do we start?</h1>
+    <p>Search for any topic or keyword to find YouTube videos and get live analysis.</p>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search by keyword...">
+    <button id="searchBtn" onclick="handleSearch()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Search
+    </button>
+  </div>
+
+  <div class="idea-card" onclick="runDualDiscovery()">
+    <h3>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 2l1.9 5.8L20 9.7l-5.8 1.9L12 17.4l-1.9-5.8L4 9.7l5.8-1.9L12 2z"/></svg>
+      Auto-generate — Evergreen + Trending niches
+    </h3>
+    <p>Evergreen (3 months) + Trending (1 week) — Google Trends + YouTube + AI filter</p>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="results-area hidden" id="results"></div>
+</div>
+
+<!-- PAGE: Active channels list -->
+<div class="page" id="page-list">
+  <div class="header-row">
+    <button class="add-btn" onclick="showPage('page-create')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Monitor
+    </button>
+  </div>
+  <h1 class="title">Active Monitoring Channels</h1>
+  <div id="monitorsList"></div>
+  <div class="sim-card" style="margin-top:10px">
+    <div class="sim-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M12 2l1.9 5.8L20 9.7l-5.8 1.9L12 17.4l-1.9-5.8L4 9.7l5.8-1.9L12 2z"/></svg>
+      Run All Monitors Now
+    </div>
+    <p class="sim-desc">Check all your monitoring channels instantly to detect new opportunities and alerts.</p>
+    <button class="sim-btn" onclick="runAllMonitors()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Run Check Now
+    </button>
+  </div>
+</div>
+
+<!-- PAGE: Create monitor -->
+<div class="page" id="page-create">
+  <div class="header-row">
+    <button class="cancel-btn" onclick="showPage('page-list')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Cancel
+    </button>
+  </div>
+  <h1 class="title">Active Monitoring Channels</h1>
+  <div class="create-card">
+    <h2>Create New Monitor</h2>
+    <div class="field">
+      <label>Topic / Keyword</label>
+      <input type="text" id="monitorName" placeholder="e.g. best budget camera 2026">
+    </div>
+    <div class="create-actions">
+      <div class="freq-group">
+        <button class="freq-btn" onclick="setFreq(this,'hourly')">Hourly</button>
+        <button class="freq-btn active" onclick="setFreq(this,'daily')">Daily</button>
+        <button class="freq-btn" onclick="setFreq(this,'weekly')">Weekly</button>
+      </div>
+      <button class="save-btn" onclick="saveMonitor()">Save Schedule</button>
+    </div>
+  </div>
+  <div id="monitorsListCreate"></div>
+</div>
+
+<!-- PAGE: Notifications -->
+<div class="page" id="page-notifications">
+  <div class="notif-header">
+    <h1 class="notif-title">Notifications (<span id="notifTotal">0</span>)</h1>
+    <div class="back-link" onclick="showPage('page-list')">
+      Back
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </div>
+  </div>
+  <hr class="notif-divider">
+  <div id="notifList"></div>
+</div>
+
+<div class="bottomnav">
+  <div class="nav-item active" id="nav-search" onclick="showPage('page-search')">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <span>Search</span>
+  </div>
+  <div class="nav-item" id="nav-list" onclick="showPage('page-list')">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+    <span>Schedule</span>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?','https://api.codetabs.com/v1/proxy?quest='];
+
+// Gemini (primary AI)
+const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+const GEMINI_MODEL='gemini-2.5-flash-lite';
+// OpenRouter fallback (works from browser - supports CORS)
+const OPENROUTER_BASE='https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL='openrouter/free';
+function getGeminiKey(){return localStorage.getItem('nf_gemini_key')||'';}
+function getOpenRouterKey(){return localStorage.getItem('nf_openrouter_key')||'';}
+function getServerURL(){return localStorage.getItem('nf_server_url')||'';}
+function hasAnyKey(){return getGeminiKey()||getOpenRouterKey();}
+function getActiveProvider(){
+  if(getGeminiKey())return'gemini';
+  if(getOpenRouterKey())return'openrouter';
+  return'none';
+}
+const PROMO_KW=['buy now','check out','link in','affiliate','discount','coupon','deal','sale','offer','limited time','order now','shop now','use code','promo','free shipping'];
+const DISCUSSION_KW=['how do i','how to','does anyone know','recommend','struggling with','help me','what do you','advice','suggestion','tip','trick','mistake','error','problem','issue','fix','solution','learn'];
+const STORY_KW=['my experience','i tried','before and after','journey','story','transform','changed','result','outcome','i started','here is what','what happened'];
+const DEMAND_KW=['does anyone know','looking for','wish there was','is there a product','anyone recommend','need help finding','looking for something','does anyone use','where can i find','how do i get','any suggestions','what do you use','best product for','alternative to','better than','frustrated with','tired of','hate when','annoying that','wish i could','if only there','would pay for','shut up and take my money'];
+const COMMERCIAL_KW=['buy','purchase','price','cost','expensive','cheap','budget','worth it','value','investment','subscription','monthly','annual','free trial','premium','pro version','upgrade','plan'];
+const TREND_KW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative'];
+const SEED_KEYWORDS=[
+  "weight loss","fitness","workout","yoga","meditation","keto diet","vegan recipes","meal prep",
+  "skincare","makeup","beauty tips","hair care","nail art","perfume",
+  "home decor","interior design","gardening","landscaping","declutter",
+  "photography","videography","photo editing","camera gear",
+  "gaming","pc build","streaming","gaming chair","gaming setup",
+  "smart home","home automation","security camera","solar panel",
+  "web development","app development","ai tools","chatgpt","programming",
+  "digital marketing","seo","social media","content creation",
+  "online course","language learning","teaching","tutoring",
+  "investing","crypto","real estate","stock market","credit card",
+  "personal finance","budgeting","side hustle","passive income",
+  "ecommerce","dropshipping","amazon fba","etsy",
+  "pet supplies","dog training","cat food","aquarium","pet grooming",
+  "baby products","pregnancy","parenting","kids education",
+  "camping","hiking","backpacking","survival gear",
+  "cooking","baking","air fryer","instant pot","bbq","kitchen gadgets",
+  "travel","solo travel","travel tips","luggage","hotel",
+  "car maintenance","car detailing","motorcycle","bicycle",
+  "fashion","streetwear","sneakers","watch",
+  "self improvement","productivity","time management","habits",
+  "anxiety relief","sleep better","mental health",
+  "woodworking","diy projects","power tools","3d printing",
+  "fishing","hunting","archery",
+  "podcast","vlogging","microphone","lighting setup",
+];
+
+let llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};
+function resetLLMStats(){llmStats={total:0,ok:0,fail:0,firstError:null,lastError:null,lastModel:null,provider:null};}
+
+// ===================== HELPERS =====================
+function countKW(text,kw){return kw.filter(k=>text.toLowerCase().includes(k)).length;}
+function countBW(text,w){return w.filter(x=>text.toLowerCase().includes(x)).length;}
+function setStatus(msg){document.getElementById('status').textContent=msg;}
+function showProgress(pct){document.getElementById('progressBar').classList.remove('hidden');document.getElementById('progressFill').style.width=pct+'%';}
+function hideProgress(){document.getElementById('progressBar').classList.add('hidden');}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+// ===================== TERMUX SERVER =====================
+const TERMUX_DEFAULT='http://127.0.0.1:3000';
+
+async function pingServer(url){
+  try{
+    const r=await fetch(url+'/ping',{signal:AbortSignal.timeout(3000)});
+    if(r.status===200){const d=await r.json();return d;}
+    return null;
+  }catch{return null;}
+}
+
+async function autoDetectTermux(){
+  if(getServerURL())return;
+  if(window.location.protocol!=='file:')return;
+  const ok=await pingServer(TERMUX_DEFAULT);
+  if(ok){
+    localStorage.setItem('nf_server_url',TERMUX_DEFAULT);
+    addLog('success','Auto-detected Termux server at '+TERMUX_DEFAULT);
+  }
+}
+
+async function testServerConn(){
+  const url=document.getElementById('serverURLInput').value.trim().replace(/\/+$/,'');
+  if(!url){alert('Enter a server URL first');return;}
+  const btn=document.querySelector('#serverFormView .modal-actions button:first-child');
+  const orig=btn.textContent;btn.textContent='Testing...';
+  try{
+    const r=await fetch(url+'/ping',{signal:AbortSignal.timeout(5000)});
+    const d=await r.json();
+    if(r.status===200){
+      btn.textContent='✓ OK';btn.style.color='var(--green)';
+      setTimeout(()=>{btn.textContent=orig;btn.style.color='';},2000);
+    }else{
+      btn.textContent='✖ Error';btn.style.color='var(--red-icon)';
+      setTimeout(()=>{btn.textContent=orig;btn.style.color='';},2000);
+    }
+  }catch{
+    btn.textContent='✖ No connection';btn.style.color='var(--red-icon)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.color='';},3000);
+  }
+}
+
+async function fetchTermuxExpand(keywords,onProgress){
+  const server=getServerURL();
+  if(!server)return[];
+  const r1=await fetch(server+'/api/expand',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keywords}),
+    signal:AbortSignal.timeout(10000)
+  });
+  if(!r1.ok){const e=await r1.json();throw new Error(e.error||'Expand start failed');}
+  let done=false;
+  while(!done){
+    await delay(3000);
+    const r2=await fetch(server+'/api/expand-status',{signal:AbortSignal.timeout(5000)});
+    const s=await r2.json();
+    if(onProgress)onProgress(s);
+    if(!s.running)done=true;
+  }
+  const r3=await fetch(server+'/api/keywords?limit=5000',{signal:AbortSignal.timeout(15000)});
+  if(!r3.ok)throw new Error('Failed to fetch expanded keywords');
+  return await r3.json();
+}
+
+async function fetchTermuxCount(keywords,ytKey,onProgress){
+  const server=getServerURL();
+  if(!server)return[];
+  const r1=await fetch(server+'/api/count',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keywords,ytKey}),
+    signal:AbortSignal.timeout(10000)
+  });
+  if(!r1.ok){const e=await r1.json();throw new Error(e.error||'Count start failed');}
+  let done=false;
+  while(!done){
+    await delay(3000);
+    const r2=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(5000)});
+    const s=await r2.json();
+    if(onProgress)onProgress(s);
+    if(!s.running)done=true;
+  }
+  const r3=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+  if(!r3.ok)throw new Error('Failed to fetch results');
+  return await r3.json();
+}
+
+async function _geminiFetch(prompt,timeoutMs){
+  const key=getGeminiKey();
+  if(!key)return{error:'NoKey',msg:'No Gemini key'};
+  const url=GEMINI_BASE+'?key='+key;
+  const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:1024}};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
+  try{
+    addLog('req',`Gemini: POST ${GEMINI_MODEL} (${(prompt.length/1024).toFixed(1)}KB prompt)`);
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timer);
+    addLog('res',`Gemini: HTTP ${r.status}`);
+    const rawText=await r.text();
+    const trimmed=rawText.trim();
+    if(trimmed.startsWith('{')){
+      try{
+        const d=JSON.parse(trimmed);
+        if(d.candidates&&d.candidates[0]?.content?.parts?.[0]?.text){
+          const txt=d.candidates[0].content.parts[0].text.trim();
+          addLog('success',`Gemini: OK (${(txt.length/1024).toFixed(1)}KB response, ${GEMINI_MODEL})`);
+          return{content:txt,realModel:GEMINI_MODEL};
+        }
+        if(d.error){
+          addLog('error',`Gemini API Error: ${JSON.stringify(d.error).substring(0,200)}`);
+          return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};
+        }
+      }catch(parseErr){}
+    }
+    addLog('error',`Gemini: Unexpected response (${r.status}): ${trimmed.substring(0,100)}`);
+    return{status:r.status,body:trimmed.substring(0,300)||'(empty response)'};
+  }catch(e){
+    clearTimeout(timer);
+    addLog('error',`Gemini: Network error — ${e.message}`);
+    return{error:e.name||e.constructor.name,msg:e.message||String(e)};
+  }
+}
+
+async function _openrouterFetch(prompt,timeoutMs){
+  const key=getOpenRouterKey();
+  if(!key)return{error:'NoKey',msg:'No OpenRouter key'};
+  const body={model:OPENROUTER_MODEL,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1024};
+  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs||60000);
+  try{
+    addLog('req',`OpenRouter: POST ${OPENROUTER_MODEL} (${(prompt.length/1024).toFixed(1)}KB prompt)`);
+    const r=await fetch(OPENROUTER_BASE,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timer);
+    addLog('res',`OpenRouter: HTTP ${r.status}`);
+    const rawText=await r.text();
+    const trimmed=rawText.trim();
+    if(trimmed.startsWith('{')){
+      try{
+        const d=JSON.parse(trimmed);
+        if(d.choices&&d.choices[0]?.message?.content){
+          const txt=d.choices[0].message.content.trim();
+          addLog('success',`OpenRouter: OK (${(txt.length/1024).toFixed(1)}KB response, ${d.model||OPENROUTER_MODEL})`);
+          return{content:txt,realModel:d.model||OPENROUTER_MODEL};
+        }
+        if(d.error){
+          addLog('error',`OpenRouter API Error: ${JSON.stringify(d.error).substring(0,200)}`);
+          return{status:r.status,body:JSON.stringify(d.error).substring(0,300)};
+        }
+      }catch(parseErr){}
+    }
+    const lines=trimmed.split('\n');
+    for(const line of lines){
+      if(line.startsWith('data: ')){
+        const jsonStr=line.slice(6).trim();
+        if(jsonStr==='[DONE]')continue;
+        try{
+          const d=JSON.parse(jsonStr);
+          if(d.choices&&d.choices[0]?.message?.content){
+            const txt=d.choices[0].message.content.trim();
+            addLog('success',`OpenRouter SSE: OK (${(txt.length/1024).toFixed(1)}KB response)`);
+            return{content:txt,realModel:d.model||OPENROUTER_MODEL};
+          }
+        }catch(parseErr){}
+      }
+    }
+    addLog('error',`OpenRouter: Unexpected response (${r.status}): ${trimmed.substring(0,100)}`);
+    return{status:r.status,body:trimmed.substring(0,300)||'(empty response)'};
+  }catch(e){
+    clearTimeout(timer);
+    addLog('error',`OpenRouter: Network error — ${e.message}`);
+    return{error:e.name||e.constructor.name,msg:e.message||String(e)};
+  }
+}
+
+async function callLLM(prompt,timeoutMs=60000){
+  llmStats.total++;
+
+  // Try Gemini first
+  if(getGeminiKey()){
+    console.log('[LLM] Trying Gemini...');
+    const geminiResult=await _geminiFetch(prompt,timeoutMs);
+    if(geminiResult&&geminiResult.content){
+      llmStats.ok++;
+      llmStats.lastModel=geminiResult.realModel||GEMINI_MODEL;
+      llmStats.provider='Gemini';
+      console.log('[LLM] SUCCESS (Gemini)');
+      addLog('success',`LLM: Gemini OK (${geminiResult.realModel||GEMINI_MODEL})`);
+      return geminiResult.content;
+    }
+    const geminiErr=geminiResult.status||0;
+    const geminiRaw=geminiResult.body||geminiResult.error||geminiResult.msg||'unknown';
+    const geminiMsg=`Gemini: STATUS ${geminiErr} | ${geminiRaw}`;
+    console.warn(`[LLM] Gemini failed: ${geminiMsg}`);
+    llmStats.firstError=geminiMsg;
+    addLog('warn',`LLM: Gemini failed — ${geminiMsg}`);
+  }
+
+  // Fallback to OpenRouter
+  if(getOpenRouterKey()){
+    console.log('[LLM] Trying OpenRouter...');
+    const orResult=await _openrouterFetch(prompt,timeoutMs);
+    if(orResult&&orResult.content){
+      llmStats.ok++;
+      llmStats.lastModel=orResult.realModel||OPENROUTER_MODEL;
+      llmStats.provider='OpenRouter';
+      llmStats.firstError=null;
+      console.log('[LLM] SUCCESS (OpenRouter)');
+      addLog('success',`LLM: OpenRouter OK (${orResult.realModel||OPENROUTER_MODEL})`);
+      return orResult.content;
+    }
+    const orErr=orResult.status||0;
+    const orRaw=orResult.body||orResult.msg||orResult.error||'unknown';
+    const orMsg=`OR: STATUS ${orErr} | ${orRaw}`;
+    console.error(`[LLM] OpenRouter FAILED — ${orMsg}`,orResult);
+    llmStats.lastError=orMsg;
+    if(!llmStats.firstError)llmStats.firstError=orMsg;
+    addLog('error',`LLM: OpenRouter failed — ${orMsg}`);
+  }
+
+  llmStats.fail++;
+  addLog('error',`LLM: All providers failed (total=${llmStats.total}, ok=${llmStats.ok}, fail=${llmStats.fail})`);
+  return null;
+}
+
+async function callOpenRouter(prompt,timeoutMs=60000){return callLLM(prompt,timeoutMs);}
+
+function saveAPIKeys(){
+  const geminiKey=document.getElementById('geminiKeyInput').value.trim();
+  const orKey=document.getElementById('orKeyInput').value.trim();
+  if(geminiKey)localStorage.setItem('nf_gemini_key',geminiKey);
+  if(orKey)localStorage.setItem('nf_openrouter_key',orKey);
+  if(!geminiKey&&!orKey){alert('Enter at least one API key');return;}
+  document.getElementById('apiKeyFormView').style.display='none';
+  const saved=document.getElementById('apiKeySaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('apiKeyFormView').style.display='';document.getElementById('apiKeyModal').classList.add('hidden');document.getElementById('geminiKeyInput').value='';document.getElementById('orKeyInput').value='';},1500);
+}
+
+function saveAPIKey(){saveAPIKeys();}
+
+function toggleDropdown(e){
+  e.stopPropagation();
+  const dd=document.getElementById('dropdownMenu');
+  dd.classList.toggle('show');
+}
+
+function openAPIKeyModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('apiKeyModal').classList.remove('hidden');
+  document.getElementById('geminiKeyInput').value=getGeminiKey();
+  document.getElementById('orKeyInput').value=getOpenRouterKey();
+}
+
+function openAboutModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('aboutModal').classList.remove('hidden');
+}
+
+const appLogs=[];
+let _logStartTime=Date.now();
+function addLog(type,msg){
+  const now=Date.now();
+  const elapsed=((now-_logStartTime)/1000).toFixed(1);
+  const ts=new Date().toLocaleTimeString();
+  const colors={info:'#94a3b8',success:'#22c55e',error:'#ef4444',warn:'#f59e0b',req:'#60a5fa',res:'#a78bfa',proxy:'#f472b6'};
+  const icons={info:'▸',success:'✔',error:'✖',warn:'!',req:'→',res:'←',proxy:'◈'};
+  appLogs.push({t:ts,elapsed,type,msg});
+  const el=document.getElementById('logsContainer');
+  if(el){
+    el.innerHTML+=`<div style="color:${colors[type]||colors.info}"><span style="opacity:.4">${elapsed}s</span> <span style="color:${colors[type]};font-weight:bold">${icons[type]||'▸'}</span> ${msg}</div>`;
+    el.scrollTop=el.scrollHeight;
+  }
+  const cnt=document.getElementById('logsCount');
+  if(cnt)cnt.textContent=`${appLogs.length} entries | errors: ${appLogs.filter(l=>l.type==='error').length}`;
+}
+function renderLogs(){
+  const el=document.getElementById('logsContainer');
+  if(!el)return;
+  el.innerHTML='';
+  for(const l of appLogs){
+    const colors={info:'#94a3b8',success:'#22c55e',error:'#ef4444',warn:'#f59e0b',req:'#60a5fa',res:'#a78bfa',proxy:'#f472b6'};
+    const icons={info:'▸',success:'✔',error:'✖',warn:'!',req:'→',res:'←',proxy:'◈'};
+    el.innerHTML+=`<div style="color:${colors[l.type]||colors.info}"><span style="opacity:.4">${l.elapsed}s</span> <span style="color:${colors[l.type]};font-weight:bold">${icons[l.type]||'▸'}</span> ${l.msg}</div>`;
+  }
+  el.scrollTop=el.scrollHeight;
+  const cnt=document.getElementById('logsCount');
+  if(cnt)cnt.textContent=`${appLogs.length} entries | errors: ${appLogs.filter(l=>l.type==='error').length}`;
+}
+function openLogsModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('logsModal').classList.remove('hidden');
+  renderLogs();
+}
+function clearLogs(){appLogs.length=0;_logStartTime=Date.now();document.getElementById('logsContainer').innerHTML='';addLog('info','Logs cleared');}
+
+function closeAPIKeyModal(){document.getElementById('apiKeyModal').classList.add('hidden');}
+
+function closeModalBg(e){if(e.target===e.currentTarget)e.target.classList.add('hidden');}
+
+document.addEventListener('click',()=>{const dd=document.getElementById('dropdownMenu');if(dd)dd.classList.remove('show');});
+
+function renderLLMStats(){
+  const s=llmStats;
+  const hasKey=getGeminiKey()||getOpenRouterKey();
+  const provider=llmStats.provider||(getGeminiKey()?'gemini':getOpenRouterKey()?'OpenRouter':'none');
+  const providerLabel=provider==='gemini'?'Gemini 2.5 Flash Lite':provider==='OpenRouter'?'OpenRouter (Free)':'No API key (Keywords only)';
+  const providerColor=hasKey?'var(--green)':'var(--text-dim)';
+  const errHtml=s.firstError?`<div style="margin-top:10px;padding:10px;background:rgba(255,85,102,.08);border:1px solid rgba(255,85,102,.25);border-radius:10px;font-size:11px;color:var(--red-icon);word-break:break-all;max-height:90px;overflow-y:auto;white-space:pre-wrap;line-height:1.5"><b style="font-size:12px">Raw error:</b>\n${s.firstError}${s.lastError?'\n'+s.lastError:''}</div>`:'';
+  const modelHtml=s.lastModel?`<div style="margin-top:6px;font-size:11px;color:var(--text-dim);text-align:center">Model: <b style="color:var(--text)">${s.lastModel}</b></div>`:'';
+  return`<div style="margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;text-align:center">AI Stats</div>
+    <div style="display:flex;justify-content:center;gap:20px;font-size:13px">
+      <span>Total: <b style="color:var(--text)">${s.total}</b></span>
+      <span style="color:var(--green)">OK: <b>${s.ok}</b></span>
+      <span style="color:var(--red-icon)">Fail: <b>${s.fail}</b></span>
+    </div>
+    <div style="margin-top:4px;font-size:10px;color:var(--text-dim);text-align:center">Provider: <b style="color:${providerColor}">${providerLabel}</b></div>
+    ${modelHtml}
+    ${errHtml}
+  </div>`;
+}
+
+// ===================== PAGES =====================
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('nav-search').classList.toggle('active',id==='page-search');
+  document.getElementById('nav-list').classList.toggle('active',id!=='page-search');
+  if(id==='page-list'||id==='page-create') renderMonitors();
+  if(id==='page-notifications') renderNotifications();
+}
+
+// ===================== SCORING =====================
+function classify(title,selftext){
+  const text=(title+' '+(selftext||'')).toLowerCase();
+  let promoSignals=0;
+  promoSignals+=countKW(text,PROMO_KW);
+  if(/amazon\.com|ebay\.com|etsy\.com|shopify|gumroad|patreon|aliexpress/i.test(text))promoSignals+=2;
+  if(/\b(?:my |i (?:made|built|created|launched|developed)|check out|visit my|follow me)\b/i.test(text))promoSignals+=2;
+  if(/\b(?:limited(?! data)|hurry|don'?t miss|act now|only \d+ left|expires|last chance|flash sale)\b/i.test(text))promoSignals+=2;
+  if(/\b(?:discount|coupon|referral|affiliate|promo code)\b/i.test(text))promoSignals+=1;
+  if(/\$\d+/.test(text))promoSignals+=1;
+  const promoScore=Math.min(100,Math.round((promoSignals/5)*100));
+  const eduScore=Math.min(100,Math.round((countKW(text,DISCUSSION_KW)/3)*100));
+  const storyScore=Math.min(100,Math.round((countKW(text,STORY_KW)/2)*100));
+  const interactiveScore=(text.match(/\?/g)||[]).length>0?70:10;
+  return{promoScore,eduScore,storyScore,interactiveScore};
+}
+
+async function classifyPost(post){
+  const prompt=`Analyze this Reddit post and return a JSON object with promo analysis.
+Post title: "${post.title}"
+Post content: "${(post.content||post.selftext||'').slice(0,400)}"
+Subreddit: r/${post.subreddit||'unknown'}
+
+Return ONLY valid JSON, no other text:
+{"promo":0-100,"edu":0-100,"story":0-100,"interactive":0-100,"reason":"brief reason"}
+
+Scoring guide:
+- promo: 0=pure discussion, 100=obvious advertisement/spam
+- edu: 0=no educational value, 100=highly informative/tutorial
+- story: 0=factual question, 100=personal experience/story
+- interactive: 0=statement, 100=engaging question`;
+
+  const result=await callOpenRouter(prompt);
+  if(!result)return null;
+  try{
+    const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const d=JSON.parse(cleaned);
+    return{promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))};
+  }catch(e){return null;}
+}
+
+async function batchClassify(posts){
+  const prompt=`Analyze these ${posts.length} Reddit posts and classify each for promotional content.
+For each post, return a JSON array with promo scores.
+
+Posts:
+${posts.map((p,i)=>`${i+1}. "${p.title}" (r/${p.subreddit||'unknown'}) - ${(p.content||p.selftext||'').slice(0,150)}`).join('\n')}
+
+Return ONLY a valid JSON array of objects, no other text:
+[{"i":1,"promo":0-100,"edu":0-100,"story":0-100,"interactive":0-100},...]
+
+Scoring:
+- promo: 0=pure discussion, 100=obvious advertisement/spam
+- edu: 0=no educational value, 100=highly informative
+- story: 0=factual question, 100=personal experience
+- interactive: 0=statement, 100=engaging question`;
+
+  const result=await callLLM(prompt);
+  if(result){
+    try{
+      const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const arr=JSON.parse(cleaned);
+      if(Array.isArray(arr))return arr.map(d=>({promoScore:Math.min(100,Math.max(0,d.promo||0)),eduScore:Math.min(100,Math.max(0,d.edu||0)),storyScore:Math.min(100,Math.max(0,d.story||0)),interactiveScore:Math.min(100,Math.max(0,d.interactive||0))}));
+    }catch(e){}
+  }
+
+  // Keyword fallback
+  return posts.map(p=>classify(p.title,p.content||p.selftext||''));
+}
+
+function computeDemandScore(title,content){
+  const text=(title+' '+(content||'')).toLowerCase();
+  let score=0;
+  score+=countKW(text,DEMAND_KW)*15;
+  score+=countKW(text,COMMERCIAL_KW)*10;
+  score+=(text.match(/\?/g)||[]).length*8;
+  score+=countKW(text,['problem','issue','frustrated','tired','hate','annoying','broken',"doesn't work","can't find",'no good'])*12;
+  score+=countKW(text,['wish','want','need','desire','looking','searching','hoping'])*10;
+  return Math.min(100,score);
+}
+
+function computeTrendScore(title,content){
+  const text=(title+' '+(content||'')).toLowerCase();
+  let score=0;
+  score+=countKW(text,TREND_KW)*20;
+  score+=countBW(text,['new','just launched','recently','recent','latest','first time','finally'])*15;
+  return Math.min(100,score);
+}
+
+function classifyNicheType(title,source,cachedTrends){
+  const trends=cachedTrends||[];
+  const titleLower=title.toLowerCase();
+  const topicWords=titleLower.split(/\s+/).filter(w=>w.length>2);
+  let inTrends=false;
+  for(const t of trends){
+    const tLower=t.title.toLowerCase();
+    const trendWords=tLower.split(/\s+/).filter(w=>w.length>2);
+    if(topicWords.some(tw=>trendWords.some(trw=>trw.includes(tw)||tw.includes(trw)))){inTrends=true;break;}
+    if(tLower.includes(titleLower)||titleLower.includes(tLower)){inTrends=true;break;}
+  }
+  if(source==='Google Trends')inTrends=true;
+
+  const trendKW=['new','trending','viral','popular','growing','emerging','latest','2024','2025','2026','future','next gen','revolutionary','innovative','hot','buzz','fad'];
+  const evergreenKW=['best','how to','guide','tutorial','review','comparison','vs','alternative','maintenance','care','essential','classic','traditional','durable','quality'];
+  const hasTrendKW=trendKW.some(kw=>titleLower.includes(kw));
+  const hasEvergreenKW=evergreenKW.some(kw=>titleLower.includes(kw));
+
+  if(inTrends&&hasEvergreenKW)return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b'};
+  if(inTrends||hasTrendKW)return{type:'trending',label:'Trending',color:'#8b5cf6'};
+  if(source==='Reddit Unmet Demand'||hasEvergreenKW)return{type:'evergreen',label:'Evergreen',color:'#10b981'};
+  return{type:'general',label:'General',color:'#64748b'};
+}
+
+async function classifyTrendingAI(topic,trendsIdeas){
+  // Try AI first
+  const prompt=`Classify this niche topic into ONE of these categories:
+- "trending": Rising momentum, time-sensitive, viral, new technology, seasonal
+- "evergreen": Persistent need, ongoing demand, essential product
+- "hybrid": Both trending and evergreen signals
+
+Niche topic: "${topic}"
+
+Return ONLY JSON: {"type":"trending|evergreen|hybrid","reason":"brief explanation"}`;
+
+  const result=await callLLM(prompt);
+  if(result){
+    try{
+      const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const d=JSON.parse(cleaned);
+      if(d.type==='trending')return{type:'trending',label:'Trending',color:'#8b5cf6',reason:d.reason};
+      if(d.type==='hybrid')return{type:'hybrid',label:'Trending+Evergreen',color:'#f59e0b',reason:d.reason};
+      return{type:'evergreen',label:'Evergreen',color:'#10b981',reason:d.reason};
+    }catch(e){}
+  }
+
+  // Keyword fallback
+  return classifyNicheType(topic,'keyword');
+}
+
+async function computeTrafficLight(posts){
+  if(!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0};
+  const total=posts.length;
+
+  // Try AI batch classify, fallback to keyword
+  let classResults=await batchClassify(posts);
+  if(!classResults||!classResults.length)classResults=posts.map(p=>classify(p.title,p.content||p.selftext||''));
+
+  const promo=posts.filter((p,i)=>{
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.promoScore>=40;
+  }).length;
+  const ratio=promo/total;
+  const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
+  const avgScore=posts.reduce((s,p)=>s+(p.score||0),0)/total;
+  const hasEngData=avgComments>0||avgScore>0;
+  const highEng=hasEngData?(avgComments+avgScore)/2>10:true;
+  const avgDemand=posts.reduce((s,p)=>s+computeDemandScore(p.title,p.content||p.selftext||''),0)/total;
+  const avgTrend=posts.reduce((s,p)=>s+computeTrendScore(p.title,p.content||p.selftext||''),0)/total;
+  const opportunityScore=Math.round((avgDemand*0.4)+(avgTrend*0.3)+((100-ratio*100)*0.3));
+  let color,label;
+  if(ratio<=0.01&&highEng){color='green';label='Clean opportunity - strong signal';}
+  else if(ratio<=0.15&&highEng){color='green';label='Open and clean market';}
+  else if(ratio<=0.4){color='yellow';label='Moderate market - deeper analysis needed';}
+  else{color='red';label='Saturated with promotions';}
+  const edu=posts.filter((p,i)=>{
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.eduScore>=30;
+  }).length;
+  const stories=posts.filter((p,i)=>{
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.storyScore>=30;
+  }).length;
+  const interactive=posts.filter((p,i)=>{
+    const cr=classResults[i]||classify(p.title,p.content||p.selftext||'');
+    return cr.interactiveScore>=30;
+  }).length;
+  const subreddits=[...new Set(posts.map(p=>p.subreddit))];
+  return{color,label,total,promo,ratio:Math.round(ratio*100),avgComments:Math.round(avgComments),avgScore:Math.round(avgScore),edu,stories,interactive,subreddits,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore};
+}
+
+// ===================== RSS / FETCH =====================
+function parseRSS(xml){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(xml,'text/xml');
+  const entries=doc.querySelectorAll('entry');
+  return Array.from(entries).map(e=>{
+    const content=(e.querySelector('content')?.textContent||'').replace(/<[^>]+>/g,'').replace(/&#\d+;/g,' ').replace(/\s+/g,' ').trim().slice(0,500);
+    const url=e.querySelector('link')?.getAttribute('href')||'';
+    const subM=url.match(/reddit\.com\/r\/([^/]+)/);
+    return{title:e.querySelector('title')?.textContent||'',author:(e.querySelector('name')?.textContent||'unknown').replace('/u/',''),url,content,subreddit:subM?subM[1]:'unknown',score:0,numComments:0};
+  }).filter(p=>p.title);
+}
+
+async function fetchWithProxy(url){
+  for(const proxy of PROXIES){
+    try{const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});const t=await r.text();if(t.includes('<entry>')||t.includes('<feed'))return t;}catch(e){continue;}
+  }
+  return null;
+}
+
+function stripGoogleTrendsPrefix(text){
+  const trimmed=text.trim();
+  if(trimmed.startsWith(")]}'"))return trimmed.slice(trimmed.indexOf('\n')+1).trim();
+  if(trimmed.startsWith(")]}'\\n"))return trimmed.slice(5).trim();
+  return trimmed;
+}
+
+async function fetchTrendsDirect(url){
+  try{
+    addLog('req',`[Direct] Fetching Google Trends directly`);
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    addLog('res',`[Direct] HTTP ${r.status}`);
+    if(r.status!==200){addLog('error',`[Direct] HTTP ${r.status} — not 200`);return null;}
+    const t=await r.text();
+    const cleaned=stripGoogleTrendsPrefix(t);
+    if(cleaned.startsWith('{')||cleaned.startsWith('[')){
+      const data=JSON.parse(cleaned);
+      if(data.default){addLog('success',`[Direct] JSON OK (${(cleaned.length/1024).toFixed(1)}KB)`);return data;}
+      addLog('warn',`[Direct] JSON parsed but no "default" key`);
+      return null;
+    }
+    addLog('warn',`[Direct] Non-JSON response (starts with: ${cleaned.substring(0,30)})`);
+    return null;
+  }catch(e){
+    addLog('error',`[Direct] Fetch failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function fetchWithProxyJSON(url){
+  const shortUrl=url.replace('https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=','');
+  const proxyNames=['allorigins','corsproxy','codetabs'];
+  for(let pi=0;pi<PROXIES.length;pi++){
+    const proxy=PROXIES[pi];
+    const name=proxyNames[pi]||'proxy'+pi;
+    try{
+      addLog('proxy',`[${name}] Fetching ed=${shortUrl}`);
+      const r=await fetch(proxy+encodeURIComponent(url),{signal:AbortSignal.timeout(15000)});
+      addLog('proxy',`[${name}] HTTP ${r.status} for ed=${shortUrl}`);
+      if(r.status!==200){addLog('error',`[${name}] HTTP ${r.status} — skipping`);continue;}
+      const t=await r.text();
+      const cleaned=stripGoogleTrendsPrefix(t);
+      if(cleaned.startsWith('{')||cleaned.startsWith('[')){
+        const data=JSON.parse(cleaned);
+        if(data.default){addLog('res',`[${name}] JSON OK ed=${shortUrl} (${(cleaned.length/1024).toFixed(1)}KB)`);return data;}
+        addLog('warn',`[${name}] JSON parsed but no "default" key ed=${shortUrl}`);
+        continue;
+      }
+      addLog('warn',`[${name}] Non-JSON response ed=${shortUrl} (starts with: ${cleaned.substring(0,30)})`);
+    }catch(e){
+      addLog('error',`[${name}] Fetch failed ed=${shortUrl}: ${e.message}`);
+    }
+  }
+  addLog('error',`All proxies failed for ed=${shortUrl}`);
+  return null;
+}
+
+async function fetchRedditComments(permalink){
+  const serverURL=getServerURL();
+  if(serverURL){
+    try{
+      const r=await fetch(serverURL+'/api/reddit-comments',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({data:[permalink]}),
+        signal:AbortSignal.timeout(20000)
+      });
+      const res=await r.json();
+      const raw=res?.data?.[0];
+      if(raw){
+        const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+        if(parsed&&!parsed.error&&parsed.comments){
+          return{score:parsed.score||0,ups:parsed.ups||0,upvote_ratio:parsed.upvote_ratio||0,num_comments:parsed.num_comments||0,comments:parsed.comments};
+        }
+      }
+    }catch(e){console.warn('[Comments] Server failed:',e.message);}
+  }
+  return null;
+}
+
+async function searchReddit(keyword){
+  const url=`https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=relevance&limit=10&t=month`;
+  const xml=await fetchWithProxy(url);
+  if(!xml)throw new Error('Could not reach Reddit.');
+  const posts=parseRSS(xml);
+  if(!posts.length)throw new Error('No results found.');
+  return posts;
+}
+
+// ===================== GOOGLE TRENDS =====================
+let cachedTrendsIdeas=[];
+
+async function fetchGoogleTrends(){
+  try{
+    const url='https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
+    const data=await fetchWithProxyJSON(url);
+    if(!data)return[];
+    const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+    const ideas=[];
+    const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
+    for(const t of trends.slice(0,25)){
+      const q=t.title.query;const ql=q.toLowerCase();
+      if(skip.some(s=>ql.includes(s)))continue;
+      ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+      for(const r of(t.relatedQueries||[]).slice(0,2)){
+        if(r.query.length>3&&r.query.length<50)ideas.push({title:r.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});
+      }
+    }
+    cachedTrendsIdeas=ideas;
+    return ideas;
+  }catch(e){console.error('Trends error:',e);cachedTrendsIdeas=[];return[];}
+}
+
+// ===================== SEED DISCOVERY (specific subreddits) =====================
+const SEED_SUBS=['findareddit','whatisthisthing','DoesAnybodyElse','AskReddit'];
+const SEED_Q='looking for OR recommend OR wish OR does anyone know OR is there OR alternative OR need OR product OR tool OR app';
+
+const Q_PATTERNS=[
+  /does anyone know (?:a |an |of )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,
+  /looking for (?:a |an )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,
+  /wish there was (?:a |an )?/i,
+  /is there (?:a |an |something|anything|any )/i,
+  /anyone recommend (?:a |an )?/i,
+  /need (?:a |an )?(?:good |great |decent )?/i,
+  /where can (?:i|we) (?:find|get|buy)/i,
+  /how (?:do|can) (?:i|we) (?:find|get|buy|make)/i,
+  /what (?:do|would) (?:i|we|you) (?:use|recommend|suggest)/i,
+  /alternative to/i,
+  /better than/i,
+  /best .+ for/i,
+];
+
+async function extractTopic(post){
+  const prompt=`Analyze this Reddit post and extract a clean, concise niche topic name (2-5 words).
+Post title: "${post.title}"
+Post content: "${(post.content||'').slice(0,300)}"
+Subreddit: r/${post.subreddit}
+
+Rules:
+- Return ONLY the topic name, nothing else
+- The topic MUST be a purchasable product, tool, app, or commercial category
+- REMOVE all question words, prefixes, filler ("does anyone know", "looking for", "is there", etc.)
+- Examples of GOOD extractions:
+  "Does anyone know a good ultralight tent under $200" → "ultralight tents"
+  "Is there a portable espresso maker that actually works?" → "portable espresso makers"
+  "Looking for a good budget mechanical keyboard" → "budget mechanical keyboards"
+- Return "SKIP" for ANY of these:
+  - Post is about finding/joining a subreddit or community
+  - Post is DAE (Does Anyone Else) — opinion/sharing, not product request
+  - Post is about memes, jokes, humor, or entertainment
+  - Post mentions "r/" or subreddit names as the main topic
+  - Topic would be a generic word like "sub", "community", "meme", "news", "post"
+- Return max 5 words
+- If unsure, return "SKIP"`;
+
+  for(let attempt=1;attempt<=2;attempt++){
+    const result=await callOpenRouter(prompt,45000);
+    if(result){
+      const cleaned=result.replace(/^["']|["']$/g,'').replace(/\n/g,' ').trim();
+      if(cleaned==='SKIP'||cleaned.length<3||cleaned.length>60){
+        console.log(`[LLM Topic] Attempt ${attempt}: invalid result "${cleaned.slice(0,40)}" for "${post.title.slice(0,40)}"`);
+        return null;
+      }
+      console.log(`[LLM Topic] Attempt ${attempt}: OK → "${cleaned}"`);
+      return cleaned;
+    }
+    console.log(`[LLM Topic] Attempt ${attempt}: null response for "${post.title.slice(0,50)}"`);
+  }
+  console.log(`[LLM Topic] FAILED after 2 attempts: "${post.title.slice(0,60)}"`);
+  return null;
+}
+
+async function processSeedPost(post,seen,allSeeds){
+  const key=post.title.toLowerCase().slice(0,60);
+  if(seen.has(key))return;
+  seen.add(key);
+  const isQ=Q_PATTERNS.some(p=>p.test(post.title))||/\?/.test(post.title);
+  if(!isQ)return;
+  const tl=post.title.toLowerCase();
+  if(/\bdae\b/.test(tl)||/\bdoes\s+anyone\s+else\b/.test(tl)){
+    console.log(`[Unmet Demand] PRE-FILTER (DAE): "${post.title.slice(0,55)}"`);
+    return;
+  }
+  if(/^r\/|subreddit|sub for|sub that|community for|channel for|group for/.test(tl)){
+    console.log(`[Unmet Demand] PRE-FILTER (subreddit): "${post.title.slice(0,55)}"`);
+    return;
+  }
+  if(/\bmeme\b/.test(tl)||/\bfunny\b/.test(tl)||/\bjoke\b/.test(tl)||/\bshitpost\b/.test(tl)){
+    console.log(`[Unmet Demand] PRE-FILTER (joke): "${post.title.slice(0,55)}"`);
+    return;
+  }
+  const prompt=`Does this post ask for a specific product or purchasable solution recommendation?
+
+Rules:
+- "DAE" / "Does Anyone Else" posts → "no" (these are opinions, not product requests)
+- Posts asking about subreddits/communities → "no"
+- Joke/satirical/absurd posts → "no"
+- Only posts where someone genuinely wants to BUY or FIND a specific physical product, tool, app, or service → "yes"
+- Vague questions like "what do you use" with no specific product context → "no"
+
+Post title: "${post.title}"
+Post content: "${(post.content||'').slice(0,300)}"
+
+Answer only "yes" or "no".`;
+  const result=await callOpenRouter(prompt,10000);
+  if(result){
+    const answer=result.toLowerCase().trim();
+    if(answer.includes('no')&&!answer.includes('yes')){
+      console.log(`[Unmet Demand] FILTERED (LLM=no): "${post.title.slice(0,55)}"`);
+      return;
+    }
+    console.log(`[Unmet Demand] PASSED (LLM=yes): "${post.title.slice(0,55)}"`);
+  }else{
+    console.log(`[Unmet Demand] LLM null, REJECTING: "${post.title.slice(0,55)}"`);
+    return;
+  }
+  allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});
+}
+
+const GARBAGE=new Set(['sub','subreddit','reddit','does','anyone','know','there','something','anything','looking','need','want','find','recommend','suggest','better','alternative','product','tool','app','software','community','group','channel','please','really','actually','also','just','like','would','could','should','might','maybe','good','great','best','nice','new','old']);
+
+function isValidTopic(topic){
+  const words=topic.toLowerCase().split(/\s+/).filter(w=>w.length>=2);
+  if(words.length===0)return false;
+  const meaningful=words.filter(w=>!GARBAGE.has(w)&&w.length>=3);
+  if(meaningful.length===0)return false;
+  if(meaningful.length===1&&meaningful[0].length<4)return false;
+  return true;
+}
+
+function extractCleanTopic(title,content){
+  let t=title.replace(/[?!]+$/g,'').trim();
+  t=t.replace(/\b(?:20\d{2})\b/g,'').replace(/\$[\d,]+/g,'').replace(/\s+/g,' ').trim();
+  const tl=t.toLowerCase();
+  if(/\bdae\b/.test(tl)||/\bdoes\s+anyone\s+else\b/.test(tl))return null;
+  if(/^r\/|subreddit|sub for|sub that|community for|channel for|group for/.test(tl))return null;
+  if(/\bmeme\b/.test(tl)||/\bfunny\b/.test(tl)||/\bjoke\b/.test(tl))return null;
+
+  const subMatch=t.match(/is there (?:a |an )?(?:sub(?:reddit)?|community|group|channel) (?:for|about|related to) (.+)/i);
+  if(subMatch&&subMatch[1]){
+    let topic=subMatch[1].replace(/[?.!,;:]+$/g,'').replace(/\s+/g,' ').trim();
+    if(topic.length>=4&&isValidTopic(topic))return topic;
+  }
+
+  const patterns=[
+    /does anyone know (?:a |an |of )?(?:good |great |decent |reliable |cheap |affordable |best )?(.+?)(?:\s+(?:for|under|over|around)\s+.*$|\s*$)/i,
+    /looking for (?:a |an )?(?:good |great |decent |reliable |cheap |affordable |best )?(.+?)(?:\s+(?:for|under|over|around)\s+.*$|\s*$)/i,
+    /wish there was (?:a |an )?(.+?)(?:\s+(?:for|under|over|around)\s+.*$|\s*$)/i,
+    /(?:anyone )?recommend (?:a |an )?(.+?)(?:\s+(?:for|under|over|around)\s+.*$|\s*$)/i,
+    /need (?:a |an )?(?:good |great |decent )?(.+?)(?:\s+(?:for|under|over|around)\s+.*$|\s*$)/i,
+    /best (.+?)(?:\s+for\b.*$|\s+of \d{4}|\s*$)/i,
+    /alternative to (.+?)(?:\s*$)/i,
+    /better than (.+?)(?:\s*$)/i,
+    /where can (?:i|we) (?:find|get|buy) (.+?)(?:\s*$)/i,
+    /how (?:do|can) (?:i|we) (?:find|get|buy|make) (.+?)(?:\s*$)/i,
+    /what (?:do|would) (?:i|we|you) (?:use|recommend|suggest) (?:for )?(.+?)(?:\s*$)/i,
+  ];
+
+  for(const p of patterns){
+    const m=t.match(p);
+    if(m&&m[1]){
+      let topic=m[1].replace(/[?.!,;:]+$/g,'').replace(/\s+/g,' ').trim();
+      if(topic.length>=4&&topic.length<=60&&isValidTopic(topic))return topic;
+    }
+  }
+
+  if(content){
+    const cp=[/(?:i|we) (?:need|want|looking for|searching for) (.+?)(?:\.|!|$)/i,/(?:problem|issue) (?:is|with|about) (.+?)(?:\.|!|$)/i];
+    for(const p of cp){
+      const m=content.match(p);
+      if(m&&m[1]){let topic=m[1].replace(/[?.!,;:]+$/g,'').replace(/\s+/g,' ').trim();if(topic.length>=4&&topic.length<=60&&isValidTopic(topic))return topic;}
+    }
+  }
+
+  const stripped=t.replace(/^(?:does anyone know|looking for|is there|wish there was|anyone recommend|need|want|where can (?:i|we) (?:find|get|buy)|how (?:do|can) (?:i|we) (?:find|get|buy|make)|what (?:do|would) (?:i|we|you) (?:use|recommend|suggest))\s+(?:a |an |the |some |any )?(?:good |great |decent |reliable |cheap |affordable |best )?/i,'').replace(/\s+/g,' ').trim();
+  if(stripped.length>=4&&isValidTopic(stripped))return stripped;
+
+  return null;
+}
+
+async function fetchSeedsFromReddit(){
+  const allSeeds=[];const seen=new Set();
+  let llmValidated=0;const LLM_CAP=10;
+  for(const sub of SEED_SUBS){
+    try{
+      const url=`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
+      const data=await fetchWithProxyJSON(url);
+      if(data?.data?.children){
+        for(const child of data.data.children){
+          const p=child.data;
+          if(p.stickied||p.score<0)continue;
+          if(llmValidated>=LLM_CAP){allSeeds.push({post:{title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},title:null,originalTitle:p.title,subreddit:p.subreddit,url:'https://reddit.com'+p.permalink,content:p.selftext||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(p.title,p.selftext||'')});continue;}
+          setStatus(`Filtering [${llmValidated}/${LLM_CAP}]: ${p.title.slice(0,50)}...`);
+          await processSeedPost({title:p.title,content:p.selftext||'',subreddit:p.subreddit,url:'https://reddit.com'+p.permalink},seen,allSeeds);
+          llmValidated++;
+          await delay(250);
+        }
+      }else{
+        const rssUrl=`https://www.reddit.com/r/${sub}/search.rss?q=${encodeURIComponent(SEED_Q)}&restrict_sr=on&sort=relevance&limit=10&t=month`;
+        const xml=await fetchWithProxy(rssUrl);
+        if(xml){const posts=parseRSS(xml);for(const post of posts){
+          if(llmValidated>=LLM_CAP){allSeeds.push({post,title:null,originalTitle:post.title,subreddit:post.subreddit,url:post.url,content:post.content||'',source:'Reddit Unmet Demand',type:'demand',demandScore:computeDemandScore(post.title,post.content||'')});continue;}
+          setStatus(`Filtering [${llmValidated}/${LLM_CAP}]: ${post.title.slice(0,50)}...`);
+          await processSeedPost(post,seen,allSeeds);
+          llmValidated++;
+          await delay(250);
+        }}
+      }
+    }catch(e){console.error('Seed error r/'+sub+':',e);continue;}
+  }
+
+  setStatus(`Analyzing ${allSeeds.length} posts with OpenRouter...`);
+  const enriched=[];
+  for(let i=0;i<allSeeds.length;i++){
+    const seed=allSeeds[i];
+    setStatus(`[${i+1}/${allSeeds.length}] Analyzing: ${seed.originalTitle.slice(0,60)}...`);
+    try{
+      const topicName=await extractTopic(seed.post||{title:seed.originalTitle,content:seed.content,subreddit:seed.subreddit});
+      if(topicName){
+        seed.title=topicName;
+        enriched.push(seed);
+      }else{
+        const fallback=extractCleanTopic(seed.originalTitle,seed.content);
+        if(fallback){seed.title=fallback;enriched.push(seed);}
+      }
+    }catch(e){
+      const fallback=extractCleanTopic(seed.originalTitle,seed.content);
+      if(fallback){seed.title=fallback;enriched.push(seed);}
+    }
+    await delay(250);
+  }
+
+  enriched.sort((a,b)=>b.demandScore-a.demandScore);
+  return enriched.slice(0,30);
+}
+
+// ===================== RELATED SUBREDDITS =====================
+async function findRelatedSubreddits(topic){
+  try{
+    const url=`https://www.reddit.com/subreddits/search.json?q=${encodeURIComponent(topic)}&limit=5`;
+    const data=await fetchWithProxyJSON(url);
+    if(!data?.data?.children)return[];
+    return data.data.children.map(c=>({name:c.data.display_name,description:(c.data.public_description||'').slice(0,200),subscribers:c.data.subscribers||0})).filter(s=>s.subscribers>100).slice(0,3);
+  }catch(e){return[];}
+}
+
+// ===================== MERGE & SCORE IDEAS =====================
+function normalizeTitle(t){return t.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim().slice(0,50);}
+function calculateIdeaScore(idea){
+  let s=0;
+  if(idea.source==='Google Trends')s+=30;
+  else if(idea.source==='Reddit Unmet Demand')s+=40;
+  if(idea.demandScore)s+=idea.demandScore*0.3;
+  if(idea.title.length<20)s+=15;else if(idea.title.length<40)s+=10;
+  const text=idea.title.toLowerCase();
+  ['best','top','new','easy','fast','cheap','free','better'].forEach(w=>{if(text.includes(w))s+=5;});
+  ['worst','bad','slow','expensive','broken','fake'].forEach(w=>{if(text.includes(w))s-=5;});
+  return Math.round(s);
+}
+
+function mergeAndScoreIdeas(ideas){
+  const merged=new Map();
+  for(const idea of ideas){
+    const key=normalizeTitle(idea.title);
+    if(merged.has(key)){
+      const e=merged.get(key);e.score+=20;e.sources.push(idea.source);e.count+=1;
+    }else{
+      merged.set(key,{title:idea.title,normalizedTitle:key,score:calculateIdeaScore(idea),sources:[idea.source],count:1,type:idea.type,demandScore:idea.demandScore||0,subreddit:idea.subreddit,url:idea.url,related:idea.related||[],nicheType:classifyNicheType(idea.title,idea.source,cachedTrendsIdeas)});
+    }
+  }
+  return Array.from(merged.values()).sort((a,b)=>b.score-a.score).slice(0,20);
+}
+
+// ===================== MANUAL SEARCH (Termux Only) =====================
+async function handleSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  if(!q)return;
+  const key=getYTKey();
+  if(!key){
+    addLog('error','No YouTube API key found');
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('results').innerHTML='<div class="error">⚠️ Add YouTube API key from settings</div>';
+    return;
+  }
+  document.getElementById('searchBtn').disabled=true;
+  document.getElementById('results').classList.remove('hidden');
+  document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  addLog('info',`Search: "${q}"`);
+
+  const server=getServerURL();
+  if(!server){
+    document.getElementById('results').innerHTML='<div class="error">⚠️ Termux server not configured.<br>Go to Settings → Termux Server → enter URL</div>';
+    document.getElementById('searchBtn').disabled=false;
+    return;
+  }
+
+  try{
+    const health=await pingServer(server);
+    if(!health){
+      document.getElementById('results').innerHTML='<div class="error">⚠️ Termux server not reachable.<br>Make sure Termux is running: bash start.sh</div>';
+      document.getElementById('searchBtn').disabled=false;
+      return;
+    }
+
+    addLog('info',`Termux: expanding "${q}"...`);
+    showProgress(10);setStatus(`Expanding "${q}" on Termux...`);
+    const ok=await startTermuxExpansion(server,[q]);
+    if(!ok)throw new Error('Failed to start expansion');
+
+    let expState;
+    for(let tries=0;tries<120;tries++){
+      await delay(5000);
+      expState=await checkTermuxExpansion(server);
+      if(!expState.running)break;
+      const pct=expState.pct||0;
+      showProgress(10+pct*0.3);
+      setStatus(`Expanding: ${expState.done}/${expState.total} keywords (${pct}%)`);
+    }
+    showProgress(40);setStatus('Fetching expanded keywords...');
+    const expanded=await fetchTermuxKeywords(server);
+    addLog('success',`Expanded "${q}" → ${expanded.length} keywords`);
+
+    if(!expanded.length){
+      document.getElementById('results').innerHTML='<div class="error">⚠️ Expansion returned 0 keywords. Try a different search term.</div>';
+      document.getElementById('searchBtn').disabled=false;
+      return;
+    }
+
+    addLog('info','Counting expanded keywords on Termux...');
+    showProgress(45);setStatus('Counting keywords via YouTube API...');
+    const r1=await fetch(server+'/api/count',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords:expanded.map(k=>({keyword:k.keyword})),ytKey:key,daysBack:90}),
+      signal:AbortSignal.timeout(10000)
+    });
+    if(!r1.ok)throw new Error('Count start failed');
+
+    for(let tries=0;tries<120;tries++){
+      await delay(3000);
+      const r2=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(5000)});
+      const cs=await r2.json();
+      showProgress(45+cs.pct*0.4);
+      setStatus(`Counting: ${cs.done}/${cs.total} keywords (${cs.pct}%)`);
+      if(!cs.running)break;
+    }
+    showProgress(85);setStatus('Loading results...');
+    const rr=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+    const rd=await rr.json();
+    const countData=rd.counts||[];
+
+    const valid=countData.filter(c=>c.keyword&&!c.error&&c.totalResults>0);
+    for(const c of valid){
+      c.eScoring=computeEvergreenScoring(c.videos||[],c.totalResults,c.recent7dCount||0);
+      c.tScoring=computeTrendingScoring(c.videos||[],c.totalResults,c.recent7dCount||0);
+    }
+    valid.sort((a,b)=>b.eScoring.score-a.eScoring.score);
+    const top=valid.slice(0,50);
+    renderSearchResults(q,top);
+    addLog('success',`Search done: ${top.length} niche ideas for "${q}"`);
+
+  }catch(e){
+    addLog('error',`Search failed: ${e.message}`);
+    document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
+  }
+  hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
+}
+
+function renderSearchResults(keyword,results){
+  const el=document.getElementById('results');
+  let html=`<div class="section-title">Niche ideas for <span class="dash">"${keyword}"</span> <span style="font-size:11px;color:var(--text-dim);font-weight:400">(${results.length} sub-niches)</span></div>`;
+  for(const r of results){
+    const avgViews=r.videos&&r.videos.length>0?Math.round(r.videos.reduce((s,v)=>s+v.views,0)/r.videos.length):0;
+    const es=r.eScoring||computeEvergreenScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
+    const ts=r.tScoring||computeTrendingScoring(r.videos||[],r.totalResults,r.recent7dCount||0);
+    html+=`<div class="niche-card">
+      <div class="niche-card-left">
+        <div class="niche-card-title">${r.keyword}</div>
+        <div class="niche-card-meta" style="display:flex;gap:8px;align-items:center">
+          <span style="color:#10b981;font-size:11px">🌳 ${es.score}</span>
+          <span style="color:var(--text-dim);font-size:10px">·</span>
+          <span style="color:#8b5cf6;font-size:11px">🔥 ${ts.score}</span>
+          <span style="color:var(--text-dim);font-size:10px">·</span>
+          <span style="color:var(--text-dim);font-size:10px">${es.label}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||0).toLocaleString()} videos · 👁️ ${avgViews.toLocaleString()} avg views</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px">
+        <div style="color:#10b981;font-weight:700;font-size:13px">${es.score}</div>
+        <div style="color:#8b5cf6;font-weight:700;font-size:13px">${ts.score}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+
+function renderSearchResult(keyword,scoring,videos,totalResults){
+  const el=document.getElementById('results');const s=scoring;const c=s.color;
+  const count=totalResults||s.videoCount;
+
+  let html=`<div class="section-title">Search Results <span class="dash">— "${keyword}"</span></div>`;
+  html+=`<div class="niche-card">
+    <div class="niche-card-left">
+      <div class="niche-card-title">${keyword}</div>
+      <div class="niche-card-meta">YouTube · ${s.label}</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${count} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+    </div>
+    <div class="niche-dot ${c}"></div>
+  </div>`;
+
+  html+=`<div class="result-stats">
+    <div class="result-stat"><div class="val">${count.toLocaleString()}</div><div class="lbl">Total Videos</div></div>
+    <div class="result-stat"><div class="val">${s.avgViews.toLocaleString()}</div><div class="lbl">Avg Views</div></div>
+    <div class="result-stat"><div class="val">${s.avgLikes.toLocaleString()}</div><div class="lbl">Avg Likes</div></div>
+    <div class="result-stat"><div class="val">${s.promoLinks}</div><div class="lbl">Promo Links</div></div>
+  </div>`;
+  html+=`<div class="result-posts">${videos.slice(0,8).map(v=>`
+    <div class="result-post">
+      <div class="result-post-title">${v.title}</div>
+      <div class="result-post-meta">${v.channel} · 👁️ ${v.views.toLocaleString()} · 👍 ${v.likes.toLocaleString()}</div>
+      <a class="result-post-link" href="${v.url}" target="_blank">Open in YouTube</a>
+    </div>`).join('')}
+  </div>`;
+
+  el.innerHTML=html;
+}
+
+// ===================== BULK FETCH (for dual discovery) =====================
+const BULK_SUBS=['findareddit','AskReddit','DoesAnybodyElse','whatisthisthing'];
+
+async function fetchRedditBulk(timeframe){
+  const allPosts=[];const seen=new Set();
+  for(const sub of BULK_SUBS){
+    if(allPosts.length>=100)break;
+    try{
+      const url=`https://www.reddit.com/r/${sub}/top/.rss?t=${timeframe}&limit=15`;
+      const xml=await fetchWithProxy(url);
+      if(xml){
+        const posts=parseRSS(xml);
+        for(const p of posts){
+          if(allPosts.length>=100)break;
+          const key=p.title.toLowerCase().slice(0,60);
+          if(seen.has(key))continue;
+          seen.add(key);
+          allPosts.push({title:p.title,content:p.content||'',subreddit:p.subreddit||sub,url:p.url,score:p.score||0,numComments:p.numComments||0});
+        }
+      }
+    }catch(e){console.error('Bulk fetch error r/'+sub+':',e);}
+    await delay(200);
+  }
+  return allPosts;
+}
+
+function getYTKey(){return localStorage.getItem('nf_yt_key')||'';}
+
+async function fetchYouTubeTrending(){
+  const key=getYTKey();
+  if(!key){console.log('[YouTube] No API key — skipping');return[];}
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&regionCode=US&maxResults=50&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    const data=await r.json();
+    if(!data.items||!data.items.length){
+      console.error('[YouTube] API error:',JSON.stringify(data));
+      return[];
+    }
+    console.log(`[YouTube] Fetched ${data.items.length} trending videos`);
+    return data.items.map(v=>({
+      title:v.snippet.title,
+      content:v.snippet.description||'',
+      source:'YouTube Trending',
+      videoId:v.id,
+      channel:v.snippet.channelTitle||'',
+      publishedAt:v.snippet.publishedAt||''
+    }));
+  }catch(e){console.error('[YouTube] Fetch error:',e);return[];}
+}
+
+// ===================== YOUTUBE SEARCH + STATS =====================
+async function searchYouTubeVideos(keyword,daysBack=90,maxResults=20){
+  const key=getYTKey();
+  if(!key){
+    addLog('error','YouTube: No API key');
+    return{videos:[],totalResults:0};
+  }
+  const publishedAfter=new Date(Date.now()-daysBack*86400000).toISOString();
+  try{
+    addLog('req',`YouTube Search: "${keyword}" (last ${daysBack}d, max ${maxResults})`);
+    const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    addLog('res',`YouTube Search: HTTP ${r.status}`);
+    const data=await r.json();
+    if(data.error){
+      addLog('error',`YouTube API Error: ${data.error.message} (code ${data.error.code})`);
+      return{videos:[],totalResults:0};
+    }
+    const totalResults=data.pageInfo?.totalResults||0;
+    addLog('info',`YouTube Search: ${totalResults} total results, ${data.items?.length||0} fetched`);
+    if(!data.items||!data.items.length)return{videos:[],totalResults:0};
+    const videoIds=data.items.map(v=>v.id.videoId).filter(Boolean);
+    addLog('req',`YouTube Stats: fetching stats for ${videoIds.length} videos`);
+    const stats=await getYouTubeVideoStats(videoIds);
+    const videos=data.items.map(v=>{
+      const vid=v.id.videoId;
+      const s=stats[vid]||{};
+      return{
+        title:v.snippet.title,
+        channel:v.snippet.channelTitle||'',
+        views:parseInt(s.viewCount||0),
+        likes:parseInt(s.likeCount||0),
+        comments:parseInt(s.commentCount||0),
+        description:v.snippet.description||'',
+        url:'https://www.youtube.com/watch?v='+vid,
+        published:v.snippet.publishedAt||''
+      };
+    });
+    addLog('success',`YouTube Search OK: "${keyword}" → ${videos.length} videos, ${totalResults} total`);
+    return{videos,totalResults};
+  }catch(e){
+    addLog('error',`YouTube Search FAILED: "${keyword}" — ${e.message}`);
+    return{videos:[],totalResults:0};
+  }
+}
+
+async function getYouTubeVideoStats(videoIds){
+  if(!videoIds.length)return{};
+  const key=getYTKey();
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds.join(',')}&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    addLog('res',`YouTube Stats: HTTP ${r.status} for ${videoIds.length} IDs`);
+    const data=await r.json();
+    if(data.error){
+      addLog('error',`YouTube Stats Error: ${data.error.message}`);
+      return{};
+    }
+    const map={};
+    (data.items||[]).forEach(v=>{map[v.id]=v.statistics||{};});
+    addLog('success',`YouTube Stats OK: ${Object.keys(map).length} videos stats fetched`);
+    return map;
+  }catch(e){
+    addLog('error',`YouTube Stats FAILED: ${e.message}`);
+    return{};
+  }
+}
+
+function countLinksInText(text){
+  if(!text)return 0;
+  return(text.match(/https?:\/\/[^\s<>"')]+|www\.[^\s<>"')]+/gi)||[]).length;
+}
+
+// ===================== YOUTUBE TRAFFIC LIGHT (6 colors) =====================
+function computeYouTubeScoring(videos,totalResults){
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data available',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0,highEng:false};
+  const vc=totalResults||videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
+  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(totalLikes/videos.length);
+  const avgComments=Math.round(totalComments/videos.length);
+  const highEng=avgViews>10000;
+  const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  let color,label;
+  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='🔵 Clean opportunity — very low competition';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='🟢 Open market — moderate competition + good engagement';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='🟡 Growing market — some activity';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='🟠 Large market — moderate competition';}
+  else if(vc>25000&&promoLinks>8){color='red';label='🔴 Saturated — high volume + many promo links';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='🟣 Saturated — many promo links with lower volume';}
+  else{color='yellow';label='🟡 Moderate market';}
+  let score=0;
+  if(highEng)score+=30;
+  else if(avgViews>5000)score+=20;
+  else if(avgViews>1000)score+=10;
+  if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
+  const engRatio=avgViews>0?(avgLikes+avgComments*5)/avgViews:0;
+  score+=Math.min(20,Math.round(engRatio*100));
+  if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
+  score=Math.min(100,score);
+  return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks,highEng};
+}
+
+function computeEvergreenScoring(videos,totalResults,recent7dCount){
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0,promoLinks:0};
+  const vc=totalResults||videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const totalLikes=videos.reduce((s,v)=>s+v.likes,0);
+  const totalComments=videos.reduce((s,v)=>s+v.comments,0);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(totalLikes/videos.length);
+  const avgComments=Math.round(totalComments/videos.length);
+  const highEng=avgViews>10000;
+  const promoLinks=videos.reduce((s,v)=>s+countLinksInText(v.description),0);
+  let score=0;
+  if(highEng)score+=30;else if(avgViews>5000)score+=20;else if(avgViews>1000)score+=10;
+  if(vc<5000)score+=25;else if(vc<25000)score+=15;else if(vc<100000)score+=5;
+  const engRatio=avgViews>0?(avgLikes+avgComments*5)/avgViews:0;
+  score+=Math.min(20,Math.round(engRatio*100));
+  if(promoLinks<=3)score+=15;else if(promoLinks<=8)score+=8;
+  score=Math.min(100,score);
+  let color,label;
+  if(vc<5000&&highEng&&promoLinks<=3){color='skyblue';label='Clean opportunity — low competition';}
+  else if(vc<=25000&&highEng&&promoLinks<=3){color='green';label='Open market — moderate competition + good engagement';}
+  else if(vc<=25000&&promoLinks<=8){color='yellow';label='Growing market — some activity';}
+  else if(vc>25000&&promoLinks<=8){color='orange';label='Large market — moderate competition';}
+  else if(vc>25000&&promoLinks>8){color='red';label='Saturated — high volume + many promo links';}
+  else if(vc<=25000&&promoLinks>8){color='purple';label='Saturated — many promo links with lower volume';}
+  else{color='yellow';label='Moderate market';}
+  return{score,color,label,videoCount:vc,avgViews,avgLikes,avgComments,promoLinks};
+}
+
+function computeTrendingScoring(videos,totalResults,recent7dCount){
+  if(!videos||!videos.length)return{score:0,color:'yellow',label:'No data',trendPct:0,videoCount:totalResults||0,avgViews:0,avgLikes:0,avgComments:0};
+  const vc=totalResults||videos.length;
+  const totalViews=videos.reduce((s,v)=>s+v.views,0);
+  const avgViews=Math.round(totalViews/videos.length);
+  const avgLikes=Math.round(videos.reduce((s,v)=>s+v.likes,0)/videos.length);
+  const avgComments=Math.round(videos.reduce((s,v)=>s+v.comments,0)/videos.length);
+  const highEng=avgViews>10000;
+  const recentRatio=videos.length>0?recent7dCount/videos.length:0;
+  let score=0;
+  if(recentRatio>=0.5)score+=40;else if(recentRatio>=0.3)score+=30;else if(recentRatio>=0.1)score+=15;else if(recentRatio>0)score+=5;
+  if(highEng)score+=40;else if(avgViews>5000)score+=30;else if(avgViews>1000)score+=20;else if(avgViews>500)score+=10;
+  if(vc>=500&&vc<50000)score+=20;else if(vc>=50000&&vc<200000)score+=10;else if(vc>0)score+=5;
+  score=Math.min(100,score);
+  let color,label;
+  if(recentRatio>=0.5&&highEng){color='purple';label='🔥 Hot trending — rapid recent activity';}
+  else if(recentRatio>=0.3&&highEng){color='blue';label='📈 Trending up — strong recent engagement';}
+  else if(recentRatio>=0.1&&avgViews>1000){color='skyblue';label='⬆️ Emerging — growing interest';}
+  else if(recentRatio<0.1&&vc>50000){color='orange';label='Established — low recent activity';}
+  else if(recentRatio<0.1){color='gray';label='Stable — no surge';}
+  else{color='yellow';label='Moderate activity';}
+  return{score,color,label,trendPct:Math.round(recentRatio*100),videoCount:vc,avgViews,avgLikes,avgComments};
+}
+
+function saveYTKey(){
+  const key=document.getElementById('ytKeyInput').value.trim();
+  if(!key){alert('Enter your YouTube API key');return;}
+  localStorage.setItem('nf_yt_key',key);
+  document.getElementById('ytKeyFormView').style.display='none';
+  const saved=document.getElementById('ytKeySaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('ytKeyFormView').style.display='';document.getElementById('ytKeyModal').classList.add('hidden');document.getElementById('ytKeyInput').value='';},1500);
+}
+
+function openYTKeyModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('ytKeyModal').classList.remove('hidden');
+  document.getElementById('ytKeyInput').value=getYTKey();
+}
+
+function closeYTKeyModal(){document.getElementById('ytKeyModal').classList.add('hidden');}
+
+function openServerModal(){
+  document.getElementById('dropdownMenu').classList.remove('show');
+  document.getElementById('serverModal').classList.remove('hidden');
+  document.getElementById('serverURLInput').value=getServerURL();
+}
+function closeServerModal(){document.getElementById('serverModal').classList.add('hidden');}
+function saveServerURL(){
+  const url=document.getElementById('serverURLInput').value.trim().replace(/\/+$/,'');
+  localStorage.setItem('nf_server_url',url);
+  document.getElementById('serverFormView').style.display='none';
+  const saved=document.getElementById('serverSaved');
+  saved.style.display='block';
+  setTimeout(()=>{saved.style.display='none';document.getElementById('serverFormView').style.display='';document.getElementById('serverModal').classList.add('hidden');document.getElementById('serverURLInput').value='';},1500);
+}
+
+// ===================== AI FILTER AND SUMMARIZE =====================
+async function aiFilterAndSummarize(items,sourceType){
+  const results=[];const batchSize=50;
+  const totalBatches=Math.ceil(items.length/batchSize);
+  for(let i=0;i<items.length;i+=batchSize){
+    const batch=items.slice(i,i+batchSize);
+    const batchNum=Math.floor(i/batchSize)+1;
+    setStatus(`AI filtering batch ${batchNum}/${totalBatches} (${batch.length} items)...`);
+    const isTrends=sourceType==='trends';
+    const prompt=`Analyze these ${batch.length} items and filter + summarize each one.
+
+FILTERING RULES — REMOVE items that match ANY of these:
+${isTrends?'- Pure celebrity gossip, drama, or personal life stories\n- Sports scores, game results, match outcomes\n- One-word or meaningless generic terms with no niche potential':'- Political news, celebrity/entertainment gossip, drama\n- Memes, jokes, humor, shitposts, satire\n- General discussion, opinions, or stories without product context\n- Questions about subreddits, communities, or channels\n- Sports scores, game releases, event announcements\n- Items that do NOT relate to a product, tool, app, or purchasable solution'}
+
+KEEP items that:
+${isTrends?'- Topics with commercial/market potential (people search → can sell products/services)\n- Technology, gadgets, tools, software, AI, health, fitness, home, finance topics\n- "Best X", "how to", comparison, review, or recommendation topics\n- Product categories, hobby niches, lifestyle topics\n- Any trending topic where products/services can be marketed':'- Ask for a specific product, tool, app, or service recommendation\n- Request alternatives to existing products\n- Describe a problem solvable with a product/tool/app\n- Ask "best X for Y" where X is a purchasable category\n- Request budget, quality, or comparison advice for products'}
+
+For each KEPT item, create a clean niche name (2-4 words) that describes the product category or market. Remove filler words, news prefixes.
+
+Items:
+${batch.map((item,idx)=>`${idx+1}. "${item.title}"${item.content?' — '+item.content.slice(0,120):''}`).join('\n')}
+
+Return ONLY a valid JSON array, no other text:
+[{"i":1,"keep":true,"niche":"clean niche name"},{"i":2,"keep":false,"niche":""},...]`;
+
+    const result=await callOpenRouter(prompt,30000);
+    if(result){
+      try{
+        const cleaned=result.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        const parsed=JSON.parse(cleaned);
+        if(Array.isArray(parsed)){
+          for(const item of parsed){
+            if(item.keep&&item.niche&&item.niche.length>2){
+              const original=batch[item.i-1];
+              if(original){
+                results.push({title:item.niche.trim(),original:original.title,source:original.source||'unknown',content:original.content||''});
+              }
+            }
+          }
+        }
+      }catch(e){console.error('AI filter parse error:',e);}
+    }else{
+      // If AI fails, keyword-based heuristic (trends-aware)
+      for(const item of batch){
+        const text=item.title.toLowerCase();
+        if(isTrends){
+          // For Google Trends: keep almost everything (already trending = has demand)
+          // Only skip very short/meaningless or pure sports/score items
+          if(text.length>3&&!/^\d+$/.test(text)&&!/^(score|win|lost|final|vs\.?)$/i.test(text)){
+            const topic=extractCleanTopic(item.title,item.content);
+            if(topic&&topic.length>2){
+              results.push({title:topic,original:item.title,source:item.source||'unknown',content:item.content||''});
+            }
+          }
+        }else{
+          const hasDemand=DEMAND_KW.some(kw=>text.includes(kw));
+          const hasQuestion=/\?/.test(item.title);
+          const hasProduct=COMMERCIAL_KW.some(kw=>text.includes(kw))||/\b(app|tool|product|software|gadget|device|kit|set|machine|maker)\b/i.test(item.title);
+          if(hasDemand||hasQuestion||hasProduct){
+            const topic=extractCleanTopic(item.title,item.content);
+            if(topic){
+              results.push({title:topic,original:item.title,source:item.source||'unknown',content:item.content||''});
+            }
+          }
+        }
+      }
+    }
+    await delay(250);
+  }
+  // Deduplicate by normalized title
+  const deduped=[];const seenTitles=new Set();
+  for(const r of results){
+    const norm=r.title.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
+    if(!seenTitles.has(norm)){
+      seenTitles.add(norm);
+      deduped.push(r);
+    }
+  }
+  return deduped;
+}
+
+// ===================== FULL DISCOVERY =====================
+async function runFullDiscovery(){
+  resetLLMStats();
+  const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
+  document.getElementById('results').classList.remove('hidden');
+  document.getElementById('results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try{
+    showProgress(5);setStatus('Fetching seeds from Reddit communities...');
+    const seeds=await fetchSeedsFromReddit();
+    showProgress(20);setStatus(`Found ${seeds.length} seed topics from r/findareddit, r/whatisthisthing, r/DoesAnybodyElse, r/AskReddit`);
+
+    showProgress(25);setStatus('Checking Google Trends...');
+    const trends=await fetchGoogleTrends();
+    showProgress(35);setStatus(`Got ${trends.length} trending topics from Google Trends`);
+
+    showProgress(40);setStatus('Finding related subreddits...');
+    for(let i=0;i<seeds.length;i++){
+      setStatus(`[${i+1}/${seeds.length}] Finding communities for: ${seeds[i].title}`);
+      showProgress(40+(i/seeds.length)*10);
+      seeds[i].relatedSubs=await findRelatedSubreddits(seeds[i].title);
+    }
+
+    showProgress(55);setStatus('Merging and classifying...');
+    const all=[...trends,...seeds];const ideas=mergeAndScoreIdeas(all);
+    if(!ideas.length){document.getElementById('results').innerHTML='<div class="error">No ideas found. Try again.</div>';return;}
+
+    const top=ideas.slice(0,10);const results=[];
+    for(let i=0;i<top.length;i++){
+      setStatus(`[${i+1}/${top.length}] Analyzing: ${top[i].title}`);
+      showProgress(60+(i/top.length)*35);
+      try{
+        const posts=await searchReddit(top[i].title);
+        const scoring=await computeTrafficLight(posts);
+
+        let nicheType=classifyNicheType(top[i].title,top[i].sources?.[0]||'manual',cachedTrendsIdeas);
+        try{
+          const aiType=await classifyTrendingAI(top[i].title,cachedTrendsIdeas);
+          if(aiType)nicheType=aiType;
+        }catch(e){}
+
+        results.push({keyword:top[i].title,scoring,posts,ideaScore:top[i].score,nicheType,sources:top[i].sources,relatedSubs:top[i].relatedSubs||[]});
+      }catch(e){continue;}
+    }
+    results.sort((a,b)=>b.scoring.opportunityScore-a.scoring.opportunityScore);
+    showProgress(100);setStatus(`Done! Found ${results.length} viable niches.`);
+    renderDiscoveryResults(results);
+  }catch(e){document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;}
+  hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
+}
+
+function renderDiscoveryResults(results){
+  const el=document.getElementById('results');
+  if(!results.length){el.innerHTML=renderLLMStats()+'<div class="error">No results found.</div>';return;}
+
+  const evergreen=results.filter(r=>r.nicheType&&(r.nicheType.type==='evergreen'||r.nicheType.type==='hybrid'));
+  const trending=results.filter(r=>r.nicheType&&r.nicheType.type==='trending');
+  const other=results.filter(r=>!r.nicheType||r.nicheType.type==='general');
+
+  function makeCard(r){
+    const c=r.scoring.color;
+    const emoji=r.nicheType?.type==='trending'?'🔥':r.nicheType?.type==='hybrid'?'🔥🌳':'🌳';
+    const typeLabel=r.nicheType?.label||'General';
+    return`<div class="niche-card">
+      <div class="niche-card-left">
+        <div class="niche-card-title">${r.keyword}</div>
+        <div class="niche-card-meta">${r.sources?.[0]||'Discovery'} &nbsp;·&nbsp; ${emoji} ${typeLabel} &nbsp;·&nbsp; Click for details</div>
+      </div>
+      <div class="niche-dot ${c}"></div>
+    </div>`;
+  }
+
+  let html=renderLLMStats();
+
+  if(evergreen.length){
+    html+=`<div class="section-title">Evergreen 🌳 <span class="dash">— Steady Demand, Brand Core</span></div>`;
+    html+=evergreen.map(makeCard).join('');
+  }
+  if(trending.length){
+    html+=`<div class="section-title">Trending 🔥 <span class="dash">— Surging Momentum, Seasonal Content</span></div>`;
+    html+=trending.map(makeCard).join('');
+  }
+  if(other.length){
+    html+=`<div class="section-title">General 💡 <span class="dash">— Other Opportunities</span></div>`;
+    html+=other.map(makeCard).join('');
+  }
+
+  el.innerHTML=html;
+}
+
+// ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
+// ===================== DUAL DISCOVERY (Google Trends + YouTube) =====================
+async function fetchTrendsFromServer(edStr){
+  const server=getServerURL();
+  if(!server)return null;
+  try{
+    const url=`${server}/api/trends?ed=${edStr}`;
+    addLog('req',`[Server] GET /api/trends?ed=${edStr}`);
+    const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
+    addLog('res',`[Server] HTTP ${r.status}`);
+    if(r.status===200){
+      const data=await r.json();
+      if(data.error){addLog('error',`[Server] ${data.error}`);return null;}
+      addLog('success',`[Server] Trends OK for ed=${edStr}`);
+      return data;
+    }
+    addLog('error',`[Server] Trends returned ${r.status}`);
+    return null;
+  }catch(e){
+    addLog('error',`[Server] Connection failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function fetchGoogleTrendsYouTube(timeframe){
+  const ideas=[];
+  const seen=new Set();
+  const skip=['news','celebrity','movie','song','game release','election','sports','score','win'];
+  const server=getServerURL();
+  try{
+    const today=new Date();
+    const days=timeframe==='week'?7:30;
+    addLog('req',`Google Trends: ${timeframe} mode → ${days} days`);
+    let dates=[];
+    for(let d=0;d<days;d++){
+      const ed=new Date(today);ed.setDate(today.getDate()-d);
+      dates.push(ed.getFullYear().toString()+String(ed.getMonth()+1).padStart(2,'0')+String(ed.getDate()).padStart(2,'0'));
+    }
+    const delayMs=server?2000:3000;
+    addLog('info',`${days} dates | delay=${delayMs}ms | server=${!!server}`);
+    let okCount=0,failCount=0;
+    let methodUsed='none';
+    for(let i=0;i<dates.length;i++){
+      const edStr=dates[i];
+      const trendUrl=`https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US&ed=${edStr}`;
+      let data=null;
+      // Priority 1: Server
+      if(server&&!data){
+        data=await fetchTrendsFromServer(edStr);
+        if(data)methodUsed='Server';
+      }
+      // Priority 2: Direct fetch (works in APK WebView)
+      if(!data){
+        data=await fetchTrendsDirect(trendUrl);
+        if(data)methodUsed='Direct';
+      }
+      // Priority 3: Proxies (allorigins, corsproxy, codetabs)
+      if(!data){
+        data=await fetchWithProxyJSON(trendUrl);
+        if(data)methodUsed='Proxies';
+      }
+      if(data){
+        okCount++;
+        const trends=data.default?.trendingSearchesDays?.[0]?.trendingSearches||[];
+        const kwCount=trends.length;
+        addLog('success',`ed=${edStr}: ${kwCount} trending searches [via ${methodUsed}]`);
+        for(const t of trends){
+          const q=t.title.query;const ql=q.toLowerCase();
+          if(skip.some(s=>ql.includes(s)))continue;
+          if(seen.has(ql))continue;seen.add(ql);
+          ideas.push({title:q,source:'Google Trends',traffic:t.formattedTraffic,related:(t.relatedQueries||[]).map(x=>x.query).slice(0,3),type:'trend'});
+          for(const r2 of(t.relatedQueries||[]).slice(0,3)){
+            const rq=r2.query.toLowerCase();
+            if(r2.query.length>3&&r2.query.length<50&&!seen.has(rq)){seen.add(rq);ideas.push({title:r2.query,source:'Google Trends',traffic:t.formattedTraffic,related:[],type:'trend'});}
+          }
+        }
+        addLog('info',`Progress: ${i+1}/${dates.length} | ok=${okCount} fail=${failCount} | keywords=${ideas.length}`);
+      }else{
+        failCount++;
+        addLog('error',`ed=${edStr}: FAILED (server + direct + all proxies failed)`);
+        addLog('info',`Progress: ${i+1}/${dates.length} | ok=${okCount} fail=${failCount} | keywords=${ideas.length}`);
+      }
+      if(i<dates.length-1)await new Promise(r=>setTimeout(r,delayMs));
+    }
+    addLog(okCount>0?'success':'error',`Google Trends done: ${okCount}/${dates.length} days OK, ${ideas.length} unique keywords [via ${methodUsed}]`);
+  }catch(e){
+    console.error('Trends error:',e);
+    addLog('error',`Google Trends FATAL: ${e.message}`);
+  }
+  return ideas.slice(0,100);
+}
+
+// Get YouTube trending directly via API (more reliable than Google Trends for YouTube)
+async function fetchYouTubeTrendingByCategory(){
+  const key=getYTKey();
+  if(!key)return[];
+  try{
+    const url=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=US&maxResults=50&key=${key}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+    const data=await r.json();
+    if(!data.items||!data.items.length)return[];
+    return data.items.map(v=>({
+      title:v.snippet.title,
+      content:v.snippet.description||'',
+      source:'YouTube Trending',
+      videoId:v.id,
+      channel:v.snippet.channelTitle||'',
+      views:parseInt(v.statistics?.viewCount||0),
+      likes:parseInt(v.statistics?.likeCount||0),
+      comments:parseInt(v.statistics?.commentCount||0),
+    }));
+  }catch(e){return[];}
+}
+
+async function checkTermuxExpansion(server){
+  try{
+    const r=await fetch(server+'/api/expand-status',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return{available:false};
+    const s=await r.json();
+    return{available:true,running:s.running,done:s.done,total:s.total,pct:s.pct,error:s.error};
+  }catch{return{available:false};}
+}
+
+async function startTermuxExpansion(server,keywords){
+  try{
+    const r=await fetch(server+'/api/expand',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords}),
+      signal:AbortSignal.timeout(10000)
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
+async function fetchTermuxKeywords(server){
+  try{
+    const r=await fetch(server+'/api/keywords?limit=5000',{signal:AbortSignal.timeout(30000)});
+    if(!r.ok)return[];
+    return await r.json();
+  }catch{return[];}
+}
+
+function addTermuxProgressRow(container,pct,label,sub){
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px';
+  const barOuter=document.createElement('div');
+  barOuter.style.cssText='flex:1;height:6px;background:var(--card-2);border-radius:3px;overflow:hidden';
+  const barFill=document.createElement('div');
+  barFill.style.cssText=`width:${pct}%;height:100%;background:var(--blue);border-radius:3px;transition:width .5s`;
+  barOuter.appendChild(barFill);
+  row.innerHTML=`<span style="width:50px;color:var(--text-dim);font-size:11px">${pct}%</span>`;
+  row.appendChild(barOuter);
+  row.innerHTML+=`<span style="flex:1;color:var(--text);font-size:11px">${label}</span>`;
+  if(sub)row.innerHTML+=`<span style="color:var(--text-dim);font-size:10px">${sub}</span>`;
+  container.appendChild(row);
+}
+
+async function runDualDiscovery(){
+  resetLLMStats();
+  appLogs.length=0;
+  addLog('info','=== Niche Discovery Started ===');
+  const key=getYTKey();
+  if(!key){
+    addLog('error','No YouTube API key found');
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('results').innerHTML='<div class="error">⚠️ Add YouTube API key from settings</div>';
+    return;
+  }
+  const btn=document.querySelector('.idea-card');if(btn)btn.style.pointerEvents='none';
+  document.getElementById('results').classList.remove('hidden');
+  const resultsEl=document.getElementById('results');
+  resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  const stats={evergreenRaw:0,evergreenFiltered:0,trendingRaw:0,trendingFiltered:0};
+
+  const server=getServerURL();
+  if(!server){
+    resultsEl.innerHTML='<div class="error">⚠️ Termux server not configured.<br>Go to Settings → Termux Server → enter URL</div>';
+    if(btn)btn.style.pointerEvents='auto';return;
+  }
+
+  try{
+    addLog('req','Pinging Termux server...');
+    const health=await pingServer(server);
+    if(!health){
+      resultsEl.innerHTML='<div class="error">⚠️ Termux server not reachable.<br>Start Termux: bash start.sh</div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+    addLog('success',`Termux server v${health.version} connected ✓`);
+
+    // ════════ STEP 0: EXPANSION CHECK ════════
+    const expState=await checkTermuxExpansion(server);
+    let expandedKeywords=[];
+    if(expState.available&&!expState.running&&expState.done>0){
+      addLog('success',`Loading ${expState.done} expanded keywords...`);
+      expandedKeywords=await fetchTermuxKeywords(server);
+      addLog('success',`Loaded ${expandedKeywords.length} keywords`);
+    }else if(expState.running){
+      addLog('info',`Expansion running: ${expState.done}/${expState.total} — waiting...`);
+      resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+      for(let tries=0;tries<120;tries++){
+        await delay(5000);
+        const s=await checkTermuxExpansion(server);
+        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords (${s.pct}%)`);
+        if(!s.running)break;
+      }
+      expandedKeywords=await fetchTermuxKeywords(server);
+      addLog('success',`Loaded ${expandedKeywords.length} keywords after waiting`);
+    }else{
+      addLog('info','Starting expansion with SEED_KEYWORDS (background)...');
+      showProgress(5);setStatus('Starting expansion...');
+      const ok=await startTermuxExpansion(server,SEED_KEYWORDS);
+      if(!ok)throw new Error('Failed to start expansion');
+      addLog('success','Expansion started in background');
+      resultsEl.innerHTML='<div class="niche-card" style="border:2px solid var(--blue);text-align:center;padding:30px">'
+        +'<div style="font-size:40px;margin-bottom:10px">⏳</div>'
+        +'<div style="font-size:16px;font-weight:600;margin-bottom:6px">Expansion Started!</div>'
+        +'<div style="font-size:13px;color:var(--text-dim)">100 seed keywords being expanded → ~5000 sub-niches<br>'
+        +'⏱ Estimated: 1-2 hours<br><br>'
+        +'Come back later and run Discovery again to see results.</div>'
+        +'<button class="modal-btn primary" style="margin-top:16px" onclick="location.reload()">Check Progress</button></div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+
+    if(!expandedKeywords.length){
+      resultsEl.innerHTML='<div class="error">⚠️ No expanded keywords found. Try again later.</div>';
+      if(btn)btn.style.pointerEvents='auto';return;
+    }
+
+    // ════════ STEP 1: PROCESS KEYWORDS ════════
+    showProgress(10);setStatus(`Processing ${expandedKeywords.length} keywords...`);
+    const allIdeas=expandedKeywords.map(k=>({
+      title:k.keyword,source:'Keyword Expansion',
+      parent:k.parent||'',src:k.src||'',type:'trend'
+    }));
+    stats.evergreenRaw=Math.ceil(allIdeas.length/2);
+    stats.trendingRaw=Math.floor(allIdeas.length/2);
+
+    // ════════ STEP 2: AI FILTER (all keywords, one pass) ════════
+    addLog('info',`AI filtering ${allIdeas.length} keywords...`);
+    showProgress(15);setStatus(`AI filtering ${allIdeas.length} keywords...`);
+    const filteredAll=await aiFilterAndSummarize(allIdeas,'trends');
+    stats.evergreenRaw=allIdeas.length;
+    stats.evergreenFiltered=filteredAll.length;
+    stats.trendingRaw=allIdeas.length;
+    stats.trendingFiltered=filteredAll.length;
+    addLog(filteredAll.length>0?'success':'warn',`Filtered: ${allIdeas.length} → ${filteredAll.length}`);
+
+    // ════════ LOAD TERMUX COUNT DATA ════════
+    let termuxCountsMap=null;
+    try{
+      const r=await fetch(server+'/api/count-status',{signal:AbortSignal.timeout(3000)});
+      const cs=await r.json();
+      if(cs.done>0&&!cs.running){
+        const rr=await fetch(server+'/api/results',{signal:AbortSignal.timeout(15000)});
+        const rd=await rr.json();
+        if(rd.counts&&rd.counts.length>0){
+          termuxCountsMap={};
+          for(const c of rd.counts){
+            if(c.keyword&&c.videos&&c.videos.length>0)
+              termuxCountsMap[c.keyword.toLowerCase()]={videos:c.videos,totalResults:c.totalResults,recent7dCount:c.recent7dCount||0};
+          }
+          addLog('success',`Count data: ${Object.keys(termuxCountsMap).length} keywords with video details`);
+        }else if(rd.counts&&rd.counts.length>0){
+          termuxCountsMap={};
+          for(const c of rd.counts){
+            if(c.keyword&&c.totalResults>0)
+              termuxCountsMap[c.keyword.toLowerCase()]={videos:[],totalResults:c.totalResults,recent7dCount:0};
+          }
+          addLog('info',`Count data: ${Object.keys(termuxCountsMap).length} keywords with totals only`);
+        }
+      }
+    }catch{addLog('warn','Could not load Termux count data');}
+
+    // ════════ STEP 3: COMPUTE BOTH SCORES PER KEYWORD ════════
+    addLog('info',`Scoring ${filteredAll.length} keywords for evergreen + trending...`);
+    const scoredItems=[];
+    for(let i=0;i<filteredAll.length;i++){
+      const kw=filteredAll[i].title||filteredAll[i].keyword||filteredAll[i];
+      setStatus(`Scoring ${i+1}/${filteredAll.length}: ${kw}`);
+      showProgress(30+(i/filteredAll.length)*60);
+      try{
+        const cached=termuxCountsMap&&termuxCountsMap[kw.toLowerCase()];
+        const videos=cached?cached.videos:[];
+        const totalResults=cached?cached.totalResults:0;
+        const recent7dCount=cached?cached.recent7dCount:0;
+        const eScoring=computeEvergreenScoring(videos,totalResults,recent7dCount);
+        const tScoring=computeTrendingScoring(videos,totalResults,recent7dCount);
+        scoredItems.push({keyword:kw,videos,totalResults,eScoring,tScoring});
+      }catch(e){
+        addLog('error',`[${i+1}] ${kw}: ${e.message}`);
+      }
+      await delay(100);
+    }
+    addLog('info',`Scored: ${scoredItems.length} keywords`);
+
+    // Sort: top 100 evergreen, top 100 trending
+    const byEvergreen=[...scoredItems].sort((a,b)=>b.eScoring.score-a.eScoring.score).slice(0,100);
+    const byTrending=[...scoredItems].sort((a,b)=>b.tScoring.score-a.tScoring.score).slice(0,100);
+    const evergreenResults=byEvergreen.map(r=>({keyword:r.keyword,scoring:r.eScoring,videos:r.videos,totalResults:r.totalResults,nicheType:{type:'evergreen',label:'Evergreen',color:'#10b981'}}));
+    const trendingResults=byTrending.map(r=>({keyword:r.keyword,scoring:r.tScoring,videos:r.videos,totalResults:r.totalResults,nicheType:{type:'trending',label:'Trending',color:'#8b5cf6'}}));
+    addLog('success',`Sorted: ${evergreenResults.length} evergreen + ${trendingResults.length} trending`);
+
+    showProgress(100);setStatus(`Done: ${evergreenResults.length} evergreen + ${trendingResults.length} trending`);
+    addLog('success',`=== Complete: ${evergreenResults.length} evergreen + ${trendingResults.length} trending ===`);
+    renderDualResults(evergreenResults,trendingResults,stats);
+
+  }catch(e){
+    addLog('error',`Fatal: ${e.message}`);
+    resultsEl.innerHTML=`<div class="error">${e.message}</div>`;
+  }
+  hideProgress();if(btn)btn.style.pointerEvents='auto';setTimeout(()=>setStatus(''),3000);
+}
+
+async function countRedditPostsViaGoogle(keyword){
+  try{
+    const url=`https://www.google.com/search?q=site:reddit.com+"${encodeURIComponent(keyword)}"&num=1`;
+    const proxyUrl=PROXIES[0]+encodeURIComponent(url);
+    const r=await fetch(proxyUrl,{signal:AbortSignal.timeout(10000)});
+    const html=await r.text();
+    const match=html.match(/About ([\d,]+) results/)||html.match(/(\d[\d,\.]+) results/);
+    if(match){
+      const numStr=match[1].replace(/[,\.]/g,'');
+      const num=parseInt(numStr);
+      if(!isNaN(num))return num;
+    }
+    return null;
+  }catch(e){return null;}
+}
+
+function countPromoLinks(posts){
+  let totalLinks=0;
+  for(const p of posts){
+    totalLinks+=countLinksInText(p.content||'');
+    totalLinks+=countLinksInText(p.title||'');
+  }
+  return totalLinks;
+}
+
+async function computeScoringFromPosts(posts,allClass,allPostsPool,keyword){
+  if(!posts||!posts.length)return{color:'gray',label:'Insufficient data',demandScore:0,trendScore:0,opportunityScore:0,postCount:0,usedComments:false};
+  const total=posts.length;
+  const classResults=posts.map(p=>{
+    const idx=allPostsPool.findIndex(ap=>ap.title===p.title);
+    return idx>=0&&allClass[idx]?allClass[idx]:classify(p.title,p.content||p.selftext||'');
+  });
+  const promoCount=classResults.filter(cr=>cr.promoScore>=40).length;
+  const promoRatio=promoCount/total;
+  const avgComments=posts.reduce((s,p)=>s+(p.numComments||0),0)/total;
+  const avgScore=posts.reduce((s,p)=>s+(p.score||0),0)/total;
+  const hasEngData=avgComments>0||avgScore>0;
+  const highEng=hasEngData?(avgComments+avgScore)/2>10:true;
+  const avgDemand=posts.reduce((s,p)=>s+computeDemandScore(p.title,p.content||p.selftext||''),0)/total;
+  const avgTrend=posts.reduce((s,p)=>s+computeTrendScore(p.title,p.content||p.selftext||''),0)/total;
+  const opportunityScore=Math.round((avgDemand*0.4)+(avgTrend*0.3)+((100-promoRatio*100)*0.3));
+  const postCount=await countRedditPostsViaGoogle(keyword||'');
+  const actualPostCount=postCount||total*50;
+
+  // ══════ COMMENT-BASED SCORING ══════
+  let commentPromoLinks=0;
+  let totalCommentsAnalyzed=0;
+  let usedComments=false;
+  const sortedPosts=[...posts].sort((a,b)=>(b.numComments||0)-(a.numComments||0)).slice(0,5);
+  for(const p of sortedPosts){
+    try{
+      const permalink=p.url?.replace('https://www.reddit.com','')||'';
+      if(!permalink)continue;
+      const cData=await fetchRedditComments(permalink);
+      if(cData&&cData.comments){
+        usedComments=true;
+        totalCommentsAnalyzed+=cData.comments.length;
+        for(const c of cData.comments){
+          commentPromoLinks+=countLinksInText(c.body);
+        }
+      }
+      await delay(300);
+    }catch(e){continue;}
+  }
+
+  let color,label;
+  if(usedComments){
+    if(actualPostCount>30000&&commentPromoLinks>5){color='red';label='🔴 Saturated — high volume, many promo links in comments';}
+    else if(actualPostCount<=30000&&commentPromoLinks>5){color='red';label='🔴 Saturated — many promo links detected in comments';}
+    else if(actualPostCount<1000&&highEng&&commentPromoLinks<=2){color='green';label='🟢 Clean opportunity — low competition, high engagement';}
+    else if(actualPostCount<=30000&&highEng&&commentPromoLinks<=2){color='green';label='🟢 Open market — moderate posts, good engagement';}
+    else if(actualPostCount<=30000&&commentPromoLinks<=5){color='yellow';label='🟡 Growing market — some activity, needs deeper analysis';}
+    else if(actualPostCount>30000&&commentPromoLinks<=5){color='yellow';label='🟡 Large market — high volume, moderate promo links';}
+    else{color='yellow';label='🟡 Moderate market — deeper analysis needed';}
+  }else{
+    const postPromoLinks=countPromoLinks(posts);
+    if(actualPostCount<1000&&highEng&&postPromoLinks<=2){color='green';label='🟢 Clean opportunity — low competition, high engagement';}
+    else if(actualPostCount<=30000&&highEng&&promoRatio<=0.2){color='green';label='🟢 Open market — moderate posts, good engagement';}
+    else if(actualPostCount<=30000&&promoRatio>0.2&&promoRatio<=0.5){color='yellow';label='🟡 Growing market — some promotions, needs analysis';}
+    else if(actualPostCount>30000&&postPromoLinks>5){color='red';label='🔴 Saturated — high post count, many promo links';}
+    else if(actualPostCount>30000){color='yellow';label='🟡 Large market — high volume, analyze competition';}
+    else{color='yellow';label='🟡 Moderate market — deeper analysis needed';}
+  }
+
+  const edu=classResults.filter(cr=>cr.eduScore>=30).length;
+  const stories=classResults.filter(cr=>cr.storyScore>=30).length;
+  const eduRatio=Math.round((edu/total)*100);
+  const storyRatio=Math.round((stories/total)*100);
+  return{color,label,demandScore:Math.round(avgDemand),trendScore:Math.round(avgTrend),opportunityScore,promoRatio:Math.round(promoRatio*100),eduRatio,storyRatio,postCount:actualPostCount,promoLinks:usedComments?commentPromoLinks:countPromoLinks(posts),usedComments,totalCommentsAnalyzed};
+}
+
+function renderDualResults(evergreenResults,trendingResults,stats){
+  const el=document.getElementById('results');
+  let html=renderLLMStats();
+
+  // ════════ Stats Panel ════════
+  html+=`<div style="margin-bottom:18px;padding:16px;background:var(--card);border-radius:16px;border:1px solid var(--border)">
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:10px;text-align:center;font-weight:700;letter-spacing:1px">DISCOVERY STATS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
+        <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
+        <div style="color:var(--text-dim);font-size:11px">Evergreen — before filtering</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: low competition + sustained demand</div>
+      </div>
+      <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
+        <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
+        <div style="color:var(--text-dim);font-size:11px">Evergreen — after filtering</div>
+      </div>
+      <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:10px">
+        <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingRaw}</div>
+        <div style="color:var(--text-dim);font-size:11px">Trending — before filtering</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: high recent activity + engagement</div>
+      </div>
+      <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:10px">
+        <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingFiltered}</div>
+        <div style="color:var(--text-dim);font-size:11px">Trending — after filtering</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ════════ Evergreen Section ════════
+  if(evergreenResults.length){
+    html+=`<div class="section-title">🌳 Evergreen Niches <span class="dash">— (3 months)</span></div>`;
+    for(const r of evergreenResults){
+      const c=r.scoring.color;
+      const s=r.scoring;
+      html+=`<div class="niche-card">
+        <div class="niche-card-left">
+          <div class="niche-card-title">${r.keyword}</div>
+          <div class="niche-card-meta">🌳 Evergreen · ${s.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+        </div>
+        <div class="niche-dot ${c}"></div>
+      </div>`;
+    }
+  }
+
+  // ════════ Trending Section ════════
+  if(trendingResults.length){
+    html+=`<div class="section-title">🔥 Trending Niches <span class="dash">— (1 week)</span></div>`;
+    for(const r of trendingResults){
+      const c=r.scoring.color;
+      const s=r.scoring;
+      html+=`<div class="niche-card">
+        <div class="niche-card-left">
+          <div class="niche-card-title">${r.keyword}</div>
+          <div class="niche-card-meta">🔥 Trending · ${s.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${(r.totalResults||s.videoCount).toLocaleString()} total videos · 👁️ ${s.avgViews.toLocaleString()} views · 👍 ${s.avgLikes.toLocaleString()} likes · 💬 ${s.avgComments.toLocaleString()} comments</div>
+        </div>
+        <div class="niche-dot ${c}"></div>
+      </div>`;
+    }
+  }
+
+  if(!evergreenResults.length&&!trendingResults.length){
+    html+='<div class="error">No niches found. Try again.</div>';
+  }
+
+  el.innerHTML=html;
+}
+
+// ===================== MONITORS =====================
+let monitorFreq='daily';
+function setFreq(el,f){monitorFreq=f;el.parentElement.querySelectorAll('.freq-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
+
+function getMonitors(){try{return JSON.parse(localStorage.getItem('nf_monitors')||'[]');}catch(e){return[];}}
+function saveMonitors(m){localStorage.setItem('nf_monitors',JSON.stringify(m));}
+
+function saveMonitor(){
+  const name=document.getElementById('monitorName').value.trim();
+  if(!name){alert('Enter a topic name');return;}
+  const monitors=getMonitors();
+  monitors.push({id:Date.now(),name,freq:monitorFreq,active:true,lastCheck:null,lastVideos:0,lastViews:0});
+  saveMonitors(monitors);
+  document.getElementById('monitorName').value='';
+  alert('Monitor saved!');
+  showPage('page-list');
+}
+
+function deleteMonitor(id){if(!confirm('Delete this monitor?'))return;saveMonitors(getMonitors().filter(m=>m.id!==id));renderMonitors();}
+
+function toggleMonitor(id){
+  const monitors=getMonitors();const m=monitors.find(x=>x.id===id);
+  if(m)m.active=!m.active;saveMonitors(monitors);renderMonitors();
+}
+
+function renderMonitors(){
+  const monitors=getMonitors();
+  const html=monitors.length?monitors.map(m=>`
+    <div class="channel-card">
+      <div class="channel-top">
+        <span class="channel-name">${m.name}</span>
+        <span class="badge">YouTube</span>
+      </div>
+      <div class="meta">Check: ${m.freq}${m.lastCheck?' · Last check: '+m.lastCheck:''}${m.lastVideos?' · 📊 '+m.lastVideos+' videos · 👁️ '+(m.lastViews||0).toLocaleString()+' views':''}</div>
+      <div class="channel-bottom">
+        <div class="toggle-wrap">
+          <span class="toggle-label">Active</span>
+          <div class="switch ${m.active?'':'off'}" onclick="toggleMonitor(${m.id})"><div class="knob"></div></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="sim-btn" style="padding:10px 16px;font-size:13px;width:auto" onclick="checkMonitor(${m.id})">🔍 Check</button>
+          <button class="del-btn" onclick="deleteMonitor(${m.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>`).join(''):'<div class="empty-state">No monitors yet. Create one to start tracking niches.</div>';
+  const el1=document.getElementById('monitorsList');if(el1)el1.innerHTML=html;
+  const el2=document.getElementById('monitorsListCreate');if(el2)el2.innerHTML=html;
+}
+
+async function checkMonitor(id){
+  const monitors=getMonitors();
+  const m=monitors.find(x=>x.id===id);
+  if(!m)return;
+  const key=getYTKey();
+  if(!key){addLog('error','No YouTube API key found');alert('Add YouTube API key from settings');return;}
+  addLog('info',`Monitor check: "${m.name}"`);
+  try{
+    const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
+    const scoring=computeYouTubeScoring(videos,totalResults);
+    addLog('success',`Monitor "${m.name}": ${totalResults} videos, score=${scoring.score}`);
+    const now=new Date();
+    m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+    m.lastVideos=scoring.videoCount;
+    m.lastViews=scoring.avgViews;
+    saveMonitors(monitors.map(x=>x.id===m.id?m:x));
+    addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+    renderMonitors();
+    alert(`✅ ${m.name}\n📊 ${totalResults} total YouTube videos\n👁️ ${scoring.avgViews.toLocaleString()} avg views\n${scoring.label}`);
+  }catch(e){
+    addLog('error',`Monitor "${m.name}" failed: ${e.message}`);
+    alert('Error: '+e.message);
+  }
+}
+
+async function runAllMonitors(){
+  const monitors=getMonitors().filter(m=>m.active);
+  if(!monitors.length){alert('No active monitors.');return;}
+  const key=getYTKey();
+  if(!key){addLog('error','No YouTube API key found');alert('Add YouTube API key from settings');return;}
+  addLog('info',`Running all monitors (${monitors.length} active)`);
+  addNotification({sub:'System',name:'All Monitors',body:`Running check on ${monitors.length} monitors...`,color:'amber',promo:''});
+  for(const m of monitors){
+    try{
+      const{videos,totalResults}=await searchYouTubeVideos(m.name,7,20);
+      const scoring=computeYouTubeScoring(videos,totalResults);
+      addLog('success',`Monitor "${m.name}": ${totalResults} videos, score=${scoring.score}`);
+      const now=new Date();
+      m.lastCheck=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+      m.lastVideos=totalResults;
+      m.lastViews=scoring.avgViews;
+      saveMonitors(getMonitors().map(x=>x.id===m.id?m:x));
+      addNotification({sub:'YouTube',name:m.name,body:`📊 ${totalResults} total videos · 👁️ ${scoring.avgViews.toLocaleString()} views · ${scoring.label}`,color:scoring.color,promo:scoring.promoLinks+''});
+    }catch(e){
+      addLog('error',`Monitor "${m.name}" failed: ${e.message}`);
+      addNotification({sub:'YouTube',name:m.name,body:'Error: '+e.message,color:'red',promo:''});
+    }
+    await new Promise(r=>setTimeout(r,500));
+  }
+  addLog('info','All monitors completed');
+  renderMonitors();
+  alert('All monitors checked!');
+}
+
+// ===================== NOTIFICATIONS =====================
+function getNotifications(){try{return JSON.parse(localStorage.getItem('nf_notifs')||'[]');}catch(e){return[];}}
+function saveNotifications(n){localStorage.setItem('nf_notifs',JSON.stringify(n));}
+function addNotification(n){const notifs=getNotifications();notifs.unshift({id:Date.now(),isRead:false,...n,time:new Date().toLocaleString()});saveNotifications(notifs);updateNotifBadge();}
+function deleteNotification(id){saveNotifications(getNotifications().filter(n=>n.id!==id));renderNotifications();updateNotifBadge();}
+function updateNotifBadge(){
+  const unread=getNotifications().filter(n=>!n.isRead).length;
+  document.getElementById('notifCount').textContent=unread;
+  document.getElementById('notifTotal').textContent=unread;
+  document.getElementById('notifCount').style.display=unread>0?'flex':'none';
+}
+function renderNotifications(){
+  const notifs=getNotifications();
+  const unread=notifs.filter(n=>!n.isRead).length;
+  document.getElementById('notifTotal').textContent=unread>0?`${unread} unread / ${notifs.length}`:notifs.length;
+  notifs.forEach(n=>n.isRead=true);
+  saveNotifications(notifs);
+  updateNotifBadge();
+  const el=document.getElementById('notifList');
+  el.innerHTML=notifs.length?notifs.map(n=>`
+    <div class="notif-card">
+      <div class="notif-top">
+        <button class="del-btn" onclick="deleteNotification(${n.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="14 11v6"/></svg>
+        </button>
+        <div class="notif-top-left">
+          <span class="badge">${n.sub}</span>
+          <span class="notif-name">${n.name}</span>
+          <span class="notif-dot ${n.color}"></span>
+        </div>
+      </div>
+      <div class="notif-body">${n.body}</div>
+      <div class="notif-bottom">
+        <span class="notif-time">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${n.time}
+        </span>
+        ${n.promo?`<span class="promo-pct">Promo rate: ${n.promo}</span>`:''}
+      </div>
+    </div>`).join(''):'<div class="empty-state">No notifications yet.</div>';
+}
+
+// ===================== INIT =====================
+updateNotifBadge();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+autoDetectTermux();
+</script>
+</body>
+</html>
