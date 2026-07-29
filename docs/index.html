@@ -1444,8 +1444,9 @@ async function handleSearch(){
       expState=await checkTermuxExpansion(server);
       if(!expState.running)break;
       const pct=expState.pct||0;
+      const detail=expState.currentKeyword?` · ${expState.currentKeyword}${expState.phase==='level2'?` (${expState.l2Done}/${expState.l2Total})`:''}`:'';
       showProgress(10+pct*0.3);
-      setStatus(`Expanding: ${expState.done}/${expState.total} keywords (${pct}%)`);
+      setStatus(`Expanding: ${expState.done}/${expState.total} keywords${detail} (${pct}%)`);
     }
     showProgress(40);setStatus('Fetching expanded keywords...');
     const expanded=await fetchTermuxKeywords(server);
@@ -2086,7 +2087,7 @@ async function checkTermuxExpansion(server){
     const r=await fetch(server+'/api/expand-status',{signal:AbortSignal.timeout(5000)});
     if(!r.ok)return{available:false};
     const s=await r.json();
-    return{available:true,running:s.running,done:s.done,total:s.total,pct:s.pct,error:s.error};
+    return{available:true,running:s.running,done:s.done,total:s.total,pct:s.pct,error:s.error,phase:s.phase,currentKeyword:s.currentKeyword,sub:s.sub,l2Done:s.l2Done,l2Total:s.l2Total};
   }catch{return{available:false};}
 }
 
@@ -2169,7 +2170,8 @@ async function runDualDiscovery(){
       for(let tries=0;tries<120;tries++){
         await delay(5000);
         const s=await checkTermuxExpansion(server);
-        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords (${s.pct}%)`);
+        const detail=s.currentKeyword?` · ${s.currentKeyword}${s.phase==='level2'?` (${s.l2Done}/${s.l2Total})`:''}`:'';
+        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
         if(!s.running)break;
       }
       expandedKeywords=await fetchTermuxKeywords(server);

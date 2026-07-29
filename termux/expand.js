@@ -70,14 +70,19 @@ async function expandKeywords(keywords, outputFile, progress) {
     fs.appendFileSync(outputFile, JSON.stringify(obj) + '\n');
   };
 
+  const l2PerKw = 3;
+  const letters = LEVEL2_LETTERS.length;
   for (let ki = 0; ki < keywords.length; ki++) {
     const keyword = keywords[ki].trim();
     if (!keyword || keyword.length < 2) {
       progress.done++;
       continue;
     }
+    progress.currentKeyword = keyword;
 
     /* Level 1 */
+    progress.phase = 'level1';
+    progress.sub = keyword;
     const level1 = await suggestWithRetry(keyword);
     const validL1 = [];
     for (const sugg of level1) {
@@ -89,11 +94,15 @@ async function expandKeywords(keywords, outputFile, progress) {
     /* Pause before Level 2 batch */
     await sleep(500 + Math.random() * 1000);
     /* Level 2 — first 3 suggestions only */
-    const l2Batch = validL1.slice(0, 3);
+    const l2Batch = validL1.slice(0, l2PerKw);
+    progress.l2Total = l2Batch.length * letters;
+    progress.l2Done = 0;
+    progress.phase = 'level2';
     for (const sugg of l2Batch) {
       for (let ci = 0; ci < LEVEL2_LETTERS.length; ci++) {
         const letter = LEVEL2_LETTERS[ci];
         const query = `${sugg} ${letter}`;
+        progress.sub = `${keyword} → "${sugg}" ${letter}`;
         const level2 = await suggestWithRetry(query);
         const lowerOrig = keyword.toLowerCase();
         for (const sub of level2) {
@@ -101,11 +110,14 @@ async function expandKeywords(keywords, outputFile, progress) {
             append({ keyword: sub, src: 'l2', parent: sugg, letter, ts: Date.now() });
           }
         }
+        progress.l2Done++;
         await sleep(randomDelay());
       }
     }
 
     progress.done++;
+    progress.phase = null;
+    progress.sub = null;
     await sleep(randomDelay());
     /* Longer pause between keywords */
     await sleep(BATCH_DELAY.min + Math.random() * (BATCH_DELAY.max - BATCH_DELAY.min));

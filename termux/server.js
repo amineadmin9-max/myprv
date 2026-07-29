@@ -131,7 +131,8 @@ app.post('/api/expand', (req, res) => {
     failed: 0,
     startedAt: Date.now(),
     error: null,
-    keywords: [...keywords]
+    keywords: [...keywords],
+    phase: null, currentKeyword: null, sub: null, l2Done: 0, l2Total: 0
   };
 
   expandKeywords(keywords, EXPANDED_FILE, expandState)
@@ -150,6 +151,16 @@ app.post('/api/expand', (req, res) => {
 
 app.get('/api/expand-status', (req, res) => {
   const elapsed = elapsedSec(expandState.startedAt);
+  let pct = 0;
+  if (expandState.total > 0) {
+    const base = expandState.done / expandState.total;
+    if (expandState.phase === 'level2' && expandState.l2Total > 0) {
+      const l2Pct = expandState.l2Done / expandState.l2Total;
+      pct = Math.round((base + l2Pct / expandState.total) * 100);
+    } else {
+      pct = Math.round(base * 100);
+    }
+  }
   res.json({
     running: expandState.running,
     total: expandState.total,
@@ -158,7 +169,12 @@ app.get('/api/expand-status', (req, res) => {
     error: expandState.error,
     elapsed: elapsed + 's',
     etc: estimateETC(expandState),
-    pct: expandState.total > 0 ? Math.round((expandState.done / expandState.total) * 100) : 0
+    pct,
+    phase: expandState.phase || null,
+    sub: expandState.sub || null,
+    currentKeyword: expandState.currentKeyword || null,
+    l2Done: expandState.l2Done || 0,
+    l2Total: expandState.l2Total || 0
   });
 });
 
