@@ -6,7 +6,6 @@ on:
     paths:
       - 'docs/**'
       - 'android/**'
-      - 'termux/**'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -36,6 +35,8 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets
           cp docs/index.html android/app/src/main/assets/
+          cp docs/expand.js android/app/src/main/assets/
+          cp docs/count.js android/app/src/main/assets/
           cp docs/sw.js android/app/src/main/assets/ 2>/dev/null || true
           cp docs/manifest.json android/app/src/main/assets/ 2>/dev/null || true
 
@@ -55,14 +56,15 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.0-${{ github.run_number }}
+          tag_name: v5.0-${{ github.run_number }}
           name: Niche Finder APK v${{ github.run_number }}
           files: android/app/build/outputs/apk/debug/app-debug.apk
           body: |
             Niche Finder Android APK
             - Bundled web app (no server needed)
-            - Uses phone's IP directly for Google Trends
-            - YouTube Data API + AI analysis
+            - YouTube Suggest expansion (incremental deepening)
+            - YouTube Data API v3 direct calls
+            - Dual scoring (Evergreen + Trending)
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
