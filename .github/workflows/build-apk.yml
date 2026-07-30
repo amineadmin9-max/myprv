@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/**'
       - 'android/**'
+      - 'termux/**'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
