@@ -81,12 +81,41 @@ app.get('/', (req, res) => {
   });
 });
 
-/* ─── Google Trends: Related Queries ─── */
-const googleTrends = require('google-trends-api');
+/* ─── Google Trends: Direct HTTPS (bypass library) ─── */
+const https = require('https');
 
-function parseRelated(result) {
-  const data = JSON.parse(result);
-  const ranked = data.default && data.default.rankedList;
+async function fetchTrends(keyword, country) {
+  const reqBody = JSON.stringify({
+    comparisonItem: [{ keyword, geo: country || 'US', time: 'today 1-m' }],
+    category: 0, property: ''
+  });
+  const url = `https://trends.google.com/trends/api/relatedQueries?req=${encodeURIComponent(reqBody)}&hl=en&tz=180`;
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://trends.google.com/',
+        'Connection': 'keep-alive'
+      },
+      timeout: 15000
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        const cleaned = data.replace(/^\)\]\}'\s*/, '').trim();
+        if (!cleaned) return reject(new Error('Empty response'));
+        if (cleaned.startsWith('<')) return reject(new Error('Google blocked request (CAPTCHA)'));
+        try { resolve(JSON.parse(cleaned)); }
+        catch (e) { reject(new Error('Invalid JSON: ' + cleaned.slice(0, 80))); }
+      });
+    }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+function parseRelated(json) {
+  const ranked = json.default && json.default.rankedList;
   if (!ranked || ranked.length < 2) return { top: [], rising: [] };
   const top = (ranked[0].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
   const rising = (ranked[1].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
@@ -97,8 +126,8 @@ app.post('/api/related', async (req, res) => {
   const { keyword, country } = req.body || {};
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   try {
-    const result = await googleTrends.relatedQueries({ keyword, geo: country || 'US', hl: 'en', time: 'today 1-m' });
-    const out = parseRelated(result);
+    const json = await fetchTrends(keyword, country);
+    const out = parseRelated(json);
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -112,11 +141,13 @@ app.post('/api/rising', async (req, res) => {
   try {
     const allRising = [];
     const seen = new Set();
-    for (const kw of keywords) {
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
       if (!kw || kw.length < 2) continue;
+      await new Promise(r => setTimeout(r, 2000)); // delay 2s between keywords
       try {
-        const result = await googleTrends.relatedQueries({ keyword: kw, geo: country || 'US', hl: 'en', time: 'today 1-m' });
-        const out = parseRelated(result);
+        const json = await fetchTrends(kw, country);
+        const out = parseRelated(json);
         for (const item of out.rising) {
           const q = item.keyword || '';
           if (q && !seen.has(q.toLowerCase())) {
