@@ -153,10 +153,20 @@ async function countKeywords(keywords, apiKey, daysBack = 90, onProgress) {
       const avgViews = r.videos.length > 0 ? Math.round(totalViews / r.videos.length) : 0;
       const avgLikes = r.videos.length > 0 ? Math.round(r.videos.reduce((s, v) => s + v.likes, 0) / r.videos.length) : 0;
       const avgComments = r.videos.length > 0 ? Math.round(r.videos.reduce((s, v) => s + v.comments, 0) / r.videos.length) : 0;
+
+      const now = Date.now();
+      let ageTotal = 0, ageCount = 0;
+      for (const v of r.videos) {
+        const t = new Date(v.published).getTime();
+        if (!isNaN(t)) { ageTotal += now - t; ageCount++; }
+      }
+      const avgVideoAge = ageCount > 0 ? Math.round(ageTotal / ageCount / 86400000) : null;
+
       output.push({
         keyword: r.keyword,
         totalResults: r.totalResults,
         avgViews, avgLikes, avgComments,
+        avgVideoAge,
         recent7dCount: countRecent(r.videos, 7),
         recent30dCount: countRecent(r.videos, 30),
         daysBack, ts: Date.now()
