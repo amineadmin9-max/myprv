@@ -1029,13 +1029,84 @@ async function handleSearch(){
   addLog('info',`Search: "${q}"`);
 
   try{
-    const{videos,totalResults}=await searchYouTubeVideos(q,90,20);
-    const scoring=computeYouTubeScoring(videos,totalResults);
-    renderSearchResult(q,scoring,videos,totalResults);
-    addLog('success',`Search done for "${q}": ${totalResults} videos`);
-  }catch(e){
-    addLog('error',`Search failed: ${e.message}`);
-    document.getElementById('results').innerHTML=`<div class="error">${e.message}</div>`;
+    showProgress(10); setStatus(`Expanding "${q}" via YouTube Suggest...`);
+    const expanded = await expandKeywords([q], (msg, phase) => {
+      const pct = parseInt(phase?.replace('level', '') || '0');
+      showProgress(Math.min(30, 5 + pct * 5));
+      setStatus(msg);
+    });
+
+    if (!expanded || !expanded.length) {
+      addLog('error', 'Expansion returned 0 keywords');
+      document.getElementById('results').innerHTML = '<div class="error">⚠️ No related keywords found.</div>';
+      hideProgress(); document.getElementById('searchBtn').disabled = false; return;
+    }
+    addLog('success', `Expanded to ${expanded.length} keywords`);
+
+    showProgress(35); setStatus(`Counting ${expanded.length} keywords...`);
+    const countResults = await countKeywords(
+      expanded.map(e => e.keyword),
+      key, 90,
+      (kw, done, total) => {
+        const pct = 35 + (done / total) * 55;
+        showProgress(pct);
+        setStatus(`Counting [${done}/${total}]: ${kw}`);
+      }
+    );
+
+    if (!countResults || !countResults.length) {
+      const quotaErr = countResults && countResults.filter(c => c.error).some(c => /quota|exceed|limit/i.test(c.error));
+      if (quotaErr) {
+        addLog('error', 'YouTube API quota exceeded');
+        document.getElementById('results').innerHTML = '<div class="error">⚠️ YouTube API quota exceeded (10,000 units/day).<br>Wait until tomorrow or use a new API key.</div>';
+      } else {
+        document.getElementById('results').innerHTML = '<div class="error">⚠️ No count results. Check YouTube API key.</div>';
+      }
+      hideProgress(); document.getElementById('searchBtn').disabled = false; return;
+    }
+
+    showProgress(92); setStatus('Scoring...');
+    const valid = countResults.filter(c => c.keyword && !c.error);
+    if (!valid.length) {
+      const quotaErr = countResults.filter(c => c.error).some(c => /quota|exceed|limit/i.test(c.error));
+      if (quotaErr) {
+        document.getElementById('results').innerHTML = '<div class="error">⚠️ YouTube API quota exceeded (10,000 units/day).<br>Wait until tomorrow or use a new API key.</div>';
+      } else {
+        document.getElementById('results').innerHTML = '<div class="error">⚠️ All keyword searches failed. Check your API key.</div>';
+      }
+      hideProgress(); document.getElementById('searchBtn').disabled = false; return;
+    }
+
+    const scored = valid.map(c => {
+      const scoring = computeCommonScore(c.totalResults || 0, c.avgViews || 0, c.avgLikes || 0, c.avgComments || 0, c.avgVideoAge);
+      return { keyword: c.keyword, totalResults: c.totalResults || 0, avgViews: c.avgViews || 0, avgVideoAge: c.avgVideoAge, scoring };
+    });
+
+    function fmtAge(a) {
+      if (a == null) return 'N/A';
+      if (a < 1) return 'today';
+      if (a === 1) return '1 day ago';
+      return a + ' days ago';
+    }
+
+    const resultsHtml = scored.sort((a, b) => b.scoring.score - a.scoring.score).slice(0, 50).map(r => {
+      const s = r.scoring;
+      return `<div class="niche-card" data-kw="${r.keyword.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" onclick="scheduleNiche(this.dataset.kw)">
+        <div class="niche-card-left">
+          <div class="niche-card-title">${r.keyword}</div>
+          <div class="niche-card-meta">${s.label}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">📊 ${r.totalResults.toLocaleString()} videos · 👁️ ${s.avgViews.toLocaleString()} views · 📅 ${fmtAge(r.avgVideoAge)}</div>
+        </div>
+        <div class="niche-dot ${s.color}"></div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('results').innerHTML = `<div class="section-title">Niche ideas for <span class="dash">"${q}"</span> <span style="font-size:11px;color:var(--text-dim);font-weight:400">(${scored.length} sub-niches)</span></div>${resultsHtml}`;
+    addLog('success', `Search done: ${scored.length} niche ideas for "${q}"`);
+
+  } catch(e) {
+    addLog('error', `Search failed: ${e.message}`);
+    document.getElementById('results').innerHTML = `<div class="error">${e.message}</div>`;
   }
   hideProgress();document.getElementById('searchBtn').disabled=false;setStatus('');
 }
@@ -1508,6 +1579,10 @@ async function runDualDiscovery(){
       resultsEl.innerHTML = '<div class="error">⚠️ No count results. Check YouTube API key and quota.</div>';
       if (btn) btn.style.pointerEvents = 'auto'; return;
     }
+    const quotaErrors = countResults.filter(c => c.error).some(c => /quota|exceed|limit|403/i.test(c.error));
+    if (quotaErrors) {
+      addLog('error', 'YouTube API quota likely exceeded');
+    }
     addLog('success', `Counted ${countResults.length} keywords`);
 
     // STEP 3: Score all keywords for evergreen + trending
@@ -1649,7 +1724,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
   }
 
   if(!evergreenResults.length&&!trendingResults.length){
-    html+='<div class="error">No niches found. Try again.</div>';
+    html+='<div class="error">⚠️ No niches found.<br>This could be due to YouTube API quota (limit: 10K/day). Check ☰ → Logs for details.</div>';
   }
 
   el.innerHTML=html;
