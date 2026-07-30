@@ -2315,9 +2315,9 @@ async function runDualDiscovery(){
     }
     addLog('success',`Termux server v${health.version} connected ✓`);
 
-    // ════════ STEP 0: FETCH RISING FROM PYTENDS ════════
+    // ════════ STEP 0: FETCH RISING FROM GOOGLE TRENDS ════════
     addLog('info',`Fetching rising keywords for ${savedKW.length} keywords (${country})...`);
-    showProgress(5);setStatus(`Fetching rising keywords from pytrends (${country})...`);
+    showProgress(5);setStatus(`Fetching rising keywords via @alkalisummer/google-trends-js (${country})...`);
     let risingKW;
     try{
       const r=await fetch(server+'/api/rising',{
@@ -2328,10 +2328,11 @@ async function runDualDiscovery(){
       if(!r.ok){const e=await r.json();throw new Error(e.error||'Rising fetch failed');}
       const rd=await r.json();
       risingKW=rd.keywords||[];
+      if(rd.failures)addLog('warn',`Google Trends failed for ${rd.failures.length} keywords`);
       addLog('success',`Rising keywords: ${risingKW.length} found`);
     }catch(e){
-      addLog('error',`Pytrends failed: ${e.message}`);
-      resultsEl.innerHTML=`<div class="error">⚠️ Pytrends error: ${e.message}</div>`;
+      addLog('error',`Google Trends failed: ${e.message}`);
+      resultsEl.innerHTML=`<div class="error">⚠️ Google Trends failed — ${e.message}</div>`;
       if(btn)btn.style.pointerEvents='auto';return;
     }
     if(!risingKW.length){

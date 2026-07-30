@@ -6,6 +6,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@alkalisummer/google-trends-js": "^0.3.7",
     "cors": "^2.8.6",
     "express": "^4.21.0"
   }

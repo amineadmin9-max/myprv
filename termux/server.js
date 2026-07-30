@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const GoogleTrendsApi = require('@alkalisummer/google-trends-js').default;
 
 const { expandKeywords } = require('./expand');
 const { countKeywords } = require('./count');
@@ -56,7 +57,7 @@ function readJSONL(file) {
 app.get('/ping', (req, res) => {
   res.json({
     status: 'ok',
-    version: '1.1.0',
+    version: '1.3.0',
     uptime: process.uptime(),
     expand: { running: expandState.running, done: expandState.done, total: expandState.total },
     count: { running: countState.running, done: countState.done, total: countState.total }
@@ -66,7 +67,7 @@ app.get('/ping', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Niche Finder Termux Server',
-    version: '1.1.0',
+    version: '1.3.0',
     endpoints: {
       ping: '/ping',
       related: 'POST /api/related',
@@ -81,15 +82,26 @@ app.get('/', (req, res) => {
   });
 });
 
-/* ─── Google Trends: Direct HTTPS (bypass library) ─── */
+/* ─── Google Trends: @alkalisummer/google-trends-js ─── */
 const https = require('https');
 
-async function fetchTrends(keyword, country) {
-  const reqBody = JSON.stringify({
-    comparisonItem: [{ keyword, geo: country || 'US', time: 'today 1-m' }],
-    category: 0, property: ''
+async function fetchRelatedQueries(keyword, country) {
+  const exploreResult = await GoogleTrendsApi.explore({
+    keyword, geo: country || 'US', time: 'today 1-m'
   });
-  const url = `https://trends.google.com/trends/api/relatedQueries?req=${encodeURIComponent(reqBody)}&hl=en&tz=180`;
+  if (!exploreResult.widgets || exploreResult.widgets.length === 0) {
+    throw new Error('Google blocked request (empty widgets)');
+  }
+  const widget = exploreResult.widgets.find(w => w.id === 'RELATED_QUERIES');
+  if (!widget) {
+    throw new Error('RELATED_QUERIES widget not found in explore response');
+  }
+  const params = new URLSearchParams({
+    hl: 'en-US', tz: '180',
+    req: JSON.stringify(widget.request),
+    token: widget.token,
+  });
+  const url = `https://trends.google.com/trends/api/widgetdata/relatedsearches?${params.toString()}`;
   return new Promise((resolve, reject) => {
     https.get(url, {
       headers: {
@@ -105,32 +117,29 @@ async function fetchTrends(keyword, country) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         const cleaned = data.replace(/^\)\]\}'\s*/, '').trim();
-        if (!cleaned) return reject(new Error('Empty response'));
+        if (!cleaned) return reject(new Error('Empty response from widgetdata'));
         if (cleaned.startsWith('<')) return reject(new Error('Google blocked request (CAPTCHA)'));
-        try { resolve(JSON.parse(cleaned)); }
-        catch (e) { reject(new Error('Invalid JSON: ' + cleaned.slice(0, 80))); }
+        let parsed;
+        try { parsed = JSON.parse(cleaned); }
+        catch (e) { return reject(new Error('Invalid JSON from widgetdata')); }
+        const ranked = parsed.default && parsed.default.rankedList;
+        if (!ranked || ranked.length < 2) return resolve({ top: [], rising: [] });
+        const top = (ranked[0].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
+        const rising = (ranked[1].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
+        resolve({ top, rising });
       });
     }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('Timeout')); });
   });
-}
-
-function parseRelated(json) {
-  const ranked = json.default && json.default.rankedList;
-  if (!ranked || ranked.length < 2) return { top: [], rising: [] };
-  const top = (ranked[0].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
-  const rising = (ranked[1].rankedKeyword || []).map(item => ({ keyword: item.query, value: item.value }));
-  return { top, rising };
 }
 
 app.post('/api/related', async (req, res) => {
   const { keyword, country } = req.body || {};
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   try {
-    const json = await fetchTrends(keyword, country);
-    const out = parseRelated(json);
+    const out = await fetchRelatedQueries(keyword, country);
     res.json(out);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: `Google Trends failed: ${err.message}` });
   }
 });
 
@@ -138,31 +147,34 @@ app.post('/api/rising', async (req, res) => {
   const { keywords, country } = req.body || {};
   if (!keywords || !Array.isArray(keywords) || keywords.length === 0)
     return res.status(400).json({ error: 'keywords array required' });
-  try {
-    const allRising = [];
-    const seen = new Set();
-    for (let i = 0; i < keywords.length; i++) {
-      const kw = keywords[i];
-      if (!kw || kw.length < 2) continue;
-      await new Promise(r => setTimeout(r, 2000)); // delay 2s between keywords
-      try {
-        const json = await fetchTrends(kw, country);
-        const out = parseRelated(json);
-        for (const item of out.rising) {
-          const q = item.keyword || '';
-          if (q && !seen.has(q.toLowerCase())) {
-            seen.add(q.toLowerCase());
-            allRising.push({ keyword: q, parent: kw });
-          }
+  const allRising = [];
+  const seen = new Set();
+  const failures = [];
+  for (let i = 0; i < keywords.length; i++) {
+    const kw = keywords[i];
+    if (!kw || kw.length < 2) continue;
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const out = await fetchRelatedQueries(kw, country);
+      for (const item of out.rising) {
+        const q = item.keyword || '';
+        if (q && !seen.has(q.toLowerCase())) {
+          seen.add(q.toLowerCase());
+          allRising.push({ keyword: q, parent: kw });
         }
-      } catch (e) {
-        console.log(`[rising] Skipped "${kw}": ${e.message}`);
       }
+    } catch (e) {
+      failures.push({ keyword: kw, error: e.message });
+      console.log(`[rising] Failed "${kw}": ${e.message}`);
     }
-    res.json({ keywords: allRising, total: allRising.length });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
+  if (failures.length === keywords.filter(k => k && k.length >= 2).length && allRising.length === 0) {
+    return res.status(502).json({
+      error: 'Google Trends failed for all keywords',
+      failures
+    });
+  }
+  res.json({ keywords: allRising, total: allRising.length, failures: failures.length > 0 ? failures : undefined });
 });
 
 /* ─── Restart: clear data ─── */
@@ -346,7 +358,7 @@ process.on('uncaughtException', (err) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n Niche Finder Server v1.1.0`);
+  console.log(`\n Niche Finder Server v1.3.0`);
   console.log(` ──────────────────────────`);
   console.log(` Running on: http://127.0.0.1:${PORT}`);
   console.log(` Ping:       /ping`);
