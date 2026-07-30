@@ -3,6 +3,26 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const GoogleTrendsApi = require('@alkalisummer/google-trends-js').default;
+const { SocksProxyAgent } = require('socks-proxy-agent');
+
+// ─── Tor SOCKS5 proxy for Google Trends ───
+const https = require('https');
+const net = require('net');
+const TOR_PORT = 9050;
+let torEnabled = false;
+(function tryTor() {
+  const sock = net.createConnection(TOR_PORT, '127.0.0.1', () => {
+    sock.end();
+    https.globalAgent = new SocksProxyAgent('socks5://127.0.0.1:' + TOR_PORT);
+    torEnabled = true;
+    console.log(`[tor] SOCKS5 proxy on 127.0.0.1:${TOR_PORT} → Google Trends via Tor`);
+  });
+  sock.on('error', () => {
+    console.log('[tor] Not detected — Google Trends requests direct');
+  });
+  sock.setTimeout(1000, () => { sock.destroy(); });
+})();
+// ──────────────────────────────────────────
 
 const { expandKeywords } = require('./expand');
 const { countKeywords } = require('./count');
@@ -57,8 +77,9 @@ function readJSONL(file) {
 app.get('/ping', (req, res) => {
   res.json({
     status: 'ok',
-    version: '1.3.0',
+    version: '1.4.0',
     uptime: process.uptime(),
+    tor: torEnabled,
     expand: { running: expandState.running, done: expandState.done, total: expandState.total },
     count: { running: countState.running, done: countState.done, total: countState.total }
   });
@@ -67,7 +88,7 @@ app.get('/ping', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Niche Finder Termux Server',
-    version: '1.3.0',
+    version: '1.4.0',
     endpoints: {
       ping: '/ping',
       related: 'POST /api/related',
@@ -83,8 +104,6 @@ app.get('/', (req, res) => {
 });
 
 /* ─── Google Trends: @alkalisummer/google-trends-js ─── */
-const https = require('https');
-
 async function fetchRelatedQueries(keyword, country) {
   const exploreResult = await GoogleTrendsApi.explore({
     keyword, geo: country || 'US', time: 'today 1-m'
