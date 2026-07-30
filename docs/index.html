@@ -1512,7 +1512,8 @@ async function runDualDiscovery(){
 
     // STEP 3: Score all keywords for evergreen + trending
     showProgress(92); setStatus('Scoring keywords...');
-    const valid = countResults.filter(c => c.keyword && !c.error && c.totalResults > 0);
+    addLog('info', `Count results: ${countResults.length} total, ${countResults.filter(c => !c.error).length} OK, ${countResults.filter(c => c.error).length} errors`);
+    const valid = countResults.filter(c => c.keyword && !c.error);
 
     function computeCommonScore(vc, avgViews, avgLikes, avgComments, avgVideoAge) {
       const avgL = avgLikes || 0;
@@ -1522,7 +1523,8 @@ async function runDualDiscovery(){
       const promoLinks = 0;
 
       let color = 'yellow', label = '🟡 No data';
-      if (vc < 5000 && highEng && promoLinks <= 3) { color = 'green'; label = '🟢 فرصة نظيفة'; }
+      if (vc === 0) { color = 'gray'; label = '⚫ No videos found'; }
+      else if (vc < 5000 && highEng && promoLinks <= 3) { color = 'green'; label = '🟢 فرصة نظيفة'; }
       else if (vc <= 25000 && highEng && promoLinks <= 3) { color = 'skyblue'; label = '🔵 سوق مفتوح'; }
       else if (vc <= 25000 && promoLinks <= 8) { color = 'yellow'; label = '🟡 سوق نامي'; }
       else if (vc > 25000 && promoLinks <= 8) { color = 'orange'; label = '🟠 سوق كبير – منافسة متوسطة'; }
@@ -1555,8 +1557,12 @@ async function runDualDiscovery(){
     });
 
     const ageCutoff = 90;
-    const evergreens = scoredItems.filter(r => r.avgVideoAge !== null && r.avgVideoAge > ageCutoff);
-    const trendings = scoredItems.filter(r => r.avgVideoAge === null || r.avgVideoAge <= ageCutoff);
+    const evergreens = scoredItems.filter(r => r.avgVideoAge != null && r.avgVideoAge > ageCutoff);
+    const trendings = scoredItems.filter(r => r.avgVideoAge == null || r.avgVideoAge <= ageCutoff);
+
+    if (!evergreens.length && !trendings.length) {
+      addLog('error', 'All keywords have avgVideoAge=undefined (old data). Clear with Restart and re-run.');
+    }
 
     stats.evergreenRaw = evergreens.length;
     stats.evergreenFiltered = evergreens.length;
