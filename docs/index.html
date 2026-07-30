@@ -1514,75 +1514,60 @@ async function runDualDiscovery(){
     showProgress(92); setStatus('Scoring keywords...');
     const valid = countResults.filter(c => c.keyword && !c.error && c.totalResults > 0);
 
-    const scoredItems = valid.map(c => {
-      const avgViews = c.avgViews || 0;
-      const avgLikes = c.avgLikes || 0;
-      const avgComments = c.avgComments || 0;
-      const engRate = avgViews > 0 ? Math.round((avgLikes + avgComments) / avgViews * 100) : 0;
+    function computeCommonScore(vc, avgViews, avgLikes, avgComments, avgVideoAge) {
+      const avgL = avgLikes || 0;
+      const avgC = avgComments || 0;
+      const engRate = avgViews > 0 ? Math.round((avgL + avgC) / avgViews * 100) : 0;
       const highEng = engRate > 5;
-      const vc = c.totalResults || 0;
-      const rec7 = c.recent7dCount || 0;
-      const avgAge = c.avgVideoAge;
+      const promoLinks = 0;
 
-      function fmtAge(a) {
-        if (a === null || a === undefined) return 'N/A';
-        if (a < 1) return 'today';
-        if (a === 1) return '1 day ago';
-        return a + ' days ago';
-      }
+      let color = 'yellow', label = '🟡 No data';
+      if (vc < 5000 && highEng && promoLinks <= 3) { color = 'green'; label = '🟢 فرصة نظيفة'; }
+      else if (vc <= 25000 && highEng && promoLinks <= 3) { color = 'skyblue'; label = '🔵 سوق مفتوح'; }
+      else if (vc <= 25000 && promoLinks <= 8) { color = 'yellow'; label = '🟡 سوق نامي'; }
+      else if (vc > 25000 && promoLinks <= 8) { color = 'orange'; label = '🟠 سوق كبير – منافسة متوسطة'; }
+      else if (vc > 25000 && promoLinks > 8) { color = 'red'; label = '🔴 مشبع'; }
+      else if (vc <= 25000 && promoLinks > 8) { color = 'purple'; label = '🟣 مشبع – روابط كثيرة مع حجم أقل'; }
 
-      const colorMap = [
-        { test: () => vc < 5000 && highEng, c: 'green', l: '🟢 فرصة نظيفة' },
-        { test: () => vc <= 25000 && highEng, c: 'skyblue', l: '🔵 سوق مفتوح' },
-        { test: () => vc <= 25000, c: 'yellow', l: '🟡 سوق نامي' },
-        { test: () => vc > 25000, c: 'orange', l: '🟠 سوق كبير – منافسة متوسطة' },
-      ];
-      function pickColor() {
-        for (const entry of colorMap) { if (entry.test()) return { color: entry.c, label: entry.l }; }
-        return { color: 'yellow', label: '🟡 No data' };
-      }
+      let score = 0;
+      if (highEng) score += 30; else if (engRate > 3) score += 20; else if (engRate > 1) score += 10;
+      if (vc < 5000) score += 25; else if (vc < 25000) score += 15; else if (vc < 100000) score += 5;
+      score += Math.min(20, engRate);
+      if (promoLinks <= 3) score += 15; else if (promoLinks <= 8) score += 8;
+      score = Math.min(100, score);
 
-      const eColor = pickColor();
-      const tColor = pickColor();
+      return { score, color, label, videoCount: vc, avgViews };
+    }
 
-      let eScore = 0;
-      if (highEng) eScore += 30; else if (engRate > 3) eScore += 20; else if (engRate > 1) eScore += 10;
-      if (vc < 5000) eScore += 30;
-      else if (vc < 25000) eScore += 20;
-      else if (vc < 100000) eScore += 10;
-      else eScore += 5;
-      if (avgAge !== null && avgAge > 90) eScore += 10;
-      eScore = Math.min(100, eScore);
-
-      let tScore = 0;
-      if (highEng) tScore += 20; else if (engRate > 3) tScore += 10;
-      if (vc >= 50000) tScore += 15;
-      else if (vc >= 10000) tScore += 10;
-      if (rec7 > 5) tScore += 30;
-      else if (rec7 > 2) tScore += 20;
-      else if (rec7 > 0) tScore += 10;
-      if (avgAge !== null && avgAge < 30) tScore += 15;
-      else if (avgAge !== null && avgAge < 90) tScore += 8;
-      tScore = Math.min(100, tScore);
-
+    const scoredItems = valid.map(c => {
+      const scoring = computeCommonScore(
+        c.totalResults || 0,
+        c.avgViews || 0,
+        c.avgLikes || 0,
+        c.avgComments || 0,
+        c.avgVideoAge
+      );
       return {
-        keyword: c.keyword, totalResults: vc, avgViews,
-        avgVideoAge: avgAge,
-        eScoring: { score: eScore, color: eColor.color, label: eColor.l, videoCount: vc, avgViews },
-        tScoring: { score: tScore, color: tColor.color, label: tColor.l, videoCount: vc, avgViews },
+        keyword: c.keyword, totalResults: c.totalResults || 0,
+        avgViews: c.avgViews || 0, avgVideoAge: c.avgVideoAge,
+        scoring
       };
     });
 
-    stats.evergreenRaw = scoredItems.length;
-    stats.evergreenFiltered = scoredItems.length;
-    stats.trendingRaw = scoredItems.length;
-    stats.trendingFiltered = scoredItems.length;
+    const ageCutoff = 90;
+    const evergreens = scoredItems.filter(r => r.avgVideoAge !== null && r.avgVideoAge > ageCutoff);
+    const trendings = scoredItems.filter(r => r.avgVideoAge === null || r.avgVideoAge <= ageCutoff);
 
-    const byEvergreen = [...scoredItems].sort((a, b) => b.eScoring.score - a.eScoring.score).slice(0, 100);
-    const byTrending = [...scoredItems].sort((a, b) => b.tScoring.score - a.tScoring.score).slice(0, 100);
+    stats.evergreenRaw = evergreens.length;
+    stats.evergreenFiltered = evergreens.length;
+    stats.trendingRaw = trendings.length;
+    stats.trendingFiltered = trendings.length;
 
-    const evergreenResults = byEvergreen.map(r => ({ keyword: r.keyword, scoring: r.eScoring, totalResults: r.totalResults, avgVideoAge: r.avgVideoAge, nicheType: { type: 'evergreen', label: 'Evergreen', color: '#10b981' } }));
-    const trendingResults = byTrending.map(r => ({ keyword: r.keyword, scoring: r.tScoring, totalResults: r.totalResults, avgVideoAge: r.avgVideoAge, nicheType: { type: 'trending', label: 'Trending', color: '#8b5cf6' } }));
+    const byEvergreen = evergreens.sort((a, b) => b.scoring.score - a.scoring.score).slice(0, 100);
+    const byTrending = trendings.sort((a, b) => b.scoring.score - a.scoring.score).slice(0, 100);
+
+    const evergreenResults = byEvergreen.map(r => ({ keyword: r.keyword, scoring: r.scoring, totalResults: r.totalResults, avgVideoAge: r.avgVideoAge, nicheType: { type: 'evergreen', label: 'Evergreen', color: '#10b981' } }));
+    const trendingResults = byTrending.map(r => ({ keyword: r.keyword, scoring: r.scoring, totalResults: r.totalResults, avgVideoAge: r.avgVideoAge, nicheType: { type: 'trending', label: 'Trending', color: '#8b5cf6' } }));
 
     showProgress(100); setStatus(`Done: ${evergreenResults.length} evergreen + ${trendingResults.length} trending`);
     addLog('success', `=== Complete: ${evergreenResults.length} evergreen + ${trendingResults.length} trending ===`);
@@ -1612,28 +1597,20 @@ function renderDualResults(evergreenResults,trendingResults,stats){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px">
         <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenRaw}</div>
-        <div style="color:var(--text-dim);font-size:11px">Evergreen — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: low competition + sustained demand</div>
-      </div>
-      <div style="text-align:center;padding:10px 6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px">
-        <div style="color:var(--green);font-weight:800;font-size:20px">${stats.evergreenFiltered}</div>
-        <div style="color:var(--text-dim);font-size:11px">Evergreen — after filtering</div>
+        <div style="color:var(--text-dim);font-size:11px">Evergreen — avg age &gt; 90 days</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">ثابت – طلب مستمر</div>
       </div>
       <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:10px">
         <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingRaw}</div>
-        <div style="color:var(--text-dim);font-size:11px">Trending — before filtering</div>
-        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">Score: high recent activity + engagement</div>
-      </div>
-      <div style="text-align:center;padding:10px 6px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:10px">
-        <div style="color:#8b5cf6;font-weight:800;font-size:20px">${stats.trendingFiltered}</div>
-        <div style="color:var(--text-dim);font-size:11px">Trending — after filtering</div>
+        <div style="color:var(--text-dim);font-size:11px">Trending — avg age &le; 90 days</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px">حديث – نشاط قريب</div>
       </div>
     </div>
   </div>`;
 
   // ════════ Evergreen Section ════════
   if(evergreenResults.length){
-    html+=`<div class="section-title">🌳 Evergreen Niches <span class="dash">— (3 months)</span></div>`;
+    html+=`<div class="section-title">🌳 Evergreen Niches <span class="dash">— avg age &gt; 90 days</span></div>`;
     for(const r of evergreenResults){
       const c=r.scoring.color;
       const s=r.scoring;
@@ -1650,7 +1627,7 @@ function renderDualResults(evergreenResults,trendingResults,stats){
 
   // ════════ Trending Section ════════
   if(trendingResults.length){
-    html+=`<div class="section-title">🔥 Trending Niches <span class="dash">— (1 week)</span></div>`;
+    html+=`<div class="section-title">🔥 Trending Niches <span class="dash">— avg age &le; 90 days</span></div>`;
     for(const r of trendingResults){
       const c=r.scoring.color;
       const s=r.scoring;
