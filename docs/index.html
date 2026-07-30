@@ -2340,28 +2340,24 @@ async function runDualDiscovery(){
       if(btn)btn.style.pointerEvents='auto';return;
     }
 
-    // ════════ STEP 1: EXPANSION CHECK ════════
+    // ════════ STEP 1: EXPANSION (incremental — each press goes deeper) ════════
     const expState=await checkTermuxExpansion(server);
     let expandedKeywords=[];
-    if(expState.available&&!expState.running&&expState.done>0){
-      addLog('success',`Loading ${expState.done} expanded keywords...`);
-      expandedKeywords=await fetchTermuxKeywords(server);
-      addLog('success',`Loaded ${expandedKeywords.length} keywords`);
-    }else if(expState.running){
+    if(expState.running){
       addLog('info',`Expansion running: ${expState.done}/${expState.total} — waiting...`);
       resultsEl.innerHTML='<div class="loading"><div class="spinner"></div></div>';
       for(let tries=0;tries<120;tries++){
         await delay(5000);
         const s=await checkTermuxExpansion(server);
-        const detail=s.currentKeyword?` · ${s.currentKeyword}${s.phase==='level2'?` (${s.l2Done}/${s.l2Total})`:''}`:'';
-        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
+        const detail=s.phase?` [${s.phase}]`:''+s.currentKeyword?` · ${s.currentKeyword}${s.phase?.startsWith('level')?` (${s.l2Done||0}/${s.l2Total||0})`:''}`:'';
+        showProgress(s.pct);setStatus(`Expanding: ${s.done}/${s.total} items${detail} (${s.pct}%)`);
         if(!s.running)break;
       }
       expandedKeywords=await fetchTermuxKeywords(server);
-      addLog('success',`Loaded ${expandedKeywords.length} keywords after waiting`);
+      addLog('success',`Loaded ${expandedKeywords.length} keywords`);
     }else{
       const risingNames=risingKW.map(k=>k.keyword||k);
-      addLog('info',`Expanding ${risingNames.length} rising keywords...`);
+      addLog('info',`Expanding ${risingNames.length} keywords (deeper level)...`);
       showProgress(10);setStatus('Expanding keywords via YouTube Suggest...');
       const ok=await startTermuxExpansion(server,risingNames);
       if(!ok)throw new Error('Failed to start expansion');
@@ -2372,10 +2368,13 @@ async function runDualDiscovery(){
         await delay(5000);
         const s=await checkTermuxExpansion(server);
         if(s.error){resultsEl.innerHTML=`<div class="error">${s.error}</div>`;break;}
-        const detail=s.currentKeyword?` · ${s.currentKeyword}${s.phase==='level2'?` (${s.l2Done}/${s.l2Total})`:''}`:'';
-        showProgress(10+s.pct*0.3);setStatus(`Expanding: ${s.done}/${s.total} keywords${detail} (${s.pct}%)`);
+        const detail=s.phase?` [${s.phase}]`:''+(s.currentKeyword?` · ${s.currentKeyword}${s.phase?.startsWith('level')?` (${s.l2Done||0}/${s.l2Total||0})`:''}`:'');
+        showProgress(10+(s.total>0?Math.min(s.done/s.total*20:0,20):0));
+        let label=`Expanding: ${s.done}/${s.total} items${detail}`;
+        if(s.sub) label+=` — ${s.sub}`;
+        setStatus(label);
         if(!s.running){
-          if(s.done>0){
+          if(s.done>0||expState.available){
             expandedKeywords=await fetchTermuxKeywords(server);
             addLog('success',`Expansion complete: ${expandedKeywords.length} keywords`);
             break;

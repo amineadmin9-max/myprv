@@ -220,11 +220,9 @@ app.post('/api/expand', (req, res) => {
     return res.status(409).json({ error: 'Expansion already running', state: expandState });
   }
 
-  fs.writeFileSync(EXPANDED_FILE, '');
-
   expandState = {
     running: true,
-    total: keywords.length,
+    total: 0,
     done: 0,
     failed: 0,
     startedAt: Date.now(),
@@ -377,7 +375,7 @@ process.on('uncaughtException', (err) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n Niche Finder Server v1.3.0`);
+  console.log(`\n Niche Finder Server v1.4.0`);
   console.log(` ──────────────────────────`);
   console.log(` Running on: http://127.0.0.1:${PORT}`);
   console.log(` Ping:       /ping`);
