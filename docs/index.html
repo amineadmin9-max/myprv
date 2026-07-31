@@ -1308,6 +1308,32 @@ function computeYouTubeScoring(videos,totalResults){
   return{score,color,label,videoCount:vc,avgViews};
 }
 
+function computeCommonScore(vc, avgViews, avgLikes, avgComments, avgVideoAge) {
+  const avgL = avgLikes || 0;
+  const avgC = avgComments || 0;
+  const engRate = avgViews > 0 ? Math.round((avgL + avgC) / avgViews * 100) : 0;
+  const highEng = engRate > 5;
+  const promoLinks = 0;
+
+  let color = 'yellow', label = '🟡 No data';
+  if (vc === 0) { color = 'gray'; label = '⚫ No videos found'; }
+  else if (vc < 5000 && highEng && promoLinks <= 3) { color = 'green'; label = '🟢 فرصة نظيفة'; }
+  else if (vc <= 25000 && highEng && promoLinks <= 3) { color = 'skyblue'; label = '🔵 سوق مفتوح'; }
+  else if (vc <= 25000 && promoLinks <= 8) { color = 'yellow'; label = '🟡 سوق نامي'; }
+  else if (vc > 25000 && promoLinks <= 8) { color = 'orange'; label = '🟠 سوق كبير – منافسة متوسطة'; }
+  else if (vc > 25000 && promoLinks > 8) { color = 'red'; label = '🔴 مشبع'; }
+  else if (vc <= 25000 && promoLinks > 8) { color = 'purple'; label = '🟣 مشبع – روابط كثيرة مع حجم أقل'; }
+
+  let score = 0;
+  if (highEng) score += 30; else if (engRate > 3) score += 20; else if (engRate > 1) score += 10;
+  if (vc < 5000) score += 25; else if (vc < 25000) score += 15; else if (vc < 100000) score += 5;
+  score += Math.min(20, engRate);
+  if (promoLinks <= 3) score += 15; else if (promoLinks <= 8) score += 8;
+  score = Math.min(100, score);
+
+  return { score, color, label, videoCount: vc, avgViews };
+}
+
 function computeEvergreenScoring(videos,totalResults,recent7dCount){
   if(!videos||!videos.length)return{score:0,color:'yellow',label:'🟡 No data',videoCount:totalResults||0,avgViews:0};
   const vc=totalResults||videos.length;
@@ -1598,32 +1624,6 @@ async function runDualDiscovery(){
       resultsEl.innerHTML = `<div class="error">${msg}</div>`;
       addLog(isQuota ? 'error' : 'error', isQuota ? 'Quota exceeded' : 'All searches failed');
       if (btn) btn.style.pointerEvents = 'auto'; hideProgress(); return;
-    }
-
-    function computeCommonScore(vc, avgViews, avgLikes, avgComments, avgVideoAge) {
-      const avgL = avgLikes || 0;
-      const avgC = avgComments || 0;
-      const engRate = avgViews > 0 ? Math.round((avgL + avgC) / avgViews * 100) : 0;
-      const highEng = engRate > 5;
-      const promoLinks = 0;
-
-      let color = 'yellow', label = '🟡 No data';
-      if (vc === 0) { color = 'gray'; label = '⚫ No videos found'; }
-      else if (vc < 5000 && highEng && promoLinks <= 3) { color = 'green'; label = '🟢 فرصة نظيفة'; }
-      else if (vc <= 25000 && highEng && promoLinks <= 3) { color = 'skyblue'; label = '🔵 سوق مفتوح'; }
-      else if (vc <= 25000 && promoLinks <= 8) { color = 'yellow'; label = '🟡 سوق نامي'; }
-      else if (vc > 25000 && promoLinks <= 8) { color = 'orange'; label = '🟠 سوق كبير – منافسة متوسطة'; }
-      else if (vc > 25000 && promoLinks > 8) { color = 'red'; label = '🔴 مشبع'; }
-      else if (vc <= 25000 && promoLinks > 8) { color = 'purple'; label = '🟣 مشبع – روابط كثيرة مع حجم أقل'; }
-
-      let score = 0;
-      if (highEng) score += 30; else if (engRate > 3) score += 20; else if (engRate > 1) score += 10;
-      if (vc < 5000) score += 25; else if (vc < 25000) score += 15; else if (vc < 100000) score += 5;
-      score += Math.min(20, engRate);
-      if (promoLinks <= 3) score += 15; else if (promoLinks <= 8) score += 8;
-      score = Math.min(100, score);
-
-      return { score, color, label, videoCount: vc, avgViews };
     }
 
     const scoredItems = valid.map(c => {
