@@ -60,6 +60,21 @@
     "flair": ""
   },
   {
+    "title": "Built a small Outlook tool to rotate recurring meeting times so the same global teammates don’t always get stuck with the late-night slot",
+    "author": "mjfusa",
+    "url": "https://www.reddit.com/r/remotework/comments/1x72rvv/built_a_small_outlook_tool_to_rotate_recurring/",
+    "content": "Throughout my career, I worked on several geographically dispersed teams spread across multiple continents. A recurring pattern I ran into was that regular team syncs almost always favored one primary office or time zone. As a result, the exact same folks in APAC or EMEA ended up taking calls at 6 AM or 11 PM week after week. Microsoft’s workplace research highlights that after-hours meetings have steadily climbed, and meeting fatigue is a massive drain on team morale when the inconvenience fall",
+    "updated": "2026-10-16T00:58:46+00:00",
+    "subreddit": "RemoteWork",
+    "score": 0,
+    "numComments": 0,
+    "isSelf": true,
+    "domain": "self.RemoteWork",
+    "selftext": "Throughout my career, I worked on several geographically dispersed teams spread across multiple continents. A recurring pattern I ran into was that regular team syncs almost always favored one primary office or time zone. As a result, the exact same folks in APAC or EMEA ended up taking calls at 6 AM or 11 PM week after week. Microsoft’s workplace research highlights that after-hours meetings have steadily climbed, and meeting fatigue is a massive drain on team morale when the inconvenience fall",
+    "permalink": "https://www.reddit.com/r/remotework/comments/1x72rvv/built_a_small_outlook_tool_to_rotate_recurring/",
+    "flair": ""
+  },
+  {
     "title": "I could use some encouragement and advice about my remote work career",
     "author": "Efficient_Object6951",
     "url": "https://www.reddit.com/r/remotework/comments/1x724o3/i_could_use_some_encouragement_and_advice_about/",
@@ -72,21 +87,6 @@
     "domain": "self.RemoteWork",
     "selftext": "(Long post; TL;DR) Hi everyone! I&#39;m a 29-year-old woman living in Mexico, and I&#39;ll be turning 30 in about two months. I&#39;d really appreciate your advice, especially from people who have been in a similar situation. Since graduating from university, approximately 90% of my work experience has been remote, either as a freelancer or an independent contractor. Over the past two years, I&#39;ve been going through a very difficult period in my personal life. I moved out of my parents&#39; h",
     "permalink": "https://www.reddit.com/r/remotework/comments/1x724o3/i_could_use_some_encouragement_and_advice_about/",
-    "flair": ""
-  },
-  {
-    "title": "I kept forgetting to stop Hubstaff, so I built a free, open-source app to see what it captures",
-    "author": "Think_Strength5196",
-    "url": "https://www.reddit.com/r/remotework/comments/1x7dqwc/i_kept_forgetting_to_stop_hubstaff_so_i_built_a/",
-    "content": "Hey everyone! I use Hubstaff for work, and I&#39;ve had two recurring problems with it. The first one is forgetting to stop the timer. I&#39;ve done this quite a few times, and Hubstaff could accidentally capture something personal, like private conversations, YouTube videos, or games. One time, Hubstaff actually captured an entire CS2 match I was playing. Luckily, I noticed afterward that the timer was still running and deleted the extra tracked time. Hubstaff already has a screenshot history, ",
-    "updated": "2026-10-16T11:31:03+00:00",
-    "subreddit": "RemoteWork",
-    "score": 0,
-    "numComments": 0,
-    "isSelf": true,
-    "domain": "self.RemoteWork",
-    "selftext": "Hey everyone! I use Hubstaff for work, and I&#39;ve had two recurring problems with it. The first one is forgetting to stop the timer. I&#39;ve done this quite a few times, and Hubstaff could accidentally capture something personal, like private conversations, YouTube videos, or games. One time, Hubstaff actually captured an entire CS2 match I was playing. Luckily, I noticed afterward that the timer was still running and deleted the extra tracked time. Hubstaff already has a screenshot history, ",
-    "permalink": "https://www.reddit.com/r/remotework/comments/1x7dqwc/i_kept_forgetting_to_stop_hubstaff_so_i_built_a/",
     "flair": ""
   },
   {
@@ -105,18 +105,18 @@
     "flair": ""
   },
   {
-    "title": "Built a small Outlook tool to rotate recurring meeting times so the same global teammates don’t always get stuck with the late-night slot",
-    "author": "mjfusa",
-    "url": "https://www.reddit.com/r/remotework/comments/1x72rvv/built_a_small_outlook_tool_to_rotate_recurring/",
-    "content": "Throughout my career, I worked on several geographically dispersed teams spread across multiple continents. A recurring pattern I ran into was that regular team syncs almost always favored one primary office or time zone. As a result, the exact same folks in APAC or EMEA ended up taking calls at 6 AM or 11 PM week after week. Microsoft’s workplace research highlights that after-hours meetings have steadily climbed, and meeting fatigue is a massive drain on team morale when the inconvenience fall",
-    "updated": "2026-10-16T00:58:46+00:00",
+    "title": "I kept forgetting to stop Hubstaff, so I built a free, open-source app to see what it captures",
+    "author": "Think_Strength5196",
+    "url": "https://www.reddit.com/r/remotework/comments/1x7dqwc/i_kept_forgetting_to_stop_hubstaff_so_i_built_a/",
+    "content": "Hey everyone! I use Hubstaff for work, and I&#39;ve had two recurring problems with it. The first one is forgetting to stop the timer. I&#39;ve done this quite a few times, and Hubstaff could accidentally capture something personal, like private conversations, YouTube videos, or games. One time, Hubstaff actually captured an entire CS2 match I was playing. Luckily, I noticed afterward that the timer was still running and deleted the extra tracked time. Hubstaff already has a screenshot history, ",
+    "updated": "2026-10-16T11:31:03+00:00",
     "subreddit": "RemoteWork",
     "score": 0,
     "numComments": 0,
     "isSelf": true,
     "domain": "self.RemoteWork",
-    "selftext": "Throughout my career, I worked on several geographically dispersed teams spread across multiple continents. A recurring pattern I ran into was that regular team syncs almost always favored one primary office or time zone. As a result, the exact same folks in APAC or EMEA ended up taking calls at 6 AM or 11 PM week after week. Microsoft’s workplace research highlights that after-hours meetings have steadily climbed, and meeting fatigue is a massive drain on team morale when the inconvenience fall",
-    "permalink": "https://www.reddit.com/r/remotework/comments/1x72rvv/built_a_small_outlook_tool_to_rotate_recurring/",
+    "selftext": "Hey everyone! I use Hubstaff for work, and I&#39;ve had two recurring problems with it. The first one is forgetting to stop the timer. I&#39;ve done this quite a few times, and Hubstaff could accidentally capture something personal, like private conversations, YouTube videos, or games. One time, Hubstaff actually captured an entire CS2 match I was playing. Luckily, I noticed afterward that the timer was still running and deleted the extra tracked time. Hubstaff already has a screenshot history, ",
+    "permalink": "https://www.reddit.com/r/remotework/comments/1x7dqwc/i_kept_forgetting_to_stop_hubstaff_so_i_built_a/",
     "flair": ""
   },
   {
